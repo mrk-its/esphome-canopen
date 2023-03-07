@@ -91,18 +91,3 @@ cover:
     close_duration: 10s
     stop_action:
       - logger.log: stop_action
-
-  - platform: time_based
-    name: "Cover 2"
-    id: cover2
-    internal: true
-    device_class: shutter
-    has_built_in_endstop: true
-    open_action:
-      - logger.log: open_action
-    open_duration: 10s
-    close_action:
-      - logger.log: close_action
-    close_duration: 10s
-    stop_action:
-      - logger.log: stop_action
