@@ -109,3 +109,7 @@ The [can2mqtt](https://github.com/mrk-its/can2mqtt) project provides can2mqtt br
         - logger.log: stop_action
 
   ```
+
+# Support
+
+* [Discord Server](https://discord.gg/f5UTFFnp)
