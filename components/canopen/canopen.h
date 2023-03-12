@@ -48,6 +48,7 @@ namespace esphome {
       uint32_t entity_id;
       struct timeval last_time;
       uint32_t update_interval;
+      twai_status_info_t last_status;
     };
 
     class CanopenComponent : public Component {

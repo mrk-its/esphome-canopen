@@ -403,31 +403,16 @@ namespace esphome {
         gettimeofday(&tv_now, NULL);
         if(abs(tv_now.tv_sec - status.value().last_time.tv_sec) >= status.value().update_interval) {
             twai_status_info_t status_info;
-            if(twai_get_status_info(&status_info) == ESP_OK) {
-                ESP_LOGI(
+            if(twai_get_status_info(&status_info) == ESP_OK && memcmp(&status.value().last_status, &status_info, sizeof(status_info))) {
+                ESP_LOGD(
                     TAG,
-                    "status_info:\n"
-                    "  state: %d\n  msgs_to_tx: %d\n  msgs_to_rx: %d\n"
-                    "  tx_error_counter: %d\n  rx_error_counter: %d\n"
-                    "  tx_failed_count: %d\n  rx_missed_count: %d\n"
-                    "  arb_lost_count: %d\n  bus_error_count: %d",
+                    "status state: %d tx: %d rx: %d tx_err: %d rx_err: %d tx_failed: %d rx_miss: %d arb_lost: %d bus_err: %d",
                     status_info.state, status_info.msgs_to_tx, status_info.msgs_to_rx,
                     status_info.tx_error_counter, status_info.rx_error_counter,
                     status_info.tx_failed_count, status_info.rx_missed_count,
                     status_info.arb_lost_count, status_info.bus_error_count
                 );
-                can_send_status_counters(
-                    status.value().entity_id, 0,
-                    status_info.tx_error_counter, status_info.rx_error_counter
-                );
-                can_send_status_counters(
-                    status.value().entity_id, 1,
-                    status_info.tx_failed_count, status_info.rx_missed_count
-                );
-                can_send_status_counters(
-                    status.value().entity_id, 2,
-                    status_info.arb_lost_count, status_info.bus_error_count
-                );
+                status.value().last_status = status_info;
             }
             status.value().last_time = tv_now;
         }
