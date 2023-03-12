@@ -2,3 +2,10 @@
 __pycache__/
 *.py[cod]
 
+config/can-node-*
+config/common.yaml
+config/wifi.yaml
+config/.*
+
+.vscode
+
