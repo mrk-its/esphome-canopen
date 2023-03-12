@@ -3,7 +3,8 @@ esphome:
   name: can-node-1
 
 external_components:
-  - source: github://mrk-its/esphome-canopen
+  - source: ../components
+  #- source: github://mrk-its/esphome-canopen
 
 # Enable logging
 logger:
@@ -48,9 +49,6 @@ canopen:
       tpdo: 0
     - id: cover1
       index: 4
-      tpdo: 1
-    - id: cover2
-      index: 5
       tpdo: 1
 
 sensor:
