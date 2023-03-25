@@ -111,5 +111,6 @@ The [can2mqtt](https://github.com/mrk-its/can2mqtt) project provides can2mqtt br
   ```
 
 # Support
+## Community
 
-* [Discord Server](https://discord.gg/f5UTFFnp)
+* [Discord Server](https://discord.gg/VXjUSnUWsd)
