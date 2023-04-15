@@ -279,9 +279,12 @@ namespace esphome {
     #ifdef USE_LIGHT
     void CanopenComponent::add_entity(esphome::light::LightState* light, uint32_t entity_id, int8_t tpdo) {
       bool state = bool(light->remote_values.get_state());
+      uint8_t brightness = (uint8_t)(light->remote_values.get_brightness() * 255);
       // auto state = switch_->get_initial_state_with_restore_mode().value_or(false);
       auto state_key = allocate_state_entry(1, &state, 1, tpdo); // allocate new bool
+      auto brightness_key = allocate_state_entry(5, &brightness, 1, tpdo); // allocate new uint8
       auto cmd_key = allocate_cmd_entry(1, 1); // allocate new bool with default=0
+      auto brightness_cmd_key = allocate_cmd_entry(5, 1); // allocate new uint8 with default=0
 
       od_add_metadata(
          entity_id,
@@ -289,17 +292,24 @@ namespace esphome {
          light->get_name(), "", "", ""
       );
       od_add_state(entity_id, state_key, &state, 1, tpdo);
+      od_add_state(entity_id, brightness_key, &brightness, 1, tpdo);
       light->add_new_remote_values_callback([=]() {
         bool value = bool(light->remote_values.get_state());
+        uint8_t brightness = (uint8_t)(light->remote_values.get_brightness() * 255);
         od_set_state(state_key, &value, 1);
+        od_set_state(brightness_key, &brightness, 1);
       });
       od_add_cmd(entity_id, cmd_key, [=](void *buffer, uint32_t size) {
-          ESP_LOGI(TAG, "switching to %d", ((uint8_t *)buffer)[0]);
+          ESP_LOGI(TAG, "setting state to:", ((uint8_t *)buffer)[0]);
           if(((uint8_t *)buffer)[0]) {
               light->turn_on().perform();
           } else {
               light->turn_off().perform();
           }
+      });
+      od_add_cmd(entity_id, brightness_cmd_key, [=](void *buffer, uint32_t size) {
+          ESP_LOGI(TAG, "setting brightness to %d", ((uint8_t *)buffer)[0]);
+          light->turn_on().set_brightness_if_supported(float(((uint8_t *)buffer)[0]) / 255.0).perform();
       });
     }
     #endif
