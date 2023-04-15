@@ -16,6 +16,7 @@ const int8_t ENTITY_TYPE_SENSOR = 1;
 const int8_t ENTITY_TYPE_BINARY_SENSOR = 2;
 const int8_t ENTITY_TYPE_SWITCH = 3;
 const int8_t ENTITY_TYPE_COVER = 4;
+const int8_t ENTITY_TYPE_LIGHT = 5;
 const uint8_t ENTITY_TYPE_CAN_STATUS = 254;
 
 const uint8_t ENTITY_INDEX_TYPE = 1;
@@ -81,6 +82,10 @@ namespace esphome {
 
       #ifdef LOG_SWITCH
       void add_entity(esphome::switch_::Switch* switch_, uint32_t entity_id, int8_t tpdo);
+      #endif
+
+      #ifdef USE_LIGHT
+      void add_entity(esphome::light::LightState* light, uint32_t entity_id, int8_t tpdo);
       #endif
 
       #ifdef LOG_COVER

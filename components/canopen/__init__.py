@@ -12,7 +12,7 @@ CanopenComponent = ns.class_(
 
 CONF_ENTITIES = "entities"
 
-DEPENDENCIES = ["switch", "cover", "sensor", "binary_sensor", "ota"]
+DEPENDENCIES = ["ota"]
 
 ENTITY_SCHEMA = cv.Schema({
     cv.Required("id"): cv.use_id(cg.EntityBase),
