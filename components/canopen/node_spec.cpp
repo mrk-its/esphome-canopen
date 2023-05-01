@@ -78,6 +78,16 @@ static struct CO_OBJ_T ClockOD[APP_OBJ_N] = {
     {CO_KEY(0x1200, 1, CO_OBJ__N__R_), CO_TUNSIGNED32, (CO_DATA)(&Obj1200_01_20)},
     {CO_KEY(0x1200, 2, CO_OBJ__N__R_), CO_TUNSIGNED32, (CO_DATA)(&Obj1200_02_20)},
 
+    {CO_KEY(0x1400, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
+    {CO_KEY(0x1401, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
+    {CO_KEY(0x1402, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
+    {CO_KEY(0x1403, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
+
+    {CO_KEY(0x1600, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
+    {CO_KEY(0x1601, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
+    {CO_KEY(0x1602, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
+    {CO_KEY(0x1603, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
+
     {CO_KEY(0x1800, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
     {CO_KEY(0x1801, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
     {CO_KEY(0x1802, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },

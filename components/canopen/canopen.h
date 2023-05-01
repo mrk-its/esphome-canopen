@@ -56,6 +56,7 @@ namespace esphome {
       CO_NODE node;
       optional<Status> status;
       bool initialized;
+      void rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t size);
 
       public:
       std::map<uint32_t, std::function< void(void *, uint32_t)>> can_cmd_handlers;
@@ -70,6 +71,9 @@ namespace esphome {
       }
 
       void setup();
+      void add_rpdo_dummy(uint8_t idx, uint8_t size);
+      void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
+      void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd);
 
       // void add_status(uint32_t entity_id, uint32_t update_interval);
       #ifdef LOG_SENSOR

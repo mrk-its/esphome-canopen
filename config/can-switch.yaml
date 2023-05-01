@@ -1,0 +1,68 @@
+
+esphome:
+  name: can-switch
+
+external_components:
+  - source: ../components
+  # - source: github://mrk-its/esphome-canopen
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  password: ""
+  reboot_timeout: 0s
+
+ota:
+  password: ""
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+wifi:
+  <<: !include {file: wifi.yaml}
+
+canbus:
+  - platform: esp32_can
+    id: can_bus
+    rx_pin: GPIO22
+    tx_pin: GPIO23
+    can_id: 0
+    bit_rate: 125kbps
+
+canopen:
+  id: can_gate
+  canbus_id: can_bus
+  node_id: 2
+  entities:
+    - id: light_switch
+      index: 1
+      tpdo: 0
+      rpdo:
+        node_id: 1
+        tpdo: 1
+        offset: 2
+
+binary_sensor:
+  - platform: gpio
+    name: "Button"
+    id: button
+    internal: true
+    on_click:
+      min_length: 50ms
+      max_length: 350ms
+      then:
+        - switch.toggle: light_switch
+    pin:
+      number: GPIO0
+      inverted: true
+
+switch:
+  - platform: gpio
+    name: "Light Switch"
+    id: light_switch
+    internal: true
+    pin: GPIO2

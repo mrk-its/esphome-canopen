@@ -217,6 +217,67 @@ namespace esphome {
       return key;
     }
 
+    void CanopenComponent::rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t size) {
+      uint8_t sub_index = 0;
+      auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1600 + idx, 0));
+      if(obj) sub_index = obj -> Data;
+      sub_index += 1;
+      ODAddUpdate(
+        NodeSpec.Dict,
+        CO_KEY(0x1600 + idx, sub_index, CO_OBJ_D___R_),
+        CO_TUNSIGNED32,
+        CO_LINK(index, sub, 8 * size)
+      );
+    }
+
+    void CanopenComponent::add_rpdo_dummy(uint8_t idx, uint8_t size) {
+      while(size > 4) {
+        add_rpdo_dummy(idx, 4);
+        size -= 4;
+      }
+      switch(size) {
+        case 1:
+          rpdo_map_append(idx, 2, 0, size);  // 2 or 5
+          break;
+        case 2:
+          rpdo_map_append(idx, 3, 0, size);  // 3 or 6
+          break;
+        case 3:
+          add_rpdo_dummy(idx, 2);
+          add_rpdo_dummy(idx, 1);
+          break;
+        case 4:
+          rpdo_map_append(idx, 4, 0, size);  // 4 or 7
+          break;
+      }
+    }
+    void CanopenComponent::add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo) {
+      ODAddUpdate(
+        NodeSpec.Dict,
+        CO_KEY(0x1400 + idx, 1, CO_OBJ_D___R_),
+        CO_TUNSIGNED32,
+        CO_COBID_RPDO_STD(1, 0x180 + CO_COBID_RPDO_INC * tpdo + node_id)
+      );
+      ODAddUpdate(
+        NodeSpec.Dict,
+        CO_KEY(0x1400 + idx, 2, CO_OBJ_D___R_),
+        CO_TUNSIGNED8,
+        (CO_DATA)254
+      );
+    }
+
+    void CanopenComponent::add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd) {
+      uint32_t index = get_entity_index(entity_id);
+      auto obj = ODFind(NodeSpec.Dict, CO_DEV(index + 2, cmd + 1));
+      if(!obj) {
+        ESP_LOGE(TAG, "can't find entity %d cmd %d key: %08x", entity_id, cmd, CO_DEV(index + 2, cmd + 1));
+        return;
+      }
+      auto key = obj->Data;
+      ESP_LOGI(TAG, "key: %08x", key);
+
+      rpdo_map_append(idx, CO_GET_IDX(key), CO_GET_SUB(key), 1);
+    }
 
     #ifdef LOG_SENSOR
     void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo) {

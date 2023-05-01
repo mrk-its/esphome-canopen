@@ -1,3 +1,4 @@
+from itertools import groupby
 import esphome.config_validation as cv
 import esphome.codegen as cg
 from esphome.const import CONF_ID
@@ -14,16 +15,19 @@ CONF_ENTITIES = "entities"
 
 DEPENDENCIES = ["ota"]
 
+RPDO_SCHEMA = cv.Schema({
+    cv.Required("node_id"): cv.int_,
+    cv.Required("tpdo"): cv.int_,
+    cv.Required("offset"): cv.int_,
+    cv.Optional("cmd", 0): cv.int_
+})
+
 ENTITY_SCHEMA = cv.Schema({
     cv.Required("id"): cv.use_id(cg.EntityBase),
     cv.Required("index"): cv.int_,
     cv.Optional("tpdo"): cv.int_,
+    cv.Optional("rpdo"): cv.ensure_list(RPDO_SCHEMA)
 })
-
-# STATUS_ENTITY_SCHEMA = cv.Schema({
-#     cv.Required("can_id"): cv.int_,
-#     cv.Optional("update_interval", default="60s"): cv.positive_time_period_seconds,
-# })
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(CanopenComponent),
@@ -46,3 +50,23 @@ def to_code(config):
         entity = yield cg.get_variable(entity_config["id"])
         tpdo = entity_config.get("tpdo", -1)
         cg.add(canopen.add_entity(entity, entity_config["index"], tpdo))
+
+    rpdo_entities = [
+        {**rpdo, "entity_index": entity["index"]}
+        for entity in entities
+        for rpdo in entity.get("rpdo", ())
+    ]
+    rpdo_entities.sort(key=lambda rpdo: (rpdo["node_id"], rpdo["tpdo"], rpdo["offset"]))
+    for idx, ((node_id, tpdo), rpdos) in enumerate(
+        groupby(rpdo_entities, key=lambda rpdo: (rpdo["node_id"], rpdo["tpdo"]))
+    ):
+        cg.add(canopen.add_rpdo_node(idx, node_id, tpdo))
+        rpdos = list(rpdos)
+        curr_offs = 0
+        for rpdo in rpdos:
+            assert rpdo["offset"] >= curr_offs, f"RPDO: invalid TPDO offset {rpdo}"
+            if rpdo["offset"] > curr_offs:
+                cg.add(canopen.add_rpdo_dummy(idx, rpdo["offset"] - curr_offs))
+                curr_offs = rpdo["offset"]
+            cg.add(canopen.add_rpdo_entity_cmd(idx, rpdo["entity_index"], rpdo["cmd"]))
+            curr_offs += 1

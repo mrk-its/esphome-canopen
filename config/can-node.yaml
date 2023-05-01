@@ -41,15 +41,19 @@ canopen:
     - id: boot
       index: 1
       tpdo: 0
-    - id: blue_led
-      index: 2
-      tpdo: 0
     - id: uptime_sensor
       index: 3
       tpdo: 0
     - id: cover1
       index: 4
       tpdo: 1
+    - id: blue_light
+      index: 5
+      tpdo: 1
+      rpdo:
+        - node_id: 2
+          tpdo: 1
+          offset: 2
 
 sensor:
   - platform: uptime
@@ -64,15 +68,15 @@ binary_sensor:
     id: boot
     internal: true
     pin:
-      number: 0
+      number: GPIO0
       inverted: true
 
 switch:
   - platform: gpio
-    name: "Led 1"
-    id: blue_led
+    name: "GPIO Switch"
+    id: gpio_switch
     internal: true
-    pin: 2
+    pin: GPIO16
 
 cover:
   - platform: time_based
@@ -89,3 +93,16 @@ cover:
     close_duration: 10s
     stop_action:
       - logger.log: stop_action
+
+output:
+  - platform: ledc
+    pin: GPIO2
+    id: blue_led
+
+light:
+  - platform: monochromatic
+    name: "PWM Blue Led"
+    output: blue_led
+    id: blue_light
+    default_transition_length: 500ms
+    internal: true
