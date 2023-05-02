@@ -52,8 +52,8 @@ canopen:
       tpdo: 1
       rpdo:
         - node_id: 2
-          tpdo: 1
-          offset: 2
+          tpdo: 0
+          offset: 0
 
 sensor:
   - platform: uptime
