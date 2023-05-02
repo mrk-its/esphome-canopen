@@ -40,20 +40,25 @@ canopen:
   entities:
     - id: boot
       index: 1
-      tpdo: 0
+      tpdo: 0 # offset: 0, size: 1 (state)
     - id: uptime_sensor
-      index: 3
-      tpdo: 0
+      index: 2
+      tpdo: 0 # offset: 1, size: 4 (state: float)
     - id: cover1
-      index: 4
-      tpdo: 1
+      index: 3
+      tpdo: 1 # offset: 0, size: 2 (state: byte, position: byte)
     - id: blue_light
-      index: 5
-      tpdo: 1
+      index: 4
+      tpdo: 1 # offset: 2, size: 2 (state: byte, position: byte)
       rpdo:
+        # following definition means:
+        # when tpdo#0 from node#2 is received
+        # then store byte from offset=0 (representing state of the 'light_switch')
+        # to blue_light cmd#0, keeping blue_light state in sync with switch state
         - node_id: 2
           tpdo: 0
           offset: 0
+          cmd: 0 # it refers to 'blue_light' cmd#0
 
 sensor:
   - platform: uptime

@@ -40,11 +40,17 @@ canopen:
   entities:
     - id: light_switch
       index: 1
-      tpdo: 0
+      tpdo: 0  # offset: 0, size: 1 (state: byte)
       rpdo:
-        node_id: 1
-        tpdo: 1
-        offset: 2
+        # state of blue_light as defined in can-node.yaml
+        # following definition means:
+        # when tpdo#1 from node#1 is received
+        # then store byte from offset=2 (representing state of the light)
+        # to light_switch cmd#0, keeping switch state in sync with light state.
+        - node_id: 1
+          tpdo: 1
+          offset: 2
+          cmd: 0  # it refers to 'light_switch' cmd#0
 
 binary_sensor:
   - platform: gpio
