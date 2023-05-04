@@ -197,44 +197,6 @@ namespace esphome {
       return key;
     }
 
-
-    uint32_t allocate_state_entry(uint16_t type_id, void *state, uint8_t size, bool tpdo) {
-      uint16_t array_index = type_id + 0x5000;
-      uint8_t subidx = 0;
-      auto obj = ODFind(NodeSpec.Dict, CO_DEV(array_index, 0));
-      if(obj) {
-        subidx = obj->Data;
-      }
-      subidx += 1;
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(array_index, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, subidx);
-      uint32_t key = CO_DEV(array_index, subidx);
-
-      uint32_t async_pdo_mask = tpdo >=0 ? CO_OBJ___A___ | CO_OBJ____P__ : 0;
-      uint32_t default_value = state == 0 ? 0 : (size == 1 ? *(uint8_t *)state : (size == 2 ? *(uint16_t *)state : *(uint32_t *)state));
-      const CO_OBJ_TYPE *type = size == 1 ? CO_TUNSIGNED8 : (size == 2 ? CO_TUNSIGNED16 : CO_TUNSIGNED32);
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(array_index, subidx, async_pdo_mask | CO_OBJ_D___R_), type, (CO_DATA)default_value);
-
-      ESP_LOGD(TAG, "allocated new state entry for type %d: %08x", type_id, key);
-      return key;
-    }
-
-    uint32_t allocate_cmd_entry(uint16_t type_id, uint8_t size) {
-      uint16_t array_index = type_id + 0x5800;
-      uint8_t subidx = 0;
-      auto obj = ODFind(NodeSpec.Dict, CO_DEV(array_index, 0));
-      if(obj) subidx = obj->Data;
-      subidx += 1;
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(array_index, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, subidx);
-      uint32_t key = CO_DEV(array_index, subidx);
-
-      // TODO: CO_TCMD16 / 32
-      const CO_OBJ_TYPE *type = size == 1 ? CO_TCMD8 : (size == 2 ? CO_TCMD8 : CO_TCMD8);
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(array_index, subidx, CO_OBJ_D___RW), type, (CO_DATA)0);
-
-      ESP_LOGD(TAG, "allocated new cmd entry for type %d: %08x", type_id, key);
-      return key;
-    }
-
     void CanopenComponent::rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t size) {
       uint8_t sub_index = 0;
       auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1600 + idx, 0));
@@ -300,7 +262,6 @@ namespace esphome {
     #ifdef LOG_SENSOR
     void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo) {
       float state = sensor->get_state();
-      allocate_state_entry(8, &state, 4, tpdo); // allocate new float
       od_add_metadata(
         entity_id,
         ENTITY_TYPE_SENSOR,
