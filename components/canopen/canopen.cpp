@@ -322,7 +322,7 @@ namespace esphome {
         od_set_state(brightness_key, &brightness, 1);
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
-          ESP_LOGI(TAG, "setting state to:", ((uint8_t *)buffer)[0]);
+          ESP_LOGI(TAG, "setting state to: %d", ((uint8_t *)buffer)[0]);
           if(((uint8_t *)buffer)[0]) {
               light->turn_on().perform();
           } else {
@@ -478,15 +478,32 @@ namespace esphome {
       ESP_LOGI(TAG, "#############################################");
     }
 
+    void CanopenComponent::csdo_recv(uint8_t num, uint32_t key, std::function<void(uint32_t, uint32_t)>&& cb) {
+      static auto csdo0 = COCSdoFind(&node, 0);
+      static uint32_t buffers[CO_CSDO_N];
+      static std::function<void(uint32_t, uint32_t)> callbacks[CO_CSDO_N];
+      auto csdo = COCSdoFind(&node, num);
+      if(csdo) {
+        buffers[num] = 0;
+        callbacks[num] = cb;
+        auto ret = COCSdoRequestUpload(csdo, key, (uint8_t *)&buffers[num], 4, [](CO_CSDO_T *csdo, uint16_t index, uint8_t sub, uint32_t code) {
+          auto num = csdo - csdo0;
+          ESP_LOGV(TAG, "COCSdoRequestUpload cb: %04x %02x %08x", index, sub, code);
+          callbacks[num](buffers[num], code);
+        }, 1000);
+      }
+
+    }
+
     void CanopenComponent::csdo_send_data(uint8_t num, uint32_t key, uint8_t *data, uint8_t len) {
       auto csdo = COCSdoFind(&node, num);
       if(csdo) {
         auto ret = COCSdoRequestDownload(csdo, key, data, len, [](CO_CSDO_T *csdo, uint16_t index, uint8_t sub, uint32_t code) {
-          ESP_LOGI(TAG, "req download: %04x %02x %08x", index, sub, code);
+          ESP_LOGV(TAG, "COCSdoRequestDownload cb: %04x %02x %08x", index, sub, code);
         }, 1000);
 
         if(ret) {
-          ESP_LOGE(TAG, "sdo_download err: %08x", ret);
+          ESP_LOGE(TAG, "COCSdoRequestDownload err: %08x", ret);
         }
       }
     }

@@ -45,8 +45,8 @@ CONFIG_SCHEMA = cv.Schema({
 })
 
 def to_code(config):
-    # cg.add_library("canopenstack=https://github.com/mrk-its/canopen-stack", "0.0.0")
-    cg.add_library("canopenstack=file:///home/mrk/canopen-stack", "0.0.0")
+    cg.add_library("canopenstack=https://github.com/mrk-its/canopen-stack", "0.0.0")
+    # cg.add_library("canopenstack=file:///home/mrk/canopen-stack", "0.0.0")
     canopen = cg.new_Pvariable(config[CONF_ID])
     yield cg.register_component(canopen, config)
     canbus = yield cg.get_variable(config["canbus_id"])

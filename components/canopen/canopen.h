@@ -43,6 +43,9 @@ const int32_t PROPERTY_CONFIG_UNIT = 11;
 
 static const char *const TAG = "canopen";
 
+#define ENTITY_STATE_KEY(entity_id, state_num) (CO_KEY(0x2000 + entity_id * 16 + 1, state_num + 1, 0))
+#define ENTITY_CMD_KEY(entity_id, cmd_num) (CO_KEY(0x2000 + entity_id * 16 + 2, cmd_num + 1, 0))
+
 namespace esphome {
   namespace canopen {
     struct Status {
@@ -71,12 +74,20 @@ namespace esphome {
       }
 
       void setup_csdo(uint8_t num, uint8_t node_id, uint32_t tx_id, uint32_t rx_id);
+      void csdo_recv(uint8_t num, uint32_t key, std::function<void(uint32_t, uint32_t)>&& cb);
+
       void csdo_send_data(uint8_t num, uint32_t key, uint8_t *data, uint8_t len);
-      void csdo_send_byte(uint8_t num, uint32_t key, uint8_t value) {
+      void csdo_send_u8(uint8_t num, uint32_t key, uint8_t value) {
         csdo_send_data(num, key, (uint8_t *)(&value), 1);
       }
-      void csdo_send_entity_cmd_u8(uint8_t num, uint8_t entity_id, uint8_t value, uint8_t cmd=0) {
-        csdo_send_byte(num, CO_KEY(0x2000 + entity_id * 16 + 2, cmd + 1, 0), value);
+      void csdo_send_u16(uint8_t num, uint32_t key, uint16_t value) {
+        csdo_send_data(num, key, (uint8_t *)(&value), 2);
+      }
+      void csdo_send_u32(uint8_t num, uint32_t key, uint32_t value) {
+        csdo_send_data(num, key, (uint8_t *)(&value), 4);
+      }
+      void csdo_send_float(uint8_t num, uint32_t key, float value) {
+        csdo_send_data(num, key, (uint8_t *)(&value), 4);
       }
 
       void setup();
