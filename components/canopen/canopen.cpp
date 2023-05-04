@@ -260,7 +260,7 @@ namespace esphome {
         sensor->get_name(), sensor->get_device_class(), "",
         esphome::sensor::state_class_to_string(sensor->get_state_class())
       );
-      auto state_key = od_add_state(entity_id, CO_TUNSIGNED8, &state, 4, tpdo);
+      auto state_key = od_add_state(entity_id, CO_TUNSIGNED32, &state, 4, tpdo);
       sensor->add_on_state_callback([=](float value) {
         od_set_state(state_key, &value, 4);
       });
