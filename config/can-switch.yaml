@@ -1,6 +1,21 @@
 
 esphome:
   name: can-switch
+  on_boot:
+    priority: 500
+    then:
+      - logger.log: "BOOT!"
+      - lambda: |-
+          // receive state of entity#4 on node#1 (as csdo#0 is configured for node#1)
+          id(can_gate).csdo_recv(0, ENTITY_STATE_KEY(4, 0), [=](uint32_t value, uint32_t err) {
+            ESP_LOGI("sdo", "received: %08x, err: %08x", value, err);
+            if(err) return;
+            if(value) {
+              id(light_switch).turn_on();
+            } else {
+              id(light_switch).turn_off();
+            }
+          });
 
 external_components:
   - source: ../components
@@ -37,6 +52,8 @@ canopen:
   id: can_gate
   canbus_id: can_bus
   node_id: 2
+  csdo:
+    - node_id: 1
   entities:
     - id: light_switch
       index: 1
