@@ -248,15 +248,7 @@ namespace esphome {
 
     void CanopenComponent::add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd) {
       uint32_t index = get_entity_index(entity_id);
-      auto obj = ODFind(NodeSpec.Dict, CO_DEV(index + 2, cmd + 1));
-      if(!obj) {
-        ESP_LOGE(TAG, "can't find entity %d cmd %d key: %08x", entity_id, cmd, CO_DEV(index + 2, cmd + 1));
-        return;
-      }
-      auto key = obj->Data;
-      ESP_LOGI(TAG, "key: %08x", key);
-
-      rpdo_map_append(idx, CO_GET_IDX(key), CO_GET_SUB(key), 1);
+      rpdo_map_append(idx, index + 2, cmd + 1, 1);
     }
 
     #ifdef LOG_SENSOR
