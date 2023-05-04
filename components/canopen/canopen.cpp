@@ -3,6 +3,15 @@
 #include "canopen.h"
 #include "fw.h"
 
+extern "C" {
+    void esp_log(const char* tag, const char *fmt, ...) {
+        va_list arglist;
+        va_start( arglist, fmt );
+        esp_log_vprintf_(0, tag, __LINE__, fmt, arglist );
+        va_end(arglist);
+    }
+}
+
 namespace esphome {
   namespace ota {
     std::unique_ptr<OTABackend> make_ota_backend();
@@ -119,32 +128,35 @@ namespace esphome {
         ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 4, CO_OBJ_D___R_), CO_TSTRING, (CO_DATA)od_string(state_class));
     }
 
-    void CanopenComponent::od_add_state(
-      uint32_t entity_id, uint32_t key, void *state, uint8_t size, int8_t tpdo
+    uint32_t CanopenComponent::od_add_state(
+      uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size, int8_t tpdo
     ) {
       uint32_t async_pdo_mask = tpdo >=0 ? CO_OBJ___A___ | CO_OBJ____P__ : 0;
-      uint32_t index = get_entity_index(entity_id);
+      uint32_t entity_index = get_entity_index(entity_id);
 
-      uint8_t max_index = 0;
-      auto obj = ODFind(NodeSpec.Dict, CO_DEV(index + 1, 0));
-      if(obj) max_index = obj -> Data;
-      max_index += 1;
+      uint8_t state_sub_index = 0;
+      auto obj = ODFind(NodeSpec.Dict, CO_DEV(entity_index + 1, 0));
+      if(obj) state_sub_index = obj -> Data;
+      state_sub_index += 1;
 
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 1, max_index, CO_OBJ_D___R_), CO_TUNSIGNED32, key);
+      uint32_t value = 0;
+      memcpy(&value, state, size);
+      ODAddUpdate(NodeSpec.Dict, CO_KEY(entity_index + 1, state_sub_index, async_pdo_mask | CO_OBJ_D___R_), type, value);
 
       if(tpdo >= 0) {
         ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32, CO_COBID_TPDO_DEFAULT(tpdo));
         ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA)254);
 
-        uint8_t max_index = 0;
+        uint8_t tpdo_sub_index = 0;
         auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1a00 + tpdo, 0));
-        if(obj) max_index = obj->Data;
-        max_index += 1;
+        if(obj) tpdo_sub_index = obj->Data;
+        tpdo_sub_index += 1;
         uint32_t bits = size * 8;
-        ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1a00 + tpdo, max_index, CO_OBJ_D___R_), CO_TUNSIGNED32, CO_LINK(CO_GET_IDX(key), CO_GET_SUB(key), bits));
-        ESP_LOGI(TAG, "tpdo: %d, SubIndex: %d, CO_LINK(%x, %x, %x)", tpdo, max_index, CO_GET_IDX(key), CO_GET_SUB(key), bits);
+        ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1a00 + tpdo, tpdo_sub_index, CO_OBJ_D___R_), CO_TUNSIGNED32, CO_LINK(entity_index + 1, state_sub_index, bits));
       }
+      return CO_KEY(entity_index + 1, state_sub_index, 0);
     }
+
 
     void  CanopenComponent::od_set_state(uint32_t key, void *state, uint8_t size) {
       auto obj = CODictFind(&node.Dict, key);
@@ -167,8 +179,8 @@ namespace esphome {
       }
     }
 
-    void CanopenComponent::od_add_cmd(
-      uint32_t entity_id, uint32_t key, std::function< void(void *, uint32_t)> cb
+    uint32_t CanopenComponent::od_add_cmd(
+      uint32_t entity_id, std::function< void(void *, uint32_t)> cb
     ) {
       uint32_t index = get_entity_index(entity_id);
 
@@ -176,9 +188,15 @@ namespace esphome {
       auto obj = ODFind(NodeSpec.Dict, CO_DEV(index + 2, 0));
       if(obj) max_index = obj -> Data;
       max_index += 1;
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 2, max_index, CO_OBJ_D___R_), CO_TUNSIGNED32, key);
+
+      // TODO: CO_TCMD16 / 32
+      const CO_OBJ_TYPE *type = CO_TCMD8;
+      ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 2, max_index, CO_OBJ_D___RW), type, (CO_DATA)0);
+      auto key = CO_KEY(index + 2, max_index, 0);
       can_cmd_handlers[key] = cb;
+      return key;
     }
+
 
     uint32_t allocate_state_entry(uint16_t type_id, void *state, uint8_t size, bool tpdo) {
       uint16_t array_index = type_id + 0x5000;
@@ -282,14 +300,14 @@ namespace esphome {
     #ifdef LOG_SENSOR
     void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo) {
       float state = sensor->get_state();
-      auto state_key = allocate_state_entry(8, &state, 4, tpdo); // allocate new float
+      allocate_state_entry(8, &state, 4, tpdo); // allocate new float
       od_add_metadata(
         entity_id,
         ENTITY_TYPE_SENSOR,
         sensor->get_name(), sensor->get_device_class(), "",
         esphome::sensor::state_class_to_string(sensor->get_state_class())
       );
-      od_add_state(entity_id, state_key, &state, 4, tpdo);
+      auto state_key = od_add_state(entity_id, CO_TUNSIGNED8, &state, 4, tpdo);
       sensor->add_on_state_callback([=](float value) {
         od_set_state(state_key, &value, 4);
       });
@@ -298,13 +316,12 @@ namespace esphome {
 
     #ifdef LOG_BINARY_SENSOR
     void CanopenComponent::add_entity(binary_sensor::BinarySensor *sensor, uint32_t entity_id, int8_t tpdo) {
-      auto state_key = allocate_state_entry(1, &sensor->state, 1, tpdo); // allocate new bool
       od_add_metadata(
         entity_id,
         ENTITY_TYPE_BINARY_SENSOR,
         sensor->get_name(), sensor->get_device_class(), "", ""
       );
-      od_add_state(entity_id, state_key, &sensor->state, 1, tpdo);
+      auto state_key = od_add_state(entity_id, CO_TUNSIGNED8, &sensor->state, 1, tpdo);
       sensor->add_on_state_callback([=](bool x) {
         od_set_state(state_key, &x, 1);
       });
@@ -314,19 +331,16 @@ namespace esphome {
     #ifdef LOG_SWITCH
     void CanopenComponent::add_entity(esphome::switch_::Switch* switch_, uint32_t entity_id, int8_t tpdo) {
       auto state = switch_->get_initial_state_with_restore_mode().value_or(false);
-      auto state_key = allocate_state_entry(1, &state, 1, tpdo); // allocate new bool
-      auto cmd_key = allocate_cmd_entry(1, 1); // allocate new bool with default=0
-
       od_add_metadata(
         entity_id,
         ENTITY_TYPE_SWITCH,
         switch_->get_name(), switch_->get_device_class(), "", ""
       );
-      od_add_state(entity_id, state_key, &state, 1, tpdo);
+      auto state_key = od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
       switch_->add_on_state_callback([=](bool value) {
         od_set_state(state_key, &value, 1);
       });
-      od_add_cmd(entity_id, cmd_key, [=](void *buffer, uint32_t size) {
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
           ESP_LOGI(TAG, "switching to %d", ((uint8_t *)buffer)[0]);
           if(((uint8_t *)buffer)[0]) {
               switch_->turn_on();
@@ -341,26 +355,20 @@ namespace esphome {
     void CanopenComponent::add_entity(esphome::light::LightState* light, uint32_t entity_id, int8_t tpdo) {
       bool state = bool(light->remote_values.get_state());
       uint8_t brightness = (uint8_t)(light->remote_values.get_brightness() * 255);
-      // auto state = switch_->get_initial_state_with_restore_mode().value_or(false);
-      auto state_key = allocate_state_entry(1, &state, 1, tpdo); // allocate new bool
-      auto brightness_key = allocate_state_entry(5, &brightness, 1, tpdo); // allocate new uint8
-      auto cmd_key = allocate_cmd_entry(1, 1); // allocate new bool with default=0
-      auto brightness_cmd_key = allocate_cmd_entry(5, 1); // allocate new uint8 with default=0
-
       od_add_metadata(
          entity_id,
          ENTITY_TYPE_LIGHT,
          light->get_name(), "", "", ""
       );
-      od_add_state(entity_id, state_key, &state, 1, tpdo);
-      od_add_state(entity_id, brightness_key, &brightness, 1, tpdo);
+      auto state_key = od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
+      auto brightness_key = od_add_state(entity_id, CO_TUNSIGNED8, &brightness, 1, tpdo);
       light->add_new_remote_values_callback([=]() {
         bool value = bool(light->remote_values.get_state());
         uint8_t brightness = (uint8_t)(light->remote_values.get_brightness() * 255);
         od_set_state(state_key, &value, 1);
         od_set_state(brightness_key, &brightness, 1);
       });
-      od_add_cmd(entity_id, cmd_key, [=](void *buffer, uint32_t size) {
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
           ESP_LOGI(TAG, "setting state to:", ((uint8_t *)buffer)[0]);
           if(((uint8_t *)buffer)[0]) {
               light->turn_on().perform();
@@ -368,7 +376,7 @@ namespace esphome {
               light->turn_off().perform();
           }
       });
-      od_add_cmd(entity_id, brightness_cmd_key, [=](void *buffer, uint32_t size) {
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
           ESP_LOGI(TAG, "setting brightness to %d", ((uint8_t *)buffer)[0]);
           light->turn_on().set_brightness_if_supported(float(((uint8_t *)buffer)[0]) / 255.0).perform();
       });
@@ -389,20 +397,13 @@ namespace esphome {
     void CanopenComponent::add_entity(esphome::cover::Cover* cover, uint32_t entity_id, int8_t tpdo) {
       uint8_t state = get_cover_state(cover);
       uint8_t position = uint8_t(cover->position * 255);
-
-      auto state_key = allocate_state_entry(5, &state, 1, tpdo); // allocate new uint8
-      auto pos_key = allocate_state_entry(5, &position, 1, tpdo); // allocate new uint8
-
-      auto state_cmd_key = allocate_cmd_entry(5, 1); // allocate new uint8
-      auto pos_cmd_key = allocate_cmd_entry(5, 1); // allocate new uint8
-
       od_add_metadata(
         entity_id,
         ENTITY_TYPE_COVER,
         cover->get_name(), cover->get_device_class(), "", ""
       );
-      od_add_state(entity_id, state_key, &state, 1, tpdo);
-      od_add_state(entity_id, pos_key, &position, 1, tpdo);
+      auto state_key = od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
+      auto pos_key = od_add_state(entity_id, CO_TUNSIGNED8, &position, 1, tpdo);
       cover->add_on_state_callback([=]() {
         ESP_LOGD(
           TAG,
@@ -415,7 +416,7 @@ namespace esphome {
         od_set_state(state_key, &state, 1);
         od_set_state(pos_key, &position, 1);
       });
-      od_add_cmd(entity_id, state_cmd_key, [=](void *buffer, uint32_t size) {
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
         uint8_t cmd = *(uint8_t *)buffer;
         ESP_LOGD(TAG, "cmd: %d", cmd);
         auto call = cover->make_call();
@@ -430,7 +431,7 @@ namespace esphome {
             call.perform();
         }
       });
-      od_add_cmd(entity_id, pos_cmd_key, [=](void *buffer, uint32_t size) {
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
         uint8_t cmd = *(uint8_t *)buffer;
         float position = ((float)cmd) / 255.0;
         ESP_LOGD(TAG, "set_position: %f", position);
@@ -474,6 +475,13 @@ namespace esphome {
       FirmwareObj.md5,
     };
 
+    void CanopenComponent::setup_csdo(uint8_t num, uint8_t node_id, uint32_t tx_id, uint32_t rx_id) {
+      ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1280 + num, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, 0);
+      ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1280 + num, 1, CO_OBJ_D___R_), CO_TUNSIGNED32, tx_id);
+      ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1280 + num, 2, CO_OBJ_D___R_), CO_TUNSIGNED32, rx_id);
+      ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1280 + num, 3, CO_OBJ_D___R_), CO_TUNSIGNED8, node_id);
+    }
+
     void CanopenComponent::setup() {
       FirmwareObj.domain.Size = 1024 * 1024;
       FirmwareObj.backend = esphome::ota::make_ota_backend();
@@ -513,6 +521,20 @@ namespace esphome {
         ESP_LOGI(TAG, "OD Index: %02x Key: %08x Data: %08x Type: %08x", index, od->Key, od->Data, od->Type);
         index++;
         od++;
+      }
+      ESP_LOGI(TAG, "#############################################");
+    }
+
+    void CanopenComponent::csdo_send_data(uint8_t num, uint32_t key, uint8_t *data, uint8_t len) {
+      auto csdo = COCSdoFind(&node, num);
+      if(csdo) {
+        auto ret = COCSdoRequestDownload(csdo, key, data, len, [](CO_CSDO_T *csdo, uint16_t index, uint8_t sub, uint32_t code) {
+          ESP_LOGI(TAG, "req download: %04x %02x %08x", index, sub, code);
+        }, 1000);
+
+        if(ret) {
+          ESP_LOGE(TAG, "sdo_download err: %08x", ret);
+        }
       }
     }
 

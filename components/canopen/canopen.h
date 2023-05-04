@@ -70,6 +70,15 @@ namespace esphome {
         return this->canbus->get_setup_priority() - 1.0f;
       }
 
+      void setup_csdo(uint8_t num, uint8_t node_id, uint32_t tx_id, uint32_t rx_id);
+      void csdo_send_data(uint8_t num, uint32_t key, uint8_t *data, uint8_t len);
+      void csdo_send_byte(uint8_t num, uint32_t key, uint8_t value) {
+        csdo_send_data(num, key, (uint8_t *)(&value), 1);
+      }
+      void csdo_send_entity_cmd_u8(uint8_t num, uint8_t entity_id, uint8_t value, uint8_t cmd=0) {
+        csdo_send_byte(num, CO_KEY(0x2000 + entity_id * 16 + 2, cmd + 1, 0), value);
+      }
+
       void setup();
       void add_rpdo_dummy(uint8_t idx, uint8_t size);
       void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
@@ -104,8 +113,8 @@ namespace esphome {
         const std::string &unit,
         const std::string &state_class
       );
-      void od_add_state(uint32_t entity_id, uint32_t key, void *state, uint8_t size, int8_t tpdo);
-      void od_add_cmd(uint32_t entity_id, uint32_t key, std::function< void(void *, uint32_t)> cb);
+      uint32_t od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size, int8_t tpdo);
+      uint32_t od_add_cmd(uint32_t entity_id, std::function< void(void *, uint32_t)> cb);
 
       void od_set_state(uint32_t key, void *state, uint8_t size);
       void on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
