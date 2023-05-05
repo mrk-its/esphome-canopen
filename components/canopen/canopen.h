@@ -49,20 +49,26 @@ static const char *const TAG = "canopen";
 
 namespace esphome {
   namespace canopen {
-    struct Status {
-      uint32_t entity_id;
-      struct timeval last_time;
-      uint32_t update_interval;
-      twai_status_info_t last_status;
+    struct CanStatus {
+      uint32_t tx_err;
+      uint32_t rx_err;
+      uint32_t tx_failed;
+      uint32_t rx_miss;
+      uint32_t arb_lost;
+      uint32_t bus_err;
     };
+    const uint32_t status_update_interval = 1;
 
     class CanopenComponent : public Component {
       CO_NODE node;
-      optional<Status> status;
+      CanStatus last_status;
+      struct timeval status_time;
+
       bool initialized;
       void rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t size);
 
       public:
+      CanStatus status;
       std::map<uint32_t, std::function< void(void *, uint32_t)>> can_cmd_handlers;
 
       canbus::Canbus *canbus;
@@ -130,13 +136,8 @@ namespace esphome {
 
       void od_set_state(uint32_t key, void *state, uint8_t size);
       void on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
-
-      void can_send_status_counters(uint32_t entity_id, uint32_t prop, uint32_t cnt1, uint32_t cnt2) {
-          std::vector<uint32_t> _data = {cnt1, cnt2};
-          std::vector<uint8_t> data((uint8_t *)&_data[0], ((uint8_t *)&_data[0]) + 8);
-          canbus->send_data((entity_id << 4) | prop, true, data);
-      };
       void loop() override;
+      bool get_can_status(CanStatus &status_info);
     };
   } // namespace canopen
   extern canopen::CanopenComponent *global_canopen;

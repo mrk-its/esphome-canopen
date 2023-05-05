@@ -4,7 +4,7 @@ esphome:
     priority: 500
     then:
       - logger.log: "BOOT!"
-      - lambda: |-     
+      - lambda: |-
           // receive state of entity#1 (float) on node#1 (as csdo#0 is configured for node#1)
           // csdo_recv packs received data into uint32_t, we need to cast it to float
           id(can_gate).csdo_recv(0, ENTITY_STATE_KEY(1, 0), [=](uint32_t value, uint32_t err) {
@@ -55,9 +55,45 @@ canopen:
     rpdo:
       - node_id: 1
         tpdo: 0 # can-node.yaml: uptime_sensor is at offset=1, tpdo=0
-        offset: 1  
+        offset: 1
 
 sensor:
   - platform: template
     name: "Uptime Sensor Proxy"
     id: uptime_proxy
+
+  - platform: template
+    name: "Arb Lost Count"
+    id: can_status_arb_lost
+    lambda: return id(can_gate).status.arb_lost;
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Bus Error Count"
+    id: can_status_bus_err
+    lambda: return id(can_gate).status.bus_err;
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Tx Err"
+    id: can_status_tx_err
+    lambda: return id(can_gate).status.tx_err;
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Rx Err"
+    id: can_status_rx_err
+    lambda: return id(can_gate).status.rx_err;
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Tx Failed"
+    id: can_status_tx_failed
+    lambda: return id(can_gate).status.tx_failed;
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Rx Miss"
+    id: can_status_rx_miss
+    lambda: return id(can_gate).status.rx_miss;
+    accuracy_decimals: 0

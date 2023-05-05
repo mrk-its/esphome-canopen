@@ -402,9 +402,6 @@ namespace esphome {
     void CanopenComponent::setup() {
       FirmwareObj.domain.Size = 1024 * 1024;
       FirmwareObj.backend = esphome::ota::make_ota_backend();
-      status = Status {
-        update_interval: 5
-      };
 
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1008, 0, CO_OBJ_____R_), CO_TSTRING,     (CO_DATA)(&ManufacturerDeviceNameObj));
 
@@ -472,28 +469,39 @@ namespace esphome {
       }
     }
 
+    bool CanopenComponent::get_can_status(CanStatus &status_info) {
+      twai_status_info_t twai_status_info;
+      if(twai_get_status_info(&twai_status_info) == ESP_OK) {
+        status_info.bus_err = twai_status_info.bus_error_count;
+        status_info.arb_lost = twai_status_info.arb_lost_count;
+        status_info.tx_err = twai_status_info.tx_error_counter;
+        status_info.rx_err = twai_status_info.rx_error_counter;
+        status_info.tx_failed = twai_status_info.tx_failed_count;
+        status_info.rx_miss = twai_status_info.rx_missed_count;
+        return true;
+      }
+      return false;
+    }
+
     void CanopenComponent::loop() {
       COTmrService(&node.Tmr);
       COTmrProcess(&node.Tmr);
 
-      if(status.has_value()) {
-        struct timeval tv_now;
-        gettimeofday(&tv_now, NULL);
-        if(abs(tv_now.tv_sec - status.value().last_time.tv_sec) >= status.value().update_interval) {
-            twai_status_info_t status_info;
-            if(twai_get_status_info(&status_info) == ESP_OK && memcmp(&status.value().last_status, &status_info, sizeof(status_info))) {
-                ESP_LOGD(
-                    TAG,
-                    "status state: %d tx: %d rx: %d tx_err: %d rx_err: %d tx_failed: %d rx_miss: %d arb_lost: %d bus_err: %d",
-                    status_info.state, status_info.msgs_to_tx, status_info.msgs_to_rx,
-                    status_info.tx_error_counter, status_info.rx_error_counter,
-                    status_info.tx_failed_count, status_info.rx_missed_count,
-                    status_info.arb_lost_count, status_info.bus_error_count
-                );
-                status.value().last_status = status_info;
-            }
-            status.value().last_time = tv_now;
+      struct timeval tv_now;
+      gettimeofday(&tv_now, NULL);
+      if(abs(tv_now.tv_sec - status_time.tv_sec) >= status_update_interval) {
+        if(get_can_status(status)) {
+          if(memcmp(&status, &last_status, sizeof(status)) != 0) {
+            ESP_LOGD(
+              TAG,
+              "tx_err: %d rx_err: %d tx_failed: %d rx_miss: %d arb_lost: %d bus_err: %d",
+              status.tx_err, status.rx_err, status.tx_failed, status.rx_miss, status.arb_lost, status.bus_err
+            );
+
+            last_status = status;
+          }
         }
+        status_time = tv_now;
       }
     }
   }
