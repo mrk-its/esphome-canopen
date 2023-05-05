@@ -1,0 +1,63 @@
+esphome:
+  name: can-sensor-proxy
+  on_boot:
+    priority: 500
+    then:
+      - logger.log: "BOOT!"
+      - lambda: |-     
+          // receive state of entity#1 (float) on node#1 (as csdo#0 is configured for node#1)
+          // csdo_recv packs received data into uint32_t, we need to cast it to float
+          id(can_gate).csdo_recv(0, ENTITY_STATE_KEY(1, 0), [=](uint32_t value, uint32_t err) {
+            ESP_LOGI("sdo", "state: %.6f err: %08x", *(float *)&value, err);
+            id(uptime_proxy).publish_state(*(float *)&value);
+          });
+
+external_components:
+  - source: ../components
+  # - source: github://mrk-its/esphome-canopen
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  password: ""
+  reboot_timeout: 0s
+
+ota:
+  password: ""
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+wifi:
+  <<: !include {file: wifi.yaml}
+
+canbus:
+  - platform: esp32_can
+    id: can_bus
+    rx_pin: GPIO22
+    tx_pin: GPIO23
+    can_id: 0
+    bit_rate: 125kbps
+
+canopen:
+  id: can_gate
+  canbus_id: can_bus
+  node_id: 2
+  csdo:
+    - node_id: 1
+  entities:
+  - id: uptime_proxy
+    index: 1
+    rpdo:
+      - node_id: 1
+        tpdo: 0 # can-node.yaml: uptime_sensor is at offset=1, tpdo=0
+        offset: 1  
+
+sensor:
+  - platform: template
+    name: "Uptime Sensor Proxy"
+    id: uptime_proxy

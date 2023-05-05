@@ -10,6 +10,7 @@ using namespace esphome;
 
 #include "node_spec.h"
 #include "co_if.h"
+#include "co_cmd.h"
 
 const int8_t ENTITY_TYPE_DISABLED = 0;
 const int8_t ENTITY_TYPE_SENSOR = 1;
@@ -125,7 +126,7 @@ namespace esphome {
         const std::string &state_class
       );
       uint32_t od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size, int8_t tpdo);
-      uint32_t od_add_cmd(uint32_t entity_id, std::function< void(void *, uint32_t)> cb);
+      uint32_t od_add_cmd(uint32_t entity_id, std::function< void(void *, uint32_t)> cb, const CO_OBJ_TYPE *type=CO_TCMD8);
 
       void od_set_state(uint32_t key, void *state, uint8_t size);
       void on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
@@ -138,4 +139,5 @@ namespace esphome {
       void loop() override;
     };
   } // namespace canopen
+  extern canopen::CanopenComponent *global_canopen;
 } // namespace esphome

@@ -27,44 +27,6 @@ namespace esphome {
 
     // }
 
-    uint32_t Cmd8Size (CO_OBJ *obj, CO_NODE *node, uint32_t width) {
-      const CO_OBJ_TYPE *uint8 = CO_TUNSIGNED8;
-      return uint8->Size(obj, node, width);
-    }
-
-    CO_ERR   Cmd8Init (CO_OBJ *obj, CO_NODE *node) {
-      return CO_ERR_NONE;
-    }
-
-    CO_ERR Cmd8Read(struct CO_OBJ_T *obj, struct CO_NODE_T *node, void *buffer, uint32_t size) {
-      ESP_LOGV(TAG, "Cmd8Read: key: %x", obj->Key);
-      const CO_OBJ_TYPE *uint8 = CO_TUNSIGNED8;
-      return uint8->Read(obj, node, buffer, size);
-    }
-
-    CO_ERR Cmd8Write(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
-      ESP_LOGI(TAG, "Cmd8Write: key: %x, val: %x, size: %x", obj->Key, *((uint8_t *)buffer), size);
-
-      const CO_OBJ_TYPE *uint8 = CO_TUNSIGNED8;
-      CO_ERR result = uint8->Write(obj, node, buffer, size);
-      uint32_t index = obj->Key & 0xffffff00;
-
-      auto cmd_handlers = global_canopen->can_cmd_handlers;
-      auto it = cmd_handlers.find(index);
-      if(it != cmd_handlers.end()) {
-        it->second(buffer, size);
-      }
-      return result;
-    }
-
-    CO_OBJ_TYPE Cmd8 = {
-      Cmd8Size,
-      Cmd8Init,
-      Cmd8Read,
-      Cmd8Write,
-    };
-    #define CO_TCMD8  ((CO_OBJ_TYPE*)&Cmd8)
-
     CO_OBJ_STR *od_string(const std::string &str) {
       auto od_str = new CO_OBJ_STR();
       od_str->Offset = 0;
@@ -180,7 +142,7 @@ namespace esphome {
     }
 
     uint32_t CanopenComponent::od_add_cmd(
-      uint32_t entity_id, std::function< void(void *, uint32_t)> cb
+      uint32_t entity_id, std::function< void(void *, uint32_t)> cb, const CO_OBJ_TYPE *type
     ) {
       uint32_t index = get_entity_index(entity_id);
 
@@ -189,8 +151,6 @@ namespace esphome {
       if(obj) max_index = obj -> Data;
       max_index += 1;
 
-      // TODO: CO_TCMD16 / 32
-      const CO_OBJ_TYPE *type = CO_TCMD8;
       ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 2, max_index, CO_OBJ_D___RW), type, (CO_DATA)0);
       auto key = CO_KEY(index + 2, max_index, 0);
       can_cmd_handlers[key] = cb;
@@ -264,6 +224,10 @@ namespace esphome {
       sensor->add_on_state_callback([=](float value) {
         od_set_state(state_key, &value, 4);
       });
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+          ESP_LOGI(TAG, "state: %f", *((float *)buffer));
+          sensor->publish_state(*(float *)buffer);
+      }, CO_TCMD32);
     }
     #endif
 
