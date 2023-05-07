@@ -27,7 +27,7 @@ CO_ERR Cmd8Write(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
     auto cmd_handlers = global_canopen->can_cmd_handlers;
     auto it = cmd_handlers.find(index);
     if(it != cmd_handlers.end()) {
-    it->second(buffer, size);
+        it->second(buffer, size);
     }
     return result;
 }
