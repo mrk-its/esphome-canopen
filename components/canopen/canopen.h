@@ -59,6 +59,9 @@ namespace esphome {
     };
     const uint32_t status_update_interval = 1;
 
+    class OperationalTrigger : public Trigger<> {};
+    class PreOperationalTrigger : public Trigger<> {};
+
     class CanopenComponent : public Component {
       CO_NODE node;
       CanStatus last_status;
@@ -66,6 +69,9 @@ namespace esphome {
 
       bool initialized;
       void rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t size);
+
+      OperationalTrigger *on_operational;
+      PreOperationalTrigger *on_pre_operational;
 
       public:
       CanStatus status;
@@ -75,6 +81,14 @@ namespace esphome {
       optional<CO_IF_FRM> recv_frame;
 
       void initialize(canbus::Canbus *canbus, uint32_t node_id);
+
+      void add_trigger(OperationalTrigger *trigger) {
+        on_operational = trigger;
+      }
+      void add_trigger(PreOperationalTrigger *trigger) {
+        on_pre_operational = trigger;
+      }
+      void set_operational_mode();
 
       float get_setup_priority() {
         return this->canbus->get_setup_priority() - 1.0f;

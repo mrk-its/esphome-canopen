@@ -1,7 +1,8 @@
 from itertools import groupby
 import esphome.config_validation as cv
 import esphome.codegen as cg
-from esphome.const import CONF_ID
+from esphome import automation
+from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.components.canbus import CanbusComponent
 
 
@@ -10,6 +11,9 @@ CanopenComponent = ns.class_(
     'CanopenComponent',
     cg.Component,
 )
+
+PreOperationalTrigger = ns.class_("PreOperationalTrigger", automation.Trigger.template())
+OperationalTrigger = ns.class_("OperationalTrigger", automation.Trigger.template())
 
 CONF_ENTITIES = "entities"
 
@@ -42,6 +46,12 @@ CONFIG_SCHEMA = cv.Schema({
     # cv.Optional("status"): STATUS_ENTITY_SCHEMA,
     cv.Optional("csdo"): cv.ensure_list(CSDO_SCHEMA),
     cv.Required(CONF_ENTITIES): cv.ensure_list(ENTITY_SCHEMA),
+    cv.Optional("on_pre_operational"): automation.validate_automation({
+        cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(PreOperationalTrigger),
+    }),
+    cv.Optional("on_operational"): automation.validate_automation({
+        cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(OperationalTrigger),
+    }),
 })
 
 def to_code(config):
@@ -61,6 +71,16 @@ def to_code(config):
 
     for num, csdo in enumerate(config.get("csdo", ())):
         cg.add(canopen.setup_csdo(num, csdo["node_id"], csdo["tx_id"], csdo["rx_id"]))
+
+    for conf in config.get("on_operational", []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
+        yield automation.build_automation(trigger, [], conf)
+        cg.add(canopen.add_trigger(trigger))
+
+    for conf in config.get("on_pre_operational", []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
+        yield automation.build_automation(trigger, [], conf)
+        cg.add(canopen.add_trigger(trigger))
 
     rpdo_entities = [
         {**rpdo, "entity_index": entity["index"]}

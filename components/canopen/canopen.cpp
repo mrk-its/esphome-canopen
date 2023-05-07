@@ -45,6 +45,8 @@ namespace esphome {
 
       global_canopen = this;
       this->canbus = canbus;
+      on_operational = 0;
+      on_pre_operational = 0;
 
       canbus_canbustrigger = new canbus::CanbusTrigger(canbus, 0, 0, false);
       canbus_canbustrigger->set_component_source("canbus");
@@ -425,7 +427,20 @@ namespace esphome {
       }
 
       CONodeStart(&node);
+
+      CONmtSetMode(&node.Nmt, CO_PREOP);
+
+      if(on_pre_operational) {
+        on_pre_operational->trigger();
+      } else {
+        set_operational_mode();
+      }
+
+    }
+
+    void CanopenComponent::set_operational_mode() {
       CONmtSetMode(&node.Nmt, CO_OPERATIONAL);
+      if(on_operational) on_operational->trigger();
       initialized = true;
       ESP_LOGI(TAG, "canopen initialized");
       CO_OBJ *od=NodeSpec.Dict;
