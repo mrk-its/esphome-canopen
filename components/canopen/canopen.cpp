@@ -47,6 +47,8 @@ namespace esphome {
       this->canbus = canbus;
       on_operational = 0;
       on_pre_operational = 0;
+      memset(&status, 0, sizeof(status));
+      memset(&last_status, 0, sizeof(last_status));
 
       canbus_canbustrigger = new canbus::CanbusTrigger(canbus, 0, 0, false);
       canbus_canbustrigger->set_component_source("canbus");
