@@ -163,7 +163,7 @@ namespace esphome {
       return key;
     }
 
-    void CanopenComponent::rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t size) {
+    void CanopenComponent::rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t bit_size) {
       uint8_t sub_index = 0;
       auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1600 + idx, 0));
       if(obj) sub_index = obj -> Data;
@@ -172,7 +172,7 @@ namespace esphome {
         NodeSpec.Dict,
         CO_KEY(0x1600 + idx, sub_index, CO_OBJ_D___R_),
         CO_TUNSIGNED32,
-        CO_LINK(index, sub, 8 * size)
+        CO_LINK(index, sub, bit_size)
       );
     }
 
@@ -183,17 +183,17 @@ namespace esphome {
       }
       switch(size) {
         case 1:
-          rpdo_map_append(idx, 2, 0, size);  // 2 or 5
+          rpdo_map_append(idx, 2, 0, size * 8);  // 2 or 5
           break;
         case 2:
-          rpdo_map_append(idx, 3, 0, size);  // 3 or 6
+          rpdo_map_append(idx, 3, 0, size * 8);  // 3 or 6
           break;
         case 3:
           add_rpdo_dummy(idx, 2);
           add_rpdo_dummy(idx, 1);
           break;
         case 4:
-          rpdo_map_append(idx, 4, 0, size);  // 4 or 7
+          rpdo_map_append(idx, 4, 0, size * 8);  // 4 or 7
           break;
       }
     }
@@ -214,7 +214,7 @@ namespace esphome {
 
     void CanopenComponent::add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd) {
       uint32_t index = get_entity_index(entity_id);
-      rpdo_map_append(idx, index + 2, cmd + 1, 1);
+      rpdo_map_append(idx, index + 2, cmd + 1, 8);
     }
 
     #ifdef LOG_SENSOR
