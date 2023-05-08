@@ -38,10 +38,6 @@ static uint8_t  Obj1001_00_08 = 0;
 
 static uint16_t Obj1017_00_10 = 1024 * 10;
 
-static uint32_t Obj2100_01_20 = 0;
-static uint8_t  Obj2100_02_08 = 0;
-static uint8_t  Obj2100_03_08 = 0;
-
 /* allocate variables for constant values in FLASH */
 const  uint32_t Obj1000_00_20 = 0x00000000L;
 
@@ -97,11 +93,6 @@ static struct CO_OBJ_T ClockOD[APP_OBJ_N] = {
     {CO_KEY(0x1A01, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
     {CO_KEY(0x1A02, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
     {CO_KEY(0x1A03, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
-
-    // {CO_KEY(0x2100, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(3)             },
-    // {CO_KEY(0x2100, 1, CO_OBJ____PR_), CO_TUNSIGNED32, (CO_DATA)(&Obj2100_01_20)},
-    // {CO_KEY(0x2100, 2, CO_OBJ____PR_), CO_TUNSIGNED8 , (CO_DATA)(&Obj2100_02_08)},
-    // {CO_KEY(0x2100, 3, CO_OBJ___APR_), CO_TUNSIGNED8 , (CO_DATA)(&Obj2100_03_08)},
 
     CO_OBJ_DICT_ENDMARK  /* mark end of used objects */
 };

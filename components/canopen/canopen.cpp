@@ -227,7 +227,6 @@ namespace esphome {
         od_set_state(state_key, &value, 4);
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
-          ESP_LOGI(TAG, "state: %f", *((float *)buffer));
           sensor->publish_state(*(float *)buffer);
       }, CO_TCMD32);
     }
@@ -260,7 +259,6 @@ namespace esphome {
         od_set_state(state_key, &value, 1);
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
-          ESP_LOGI(TAG, "switching to %d", ((uint8_t *)buffer)[0]);
           if(((uint8_t *)buffer)[0]) {
               switch_->turn_on();
           } else {
@@ -288,7 +286,6 @@ namespace esphome {
         od_set_state(brightness_key, &brightness, 1);
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
-          ESP_LOGI(TAG, "setting state to: %d", ((uint8_t *)buffer)[0]);
           if(((uint8_t *)buffer)[0]) {
               light->turn_on().perform();
           } else {
@@ -296,7 +293,6 @@ namespace esphome {
           }
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
-          ESP_LOGI(TAG, "setting brightness to %d", ((uint8_t *)buffer)[0]);
           light->turn_on().set_brightness_if_supported(float(((uint8_t *)buffer)[0]) / 255.0).perform();
       });
     }
@@ -337,7 +333,6 @@ namespace esphome {
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
         uint8_t cmd = *(uint8_t *)buffer;
-        ESP_LOGD(TAG, "cmd: %d", cmd);
         auto call = cover->make_call();
         if(cmd == 0) {
             call.set_command_stop();
@@ -353,7 +348,6 @@ namespace esphome {
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
         uint8_t cmd = *(uint8_t *)buffer;
         float position = ((float)cmd) / 255.0;
-        ESP_LOGD(TAG, "set_position: %f", position);
         auto call = cover->make_call();
         call.set_position(position);
         call.perform();
@@ -454,8 +448,11 @@ namespace esphome {
       ESP_LOGI(TAG, "#############################################");
     }
 
-    void CanopenComponent::csdo_recv(uint8_t num, uint32_t key, std::function<void(uint32_t, uint32_t)>&& cb) {
+    void CanopenComponent::csdo_recv(uint8_t num, uint32_t key, std::function<void(uint32_t, uint32_t)> cb) {
       static auto csdo0 = COCSdoFind(&node, 0);
+      if(!csdo0) {
+        return cb(0, -1);
+      }
       static uint32_t buffers[CO_CSDO_N];
       static std::function<void(uint32_t, uint32_t)> callbacks[CO_CSDO_N];
       auto csdo = COCSdoFind(&node, num);
@@ -467,8 +464,9 @@ namespace esphome {
           ESP_LOGV(TAG, "COCSdoRequestUpload cb: %04x %02x %08x", index, sub, code);
           callbacks[num](buffers[num], code);
         }, 1000);
+      } else {
+        cb(0, -1);
       }
-
     }
 
     void CanopenComponent::csdo_send_data(uint8_t num, uint32_t key, uint8_t *data, uint8_t len) {
