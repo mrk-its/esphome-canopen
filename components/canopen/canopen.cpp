@@ -441,7 +441,6 @@ namespace esphome {
     void CanopenComponent::set_operational_mode() {
       CONmtSetMode(&node.Nmt, CO_OPERATIONAL);
       if(on_operational) on_operational->trigger();
-      initialized = true;
       ESP_LOGI(TAG, "canopen initialized");
       CO_OBJ *od=NodeSpec.Dict;
       uint32_t index = 0;

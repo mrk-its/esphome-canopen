@@ -79,7 +79,7 @@ namespace esphome {
       canbus::Canbus *canbus;
       optional<CO_IF_FRM> recv_frame;
 
-      void initialize(canbus::Canbus *canbus, uint32_t node_id);
+      CanopenComponent(canbus::Canbus *canbus, uint32_t node_id);
 
       void add_trigger(OperationalTrigger *trigger) {
         on_operational = trigger;
