@@ -111,6 +111,7 @@ namespace esphome {
         csdo_send_data(num, key, (uint8_t *)(&value), 4);
       }
 
+      float get_setup_priority() const { return esphome::setup_priority::BUS; }
       void setup();
       void add_rpdo_dummy(uint8_t idx, uint8_t size);
       void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
