@@ -125,6 +125,10 @@ namespace esphome {
     void  CanopenComponent::od_set_state(uint32_t key, void *state, uint8_t size) {
       auto obj = CODictFind(&node.Dict, key);
       if(!obj) return;
+      if(!size) {
+        size = obj->Type->Size(obj, &node, 4);
+      }
+      auto initialized = is_initialized();
       if(CO_IS_PDOMAP(obj->Key)) {
         if(initialized) {
           // trigger tpdo
@@ -134,12 +138,12 @@ namespace esphome {
         }
       } else {
         CODictWrBuffer(&node.Dict, key, (uint8_t *)state, size);
-        if(initialized) {
-          uint32_t value = size == 1 ? *(uint8_t *)state : (size == 2 ? *(uint16_t *)state : *(uint32_t *)state);
-          CODictWrLong(&node.Dict, CO_DEV(0x3000, 1), key);
-          CODictWrLong(&node.Dict, CO_DEV(0x3000, 2), value);
-          COTPdoTrigPdo(node.TPdo, 3);
-        }
+        // if(initialized) {
+        //   uint32_t value = size == 1 ? *(uint8_t *)state : (size == 2 ? *(uint16_t *)state : *(uint32_t *)state);
+        //   CODictWrLong(&node.Dict, CO_DEV(0x3000, 1), key);
+        //   CODictWrLong(&node.Dict, CO_DEV(0x3000, 2), value);
+        //   COTPdoTrigPdo(node.TPdo, 3);
+        // }
       }
     }
 

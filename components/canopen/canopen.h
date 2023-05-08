@@ -67,7 +67,6 @@ namespace esphome {
       CanStatus last_status;
       struct timeval status_time;
 
-      bool initialized;
       void rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t size);
 
       OperationalTrigger *on_operational;
@@ -113,6 +112,9 @@ namespace esphome {
 
       float get_setup_priority() const { return esphome::setup_priority::BUS; }
       void setup();
+      bool is_initialized() {
+        return node.Nmt.Mode == CO_PREOP || node.Nmt.Mode == CO_OPERATIONAL;
+      }
       void add_rpdo_dummy(uint8_t idx, uint8_t size);
       void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
       void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd);
