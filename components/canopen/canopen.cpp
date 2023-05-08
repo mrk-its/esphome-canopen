@@ -34,7 +34,7 @@ namespace esphome {
       return od_str;
     }
 
-    void CanopenComponent::initialize(canbus::Canbus *canbus, uint32_t node_id) {
+    CanopenComponent::CanopenComponent(canbus::Canbus *canbus, uint32_t node_id) {
       ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03x", node_id);
       NodeSpec.NodeId = node_id;
       CODictInit(&node.Dict, &node, NodeSpec.Dict, NodeSpec.DictLen);
