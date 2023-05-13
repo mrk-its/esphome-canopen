@@ -85,7 +85,6 @@ namespace esphome {
       uint32_t entity_id, uint8_t type, const std::string &name, const std::string &device_class,
       const std::string &unit, const std::string &state_class
     ) {
-      uint8_t max_sub=1;
       uint32_t index = get_entity_index(entity_id);
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x2000, entity_id, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA)type);
       if(name.size())
@@ -335,14 +334,10 @@ namespace esphome {
         od_set_state(brightness_key, &brightness, 1);
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
-          if(((uint8_t *)buffer)[0]) {
-              light->turn_on().perform();
-          } else {
-              light->turn_off().perform();
-          }
+          light->make_call().set_state(((uint8_t *)buffer)[0]).perform();
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
-          light->turn_on().set_brightness_if_supported(float(((uint8_t *)buffer)[0]) / 255.0).perform();
+          light->make_call().set_brightness_if_supported(float(((uint8_t *)buffer)[0]) / 255.0).perform();
       });
     }
     #endif
