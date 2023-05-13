@@ -89,10 +89,6 @@ namespace esphome {
       }
       void set_operational_mode();
 
-      float get_setup_priority() {
-        return this->canbus->get_setup_priority() - 1.0f;
-      }
-
       void setup_csdo(uint8_t num, uint8_t node_id, uint32_t tx_id, uint32_t rx_id);
       void csdo_recv(uint8_t num, uint32_t key, std::function<void(uint32_t, uint32_t)> cb);
 
@@ -110,7 +106,7 @@ namespace esphome {
         csdo_send_data(num, key, (uint8_t *)(&value), 4);
       }
 
-      float get_setup_priority() const { return esphome::setup_priority::BUS; }
+      float get_setup_priority() const override { return setup_priority::HARDWARE - 1.0; }
       void setup();
       bool is_initialized() {
         return node.Nmt.Mode == CO_PREOP || node.Nmt.Mode == CO_OPERATIONAL;
