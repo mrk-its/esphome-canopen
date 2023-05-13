@@ -440,6 +440,8 @@ namespace esphome {
     }
 
     void CanopenComponent::setup() {
+      ESP_LOGCONFIG(TAG, "Setting up CANopen...");
+
       FirmwareObj.domain.Size = 1024 * 1024;
       FirmwareObj.backend = esphome::ota::make_ota_backend();
 
@@ -465,30 +467,41 @@ namespace esphome {
       }
 
       CONodeStart(&node);
+      set_pre_operational_mode();
+    }
 
+    void CanopenComponent::set_pre_operational_mode() {
       CONmtSetMode(&node.Nmt, CO_PREOP);
-
+      ESP_LOGI(TAG, "node is pre_operational");
       if(on_pre_operational) {
         on_pre_operational->trigger();
       } else {
         set_operational_mode();
       }
-
     }
 
     void CanopenComponent::set_operational_mode() {
+      // update dictionary size
+      // as new entries may have been added on pre_operational phase
+      CODictInit(&node.Dict, &node, NodeSpec.Dict, NodeSpec.DictLen);
       CONmtSetMode(&node.Nmt, CO_OPERATIONAL);
-      if(on_operational) on_operational->trigger();
-      ESP_LOGI(TAG, "canopen initialized");
-      CO_OBJ *od=NodeSpec.Dict;
-      uint32_t index = 0;
-      ESP_LOGI(TAG, "############# Object Dictionary #############");
-      while (index < NodeSpec.DictLen && (od->Key != 0)) {
-        ESP_LOGI(TAG, "OD Index: %02x Key: %08x Data: %08x Type: %08x", index, od->Key, od->Data, od->Type);
+
+      ESP_LOGD(TAG, "############# Object Dictionary #############");
+      uint16_t index = 0;
+      for(auto od=node.Dict.Root; index < NodeSpec.DictLen && (od->Key != 0);) {
+        ESP_LOGD(TAG, "OD Index: %02x Key: %08x Data: %08x Type: %08x", index, od->Key, od->Data, od->Type);
         index++;
         od++;
       }
-      ESP_LOGI(TAG, "#############################################");
+      ESP_LOGD(TAG, "#############################################");
+
+      ESP_LOGI(TAG, "node is operational");
+
+      for(auto tpdo=0; tpdo < CO_TPDO_N; tpdo++) {
+          COTPdoTrigPdo(node.TPdo, tpdo);
+      }
+
+      if(on_operational) on_operational->trigger();
     }
 
     void CanopenComponent::csdo_recv(uint8_t num, uint32_t key, std::function<void(uint32_t, uint32_t)> cb) {

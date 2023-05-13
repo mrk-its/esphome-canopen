@@ -97,6 +97,7 @@ namespace esphome {
       void add_trigger(PreOperationalTrigger *trigger) {
         on_pre_operational = trigger;
       }
+      void set_pre_operational_mode();
       void set_operational_mode();
 
       void setup_csdo(uint8_t num, uint8_t node_id, uint32_t tx_id, uint32_t rx_id);
