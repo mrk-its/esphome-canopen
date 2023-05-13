@@ -100,6 +100,8 @@ namespace esphome {
       void set_pre_operational_mode();
       void set_operational_mode();
 
+      void trig_tpdo(int8_t num=-1);
+
       void setup_csdo(uint8_t num, uint8_t node_id, uint32_t tx_id, uint32_t rx_id);
       void csdo_recv(uint8_t num, uint32_t key, std::function<void(uint32_t, uint32_t)> cb);
 

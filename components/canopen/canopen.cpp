@@ -497,11 +497,15 @@ namespace esphome {
 
       ESP_LOGI(TAG, "node is operational");
 
-      for(auto tpdo=0; tpdo < CO_TPDO_N; tpdo++) {
-          COTPdoTrigPdo(node.TPdo, tpdo);
-      }
-
       if(on_operational) on_operational->trigger();
+    }
+
+    void CanopenComponent::trig_tpdo(int8_t num) {
+      for(auto tpdo=0; tpdo < CO_TPDO_N; tpdo++) {
+        if(node.TPdo[tpdo].ObjNum > 0 && (num < 0 || tpdo == num)) {
+          COTPdoTrigPdo(node.TPdo, tpdo);
+        }
+      }
     }
 
     void CanopenComponent::csdo_recv(uint8_t num, uint32_t key, std::function<void(uint32_t, uint32_t)> cb) {
