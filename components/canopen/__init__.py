@@ -55,7 +55,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("on_operational"): automation.validate_automation({
         cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(OperationalTrigger),
     }),
-})
+    cv.Optional("state_update_delay", "50ms"): cv.positive_time_period_microseconds,
+}).extend(cv.COMPONENT_SCHEMA)
 
 def to_code(config):
     cg.add_library("canopenstack=https://github.com/mrk-its/canopen-stack", "0.0.0")
@@ -63,6 +64,7 @@ def to_code(config):
     canbus = yield cg.get_variable(config["canbus_id"])
     node_id = config["node_id"]
     canopen = cg.new_Pvariable(config[CONF_ID], canbus, node_id)
+    cg.add(canopen.set_state_update_delay(config["state_update_delay"]))
     yield cg.register_component(canopen, config)
 
     entities = sorted(config.get(CONF_ENTITIES, []), key=lambda x: x['index'])

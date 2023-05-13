@@ -47,6 +47,7 @@ namespace esphome {
       this->canbus = canbus;
       on_operational = 0;
       on_pre_operational = 0;
+      state_update_delay_us=0;
       memset(&status, 0, sizeof(status));
       memset(&last_status, 0, sizeof(last_status));
 
@@ -59,6 +60,9 @@ namespace esphome {
       };
       lambdaaction = new LambdaAction<std::vector<uint8_t>, uint32_t, bool>(cb);
       automation->add_actions({lambdaaction});
+    }
+    void CanopenComponent::set_state_update_delay(uint32_t delay_us) {
+      state_update_delay_us = delay_us;
     }
 
     void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
@@ -123,30 +127,25 @@ namespace esphome {
       return CO_KEY(entity_index + 1, state_sub_index, 0);
     }
 
-
     void  CanopenComponent::od_set_state(uint32_t key, void *state, uint8_t size) {
       auto obj = CODictFind(&node.Dict, key);
       if(!obj) return;
       if(!size) {
         size = obj->Type->Size(obj, &node, 4);
       }
-      auto initialized = is_initialized();
-      if(CO_IS_PDOMAP(obj->Key)) {
-        if(initialized) {
-          // trigger tpdo
-          COObjWrValue(obj, &node, state, size);
-        } else {
-          CODictWrBuffer(&node.Dict, key, (uint8_t *)state, size);
-        }
+      auto it=queued_states.begin();
+      while(it!=queued_states.end() && it->obj != obj) it++;
+      if(it != queued_states.end()) {
+        it->size = size;
+        memcpy(&it->state, state, size);
+        gettimeofday(&it->time, NULL);
       } else {
-        CODictWrBuffer(&node.Dict, key, (uint8_t *)state, size);
-        // if(initialized) {
-        //   uint32_t value = size == 1 ? *(uint8_t *)state : (size == 2 ? *(uint16_t *)state : *(uint32_t *)state);
-        //   CODictWrLong(&node.Dict, CO_DEV(0x3000, 1), key);
-        //   CODictWrLong(&node.Dict, CO_DEV(0x3000, 2), value);
-        //   COTPdoTrigPdo(node.TPdo, 3);
-        // }
-      }
+        QueuedState qstate = {obj, {}, size, {}};
+        qstate.size = size;
+        memcpy(&qstate.state, state, size);
+        gettimeofday(&qstate.time, NULL);
+        queued_states.push_back(qstate);
+      };
     }
 
     uint32_t CanopenComponent::od_add_cmd(
@@ -543,6 +542,17 @@ namespace esphome {
 
       struct timeval tv_now;
       gettimeofday(&tv_now, NULL);
+
+      for (auto it = queued_states.begin(); it != queued_states.end(); ) {
+          uint32_t diff = (tv_now.tv_sec - it->time.tv_sec) * 1000000 + (tv_now.tv_usec - it->time.tv_usec);
+          if(diff >= state_update_delay_us) {
+            COObjWrValue(it->obj, &node, &it->state, it->size);
+            it = queued_states.erase(it);
+          } else {
+            ++it;
+          }
+      }
+
       if(abs(tv_now.tv_sec - status_time.tv_sec) >= status_update_interval) {
         if(get_can_status(status)) {
           if(memcmp(&status, &last_status, sizeof(status)) != 0) {

@@ -57,6 +57,14 @@ namespace esphome {
       uint32_t arb_lost;
       uint32_t bus_err;
     };
+
+    struct QueuedState {
+      CO_OBJ_T *obj;
+      uint32_t state;
+      uint8_t size;
+      struct timeval time;
+    };
+
     const uint32_t status_update_interval = 1;
 
     class OperationalTrigger : public Trigger<> {};
@@ -71,6 +79,8 @@ namespace esphome {
 
       OperationalTrigger *on_operational;
       PreOperationalTrigger *on_pre_operational;
+      std::vector<QueuedState> queued_states;
+      uint32_t state_update_delay_us;
 
       public:
       CanStatus status;
@@ -147,6 +157,7 @@ namespace esphome {
       uint32_t od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size, int8_t tpdo);
       uint32_t od_add_cmd(uint32_t entity_id, std::function< void(void *, uint32_t)> cb, const CO_OBJ_TYPE *type=CO_TCMD8);
 
+      void set_state_update_delay(uint32_t delay_ms);
       void od_set_state(uint32_t key, void *state, uint8_t size);
       void on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
       void loop() override;
