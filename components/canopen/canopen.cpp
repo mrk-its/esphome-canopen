@@ -98,6 +98,13 @@ namespace esphome {
         ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 4, CO_OBJ_D___R_), CO_TSTRING, (CO_DATA)od_string(state_class));
     }
 
+    void CanopenComponent::od_add_sensor_metadata(uint32_t entity_id, uint8_t size, float min_value, float max_value) {
+      uint32_t index = get_entity_index(entity_id);
+      ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 5, CO_OBJ_____R_), CO_TUNSIGNED8, (CO_DATA)size);
+      ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 6, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA)*(uint32_t *)&min_value);
+      ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 6, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA)*(uint32_t *)&max_value);
+    }
+
     uint32_t CanopenComponent::od_add_state(
       uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size, int8_t tpdo
     ) {
@@ -227,6 +234,7 @@ namespace esphome {
         sensor->get_name(), sensor->get_device_class(), "",
         esphome::sensor::state_class_to_string(sensor->get_state_class())
       );
+      od_add_sensor_metadata(entity_id, size, min_val, max_val);
       uint32_t state_key;
 
       const CO_OBJ_TYPE *type;

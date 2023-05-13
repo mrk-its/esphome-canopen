@@ -154,6 +154,7 @@ namespace esphome {
         const std::string &unit,
         const std::string &state_class
       );
+      void od_add_sensor_metadata(uint32_t entity_id, uint8_t size, float min_value, float max_value);
       uint32_t od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size, int8_t tpdo);
       uint32_t od_add_cmd(uint32_t entity_id, std::function< void(void *, uint32_t)> cb, const CO_OBJ_TYPE *type=CO_TCMD8);
 
