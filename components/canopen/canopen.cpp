@@ -452,9 +452,6 @@ namespace esphome {
         ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + i, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA)254);
       }
 
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1a03, 1, CO_OBJ_D___R_), CO_TUNSIGNED32, CO_LINK(0x3000, 1, 32)); // map 32-bits of 0x3000,1 entry to first part of PDO3
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1a03, 2, CO_OBJ_D___R_), CO_TUNSIGNED32, CO_LINK(0x3000, 2, 32)); // map 32-bits of 0x3000,2 entry to second part of PDO3
-
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 1, CO_OBJ_D____W), FW_CTRL, (CO_DATA)0);
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 2, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA)(&FirmwareObj.size));
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 3, CO_OBJ______W), CO_TDOMAIN, (CO_DATA)(&FirmwareMD5));
