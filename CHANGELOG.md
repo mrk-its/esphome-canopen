@@ -6,3 +6,7 @@
   * min_value: min_value of sensor, used for scaling
   * max_value: max value of sensor, used for scaling
   values outside of range are clipped into [min_value, max_value]
+
+* configure canopen early, with setup_priority::HARDWARE
+* fix 'oscillations' caused by mutual state updates by delaying state update by configured amount of time (50ms by default, can be changed via `state_update_delay` config option)
+* add `trig_tpdo` method to trigger TPDO
