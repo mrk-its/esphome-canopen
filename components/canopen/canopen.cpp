@@ -220,7 +220,7 @@ namespace esphome {
     }
 
     #ifdef LOG_SENSOR
-    void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo) {
+    void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo, uint8_t size, float min_val, float max_val) {
       float state = sensor->get_state();
       od_add_metadata(
         entity_id,
@@ -228,12 +228,48 @@ namespace esphome {
         sensor->get_name(), sensor->get_device_class(), "",
         esphome::sensor::state_class_to_string(sensor->get_state_class())
       );
-      auto state_key = od_add_state(entity_id, CO_TUNSIGNED32, &state, 4, tpdo);
+      uint32_t state_key;
+
+      const CO_OBJ_TYPE *type;
+      std::function<uint32_t(float state)> to_wire;
+      std::function<float(void *buf)> from_wire;
+
+      auto scale_to_wire = [=](float value, float n_levels) {
+        float result = n_levels * (value - min_val) / (max_val - min_val + 1);
+        return result < 0 ? 0 : (result > n_levels - 1 ? n_levels - 1 : result);
+      };
+      auto scale_from_wire = [=](float value, float n_levels) {
+        return value * (max_val - min_val + 1) / n_levels + min_val;
+      };
+
+      switch(size) {
+        case 1:
+          to_wire = [=](float state) { return (uint8_t)scale_to_wire(state, 256); };
+          from_wire = [=](void *buf) {return scale_from_wire((float)*(uint8_t *)buf, 256); };
+          type = CO_TUNSIGNED8;
+          break;
+        case 2:
+          to_wire = [=](float state) { return (uint16_t)scale_to_wire(state, 65536); };
+          from_wire = [=](void *buf) {return scale_from_wire((float)*(uint16_t *)buf, 65536); };
+          type = CO_TUNSIGNED16;
+          break;
+        case 4:
+          to_wire = [=](float state) { return *(uint32_t*)&state; };
+          from_wire = [=](void *buf) {return *(float *)buf; };
+          type = CO_TUNSIGNED32;
+          break;
+        default:
+          ESP_LOGE(TAG, "Unsupported sensor size: %d", size);
+          return;
+      }
+      auto casted_state = to_wire(state);
+      state_key = od_add_state(entity_id, type, &casted_state, size, tpdo);
       sensor->add_on_state_callback([=](float value) {
-        od_set_state(state_key, &value, 4);
+        auto casted_state = to_wire(value);
+        od_set_state(state_key, &casted_state, size);
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
-          sensor->publish_state(*(float *)buffer);
+        sensor->publish_state(from_wire(buffer));
       }, CO_TCMD32);
     }
     #endif

@@ -35,6 +35,9 @@ RPDO_SCHEMA = cv.Schema({
 ENTITY_SCHEMA = cv.Schema({
     cv.Required("id"): cv.use_id(cg.EntityBase),
     cv.Required("index"): cv.int_,
+    cv.Optional("size"): cv.int_,
+    cv.Optional("min_value", 0): cv.float_,
+    cv.Optional("max_value", 0): cv.float_,
     cv.Optional("tpdo"): cv.int_,
     cv.Optional("rpdo"): cv.ensure_list(RPDO_SCHEMA),
 })
@@ -67,7 +70,13 @@ def to_code(config):
     for entity_config in entities:
         entity = yield cg.get_variable(entity_config["id"])
         tpdo = entity_config.get("tpdo", -1)
-        cg.add(canopen.add_entity(entity, entity_config["index"], tpdo))
+        size = entity_config.get("size")
+        if size in (1, 2):
+            min_val = entity_config.get("min_value", 0)
+            max_val = entity_config.get("max_value", 255 if size == 1 else 65535)
+            cg.add(canopen.add_entity(entity, entity_config["index"], tpdo, size, min_val, max_val))
+        else:
+            cg.add(canopen.add_entity(entity, entity_config["index"], tpdo))
 
     for num, csdo in enumerate(config.get("csdo", ())):
         cg.add(canopen.setup_csdo(num, csdo["node_id"], csdo["tx_id"], csdo["rx_id"]))

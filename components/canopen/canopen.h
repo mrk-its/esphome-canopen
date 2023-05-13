@@ -121,7 +121,7 @@ namespace esphome {
 
       // void add_status(uint32_t entity_id, uint32_t update_interval);
       #ifdef LOG_SENSOR
-      void add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo);
+      void add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo, uint8_t size=4, float min_val=0, float max_val=0);
       #endif
 
       #ifdef LOG_BINARY_SENSOR
