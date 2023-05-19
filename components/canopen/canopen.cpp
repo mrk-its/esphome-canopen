@@ -129,7 +129,8 @@ namespace esphome {
       ODAddUpdate(NodeSpec.Dict, CO_KEY(entity_index + 1, state_sub_index, async_pdo_mask | CO_OBJ_D___R_), type, value);
 
       if(tpdo >= 0) {
-        ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32, CO_COBID_TPDO_DEFAULT(tpdo));
+        ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32,
+          tpdo < 4 ? CO_COBID_TPDO_DEFAULT(tpdo) : CO_COBID_TPDO_DEFAULT(tpdo-4) + 0x80);
         ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA)254);
 
         uint8_t tpdo_sub_index = 0;
@@ -218,7 +219,7 @@ namespace esphome {
         NodeSpec.Dict,
         CO_KEY(0x1400 + idx, 1, CO_OBJ_D___R_),
         CO_TUNSIGNED32,
-        CO_COBID_RPDO_STD(1, 0x180 + CO_COBID_RPDO_INC * tpdo + node_id)
+        (tpdo<4 ? CO_COBID_TPDO_DEFAULT(tpdo) : CO_COBID_TPDO_DEFAULT(tpdo-4) + 0x80) + node_id
       );
       ODAddUpdate(
         NodeSpec.Dict,
@@ -450,14 +451,16 @@ namespace esphome {
 
     void CanopenComponent::setup() {
       ESP_LOGCONFIG(TAG, "Setting up CANopen...");
+      ESP_LOGD(TAG, "CO_TPDO_N: %d", CO_TPDO_N);
+      ESP_LOGD(TAG, "CO_RPDO_N: %d", CO_RPDO_N);
 
       FirmwareObj.domain.Size = 1024 * 1024;
       FirmwareObj.backend = esphome::ota::make_ota_backend();
 
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1008, 0, CO_OBJ_____R_), CO_TSTRING,     (CO_DATA)(&ManufacturerDeviceNameObj));
 
-      for(uint8_t i=0; i<4; i++) {
-        ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + i, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32, CO_COBID_TPDO_DEFAULT(i));
+      for(uint8_t i=0; i<8; i++) {
+        ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + i, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32, i < 4 ? CO_COBID_TPDO_DEFAULT(i) : CO_COBID_TPDO_DEFAULT(i - 4) + 0x80);
         ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + i, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA)254);
       }
 

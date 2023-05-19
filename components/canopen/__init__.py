@@ -59,7 +59,7 @@ CONFIG_SCHEMA = cv.Schema({
 }).extend(cv.COMPONENT_SCHEMA)
 
 def to_code(config):
-    cg.add_library("canopenstack=https://github.com/mrk-its/canopen-stack", "0.0.0")
+    cg.add_library("canopenstack=https://github.com/mrk-its/canopen-stack#dev", "0.0.0")
     # cg.add_library("canopenstack=file:///home/mrk/canopen-stack", "0.0.0")
     canbus = yield cg.get_variable(config["canbus_id"])
     node_id = config["node_id"]
