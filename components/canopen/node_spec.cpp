@@ -27,7 +27,7 @@
 #define APP_BAUDRATE      250000u             /* CAN baudrate                */
 #define APP_TMR_N         16u                 /* Number of software timers   */
 #define APP_TICKS_PER_SEC 1000000u            /* Timer clock frequency in Hz */
-#define APP_OBJ_N         128u                /* Object dictionary max size  */
+#define APP_OBJ_N         256u                /* Object dictionary max size  */
 
 /******************************************************************************
 * PRIVATE VARIABLES
@@ -50,12 +50,6 @@ const  uint32_t Obj1018_04_20 = 0x00000000L;
 
 const  uint32_t Obj1200_01_20 = CO_COBID_SDO_REQUEST();
 const  uint32_t Obj1200_02_20 = CO_COBID_SDO_RESPONSE();
-
-const  uint32_t Obj1800_01_20 = CO_COBID_TPDO_DEFAULT(0);
-
-const  uint32_t Obj1A00_01_20 = CO_LINK(0x2100, 0x01, 32);
-const  uint32_t Obj1A00_02_20 = CO_LINK(0x2100, 0x02,  8);
-const  uint32_t Obj1A00_03_20 = CO_LINK(0x2100, 0x03,  8);
 
 /* define the static object dictionary */
 static struct CO_OBJ_T ClockOD[APP_OBJ_N] = {

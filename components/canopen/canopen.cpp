@@ -88,20 +88,29 @@ namespace esphome {
       uint32_t index = get_entity_index(entity_id);
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x2000, entity_id, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA)type);
       if(name.size())
-        ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 1, CO_OBJ_____R_), CO_TSTRING, (CO_DATA)od_string(name));
+        ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_NAME, CO_OBJ_____R_), CO_TSTRING, (CO_DATA)od_string(name));
       if(device_class.size())
-        ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 2, CO_OBJ_____R_), CO_TSTRING, (CO_DATA)od_string(device_class));
+        ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_DEVICE_CLASS, CO_OBJ_____R_), CO_TSTRING, (CO_DATA)od_string(device_class));
       if(unit.size())
-        ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 3, CO_OBJ_____R_), CO_TSTRING, (CO_DATA)od_string(unit));
+        ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_UNIT, CO_OBJ_____R_), CO_TSTRING, (CO_DATA)od_string(unit));
       if(state_class.size())
-        ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 4, CO_OBJ_D___R_), CO_TSTRING, (CO_DATA)od_string(state_class));
+        ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_STATE_CLASS, CO_OBJ_D___R_), CO_TSTRING, (CO_DATA)od_string(state_class));
     }
 
-    void CanopenComponent::od_add_sensor_metadata(uint32_t entity_id, uint8_t size, float min_value, float max_value) {
+    void CanopenComponent::od_add_sensor_metadata(uint32_t entity_id, float min_value, float max_value) {
       uint32_t index = get_entity_index(entity_id);
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 5, CO_OBJ_____R_), CO_TUNSIGNED8, (CO_DATA)size);
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 6, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA)*(uint32_t *)&min_value);
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 0, 6, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA)*(uint32_t *)&max_value);
+      ODAddUpdate(
+        NodeSpec.Dict,
+        CO_KEY(index, ENTITY_INDEX_SENSOR_MIN_VALUE, CO_OBJ_D___R_),
+        CO_TUNSIGNED32,
+        (CO_DATA)*(uint32_t *)&min_value
+      );
+      ODAddUpdate(
+        NodeSpec.Dict,
+        CO_KEY(index, ENTITY_INDEX_SENSOR_MAX_VALUE, CO_OBJ_D___R_),
+        CO_TUNSIGNED32,
+        (CO_DATA)*(uint32_t *)&max_value
+      );
     }
 
     uint32_t CanopenComponent::od_add_state(
@@ -229,11 +238,11 @@ namespace esphome {
       float state = sensor->get_state();
       od_add_metadata(
         entity_id,
-        ENTITY_TYPE_SENSOR,
+        size == 1 ? ENTITY_TYPE_SENSOR_UINT8 : size == 2 ? ENTITY_TYPE_SENSOR_UINT16 : ENTITY_TYPE_SENSOR,
         sensor->get_name(), sensor->get_device_class(), "",
         esphome::sensor::state_class_to_string(sensor->get_state_class())
       );
-      od_add_sensor_metadata(entity_id, size, min_val, max_val);
+      od_add_sensor_metadata(entity_id, min_val, max_val);
       uint32_t state_key;
 
       const CO_OBJ_TYPE *type;

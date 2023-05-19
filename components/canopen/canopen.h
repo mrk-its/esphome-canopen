@@ -18,12 +18,18 @@ const int8_t ENTITY_TYPE_BINARY_SENSOR = 2;
 const int8_t ENTITY_TYPE_SWITCH = 3;
 const int8_t ENTITY_TYPE_COVER = 4;
 const int8_t ENTITY_TYPE_LIGHT = 5;
+const int8_t ENTITY_TYPE_SENSOR_UINT8 = 6;
+const int8_t ENTITY_TYPE_SENSOR_UINT16 = 7;
 const uint8_t ENTITY_TYPE_CAN_STATUS = 254;
 
-const uint8_t ENTITY_INDEX_TYPE = 1;
+const uint8_t ENTITY_INDEX_NAME = 1;
 const uint8_t ENTITY_INDEX_DEVICE_CLASS = 2;
-const uint8_t ENTITY_INDEX_NAME = 3;
-const uint8_t ENTITY_INDEX_UNIT = 4;
+const uint8_t ENTITY_INDEX_UNIT = 3;
+const uint8_t ENTITY_INDEX_STATE_CLASS = 4;
+
+const uint8_t ENTITY_INDEX_SENSOR_MIN_VALUE = 7;
+const uint8_t ENTITY_INDEX_SENSOR_MAX_VALUE = 8;
+
 
 const int32_t PROPERTY_STATE0 = 0;
 const int32_t PROPERTY_STATE1= 1;
@@ -157,7 +163,7 @@ namespace esphome {
         const std::string &unit,
         const std::string &state_class
       );
-      void od_add_sensor_metadata(uint32_t entity_id, uint8_t size, float min_value, float max_value);
+      void od_add_sensor_metadata(uint32_t entity_id, float min_value, float max_value);
       uint32_t od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size, int8_t tpdo);
       uint32_t od_add_cmd(uint32_t entity_id, std::function< void(void *, uint32_t)> cb, const CO_OBJ_TYPE *type=CO_TCMD8);
 
