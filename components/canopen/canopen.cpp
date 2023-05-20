@@ -48,6 +48,7 @@ namespace esphome {
       on_operational = 0;
       on_pre_operational = 0;
       state_update_delay_us=0;
+      heartbeat_interval_ms=0;
       memset(&status, 0, sizeof(status));
       memset(&last_status, 0, sizeof(last_status));
 
@@ -63,6 +64,9 @@ namespace esphome {
     }
     void CanopenComponent::set_state_update_delay(uint32_t delay_us) {
       state_update_delay_us = delay_us;
+    }
+    void CanopenComponent::set_heartbeat_interval(uint16_t interval_ms) {
+      heartbeat_interval_ms = interval_ms;
     }
 
     void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
@@ -458,6 +462,9 @@ namespace esphome {
       FirmwareObj.backend = esphome::ota::make_ota_backend();
 
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1008, 0, CO_OBJ_____R_), CO_TSTRING,     (CO_DATA)(&ManufacturerDeviceNameObj));
+      if(heartbeat_interval_ms) {
+        ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1017, 0, CO_OBJ_D___RW), CO_THB_PROD, (CO_DATA)(heartbeat_interval_ms));
+      }
 
       for(uint8_t i=0; i<8; i++) {
         ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + i, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32, i < 4 ? CO_COBID_TPDO_DEFAULT(i) : CO_COBID_TPDO_DEFAULT(i - 4) + 0x80);

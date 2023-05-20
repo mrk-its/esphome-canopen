@@ -87,7 +87,7 @@ namespace esphome {
       PreOperationalTrigger *on_pre_operational;
       std::vector<QueuedState> queued_states;
       uint32_t state_update_delay_us;
-
+      uint16_t heartbeat_interval_ms;
       public:
       CanStatus status;
       std::map<uint32_t, std::function< void(void *, uint32_t)>> can_cmd_handlers;
@@ -168,6 +168,7 @@ namespace esphome {
       uint32_t od_add_cmd(uint32_t entity_id, std::function< void(void *, uint32_t)> cb, const CO_OBJ_TYPE *type=CO_TCMD8);
 
       void set_state_update_delay(uint32_t delay_ms);
+      void set_heartbeat_interval(uint16_t interval_ms);
       void od_set_state(uint32_t key, void *state, uint8_t size);
       void on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
       void loop() override;

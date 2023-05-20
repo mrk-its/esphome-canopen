@@ -56,6 +56,7 @@ CONFIG_SCHEMA = cv.Schema({
         cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(OperationalTrigger),
     }),
     cv.Optional("state_update_delay", "50ms"): cv.positive_time_period_microseconds,
+    cv.Optional("heartbeat_interval", "5000ms"): cv.positive_time_period_milliseconds,
 }).extend(cv.COMPONENT_SCHEMA)
 
 def to_code(config):
@@ -65,6 +66,7 @@ def to_code(config):
     node_id = config["node_id"]
     canopen = cg.new_Pvariable(config[CONF_ID], canbus, node_id)
     cg.add(canopen.set_state_update_delay(config["state_update_delay"]))
+    cg.add(canopen.set_heartbeat_interval(config["heartbeat_interval"]))
     yield cg.register_component(canopen, config)
 
     entities = sorted(config.get(CONF_ENTITIES, []), key=lambda x: x['index'])

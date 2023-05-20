@@ -36,8 +36,6 @@
 /* allocate variables for dynamic runtime value in RAM */
 static uint8_t  Obj1001_00_08 = 0;
 
-static uint16_t Obj1017_00_10 = 1024 * 10;
-
 /* allocate variables for constant values in FLASH */
 const  uint32_t Obj1000_00_20 = 0x00000000L;
 
@@ -56,7 +54,6 @@ static struct CO_OBJ_T ClockOD[APP_OBJ_N] = {
     {CO_KEY(0x1000, 0, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA)(&Obj1000_00_20)},
     {CO_KEY(0x1001, 0, CO_OBJ_____R_), CO_TUNSIGNED8 , (CO_DATA)(&Obj1001_00_08)},
     {CO_KEY(0x1014, 0, CO_OBJ__N__R_), CO_TEMCY_ID,    (CO_DATA)(&Obj1014_00_20)},
-    {CO_KEY(0x1017, 0, CO_OBJ_____RW), CO_THB_PROD,    (CO_DATA)(&Obj1017_00_10)},
 
     {CO_KEY(0x1018, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(4)             },
     {CO_KEY(0x1018, 1, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA)(&Obj1018_01_20)},
