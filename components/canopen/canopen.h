@@ -56,6 +56,7 @@ static const char *const TAG = "canopen";
 namespace esphome {
   namespace canopen {
     struct CanStatus {
+      uint8_t state;
       uint32_t tx_err;
       uint32_t rx_err;
       uint32_t tx_failed;
@@ -169,6 +170,8 @@ namespace esphome {
 
       void set_state_update_delay(uint32_t delay_ms);
       void set_heartbeat_interval(uint16_t interval_ms);
+      void initiate_recovery();
+      void start();
       void od_set_state(uint32_t key, void *state, uint8_t size);
       void on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
       void loop() override;

@@ -561,6 +561,7 @@ namespace esphome {
     bool CanopenComponent::get_can_status(CanStatus &status_info) {
       twai_status_info_t twai_status_info;
       if(twai_get_status_info(&twai_status_info) == ESP_OK) {
+        status_info.state = twai_status_info.state;
         status_info.bus_err = twai_status_info.bus_error_count;
         status_info.arb_lost = twai_status_info.arb_lost_count;
         status_info.tx_err = twai_status_info.tx_error_counter;
@@ -570,6 +571,14 @@ namespace esphome {
         return true;
       }
       return false;
+    }
+
+    void CanopenComponent::initiate_recovery() {
+      twai_initiate_recovery();
+    }
+
+    void CanopenComponent::start() {
+      twai_start();
     }
 
     void CanopenComponent::loop() {
