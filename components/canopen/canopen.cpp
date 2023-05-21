@@ -36,6 +36,8 @@ namespace esphome {
 
     CanopenComponent::CanopenComponent(canbus::Canbus *canbus, uint32_t node_id) {
       ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03x", node_id);
+      memset(rpdo_buf, 0, sizeof(rpdo_buf));
+
       NodeSpec.NodeId = node_id;
       CODictInit(&node.Dict, &node, NodeSpec.Dict, NodeSpec.DictLen);
 
@@ -185,16 +187,14 @@ namespace esphome {
     }
 
     void CanopenComponent::rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t bit_size) {
-      uint8_t sub_index = 0;
       auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1600 + idx, 0));
-      if(obj) sub_index = obj -> Data;
-      sub_index += 1;
-      ODAddUpdate(
-        NodeSpec.Dict,
-        CO_KEY(0x1600 + idx, sub_index, CO_OBJ_D___R_),
-        CO_TUNSIGNED32,
-        CO_LINK(index, sub, bit_size)
-      );
+      if(!obj) {
+        ESP_LOGE(TAG, "RPDO map %d not found", idx);
+        return;
+      }
+      uint8_t *sub_index_ptr = (uint8_t *)(obj -> Data);
+      *sub_index_ptr += 1;
+      *(uint32_t *)(obj[*sub_index_ptr].Data) = CO_LINK(index, sub, bit_size);
     }
 
     void CanopenComponent::add_rpdo_dummy(uint8_t idx, uint8_t size) {
@@ -219,18 +219,14 @@ namespace esphome {
       }
     }
     void CanopenComponent::add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo) {
-      ODAddUpdate(
-        NodeSpec.Dict,
-        CO_KEY(0x1400 + idx, 1, CO_OBJ_D___R_),
-        CO_TUNSIGNED32,
-        (tpdo<4 ? CO_COBID_TPDO_DEFAULT(tpdo) : CO_COBID_TPDO_DEFAULT(tpdo-4) + 0x80) + node_id
-      );
-      ODAddUpdate(
-        NodeSpec.Dict,
-        CO_KEY(0x1400 + idx, 2, CO_OBJ_D___R_),
-        CO_TUNSIGNED8,
-        (CO_DATA)254
-      );
+      auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1400 + idx, 0));
+      if(!obj) {
+        ESP_LOGE(TAG, "RPDO param %d not found", idx);
+        return;
+      }
+      *(uint8_t *)(obj -> Data) = 2;
+      *(uint32_t *)(obj[1].Data) = (tpdo<4 ? CO_COBID_TPDO_DEFAULT(tpdo) : CO_COBID_TPDO_DEFAULT(tpdo-4) + 0x80) + node_id;
+      *(uint8_t *)(obj[2].Data) = 254;
     }
 
     void CanopenComponent::add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd) {
@@ -511,7 +507,13 @@ namespace esphome {
       ESP_LOGD(TAG, "############# Object Dictionary #############");
       uint16_t index = 0;
       for(auto od=node.Dict.Root; index < NodeSpec.DictLen && (od->Key != 0);) {
-        ESP_LOGD(TAG, "OD Index: %02x Key: %08x Data: %08x Type: %08x", index, od->Key, od->Data, od->Type);
+        uint32_t value = od->Key & CO_OBJ_D_____ ? od->Data : (*(uint32_t *)od->Data);
+        if(od->Type && od->Type->Size) {
+          auto size = od->Type->Size(od, &node, 4);
+          if(size == 1) value &= 0xff;
+          else if(size == 2) value &= 0xffff;
+        }
+        ESP_LOGD(TAG, "OD Index: %02x Key: %08x Data: %08x Type: %08x", index, od->Key, value, od->Type);
         index++;
         od++;
       }

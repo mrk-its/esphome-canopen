@@ -49,6 +49,25 @@ const uint32_t SERIAL_NUMBER = 0x00000000;
 const  uint32_t Obj1200_01_20 = CO_COBID_SDO_REQUEST();
 const  uint32_t Obj1200_02_20 = CO_COBID_SDO_RESPONSE();
 
+uint8_t rpdo_buf[CO_RPDO_N][41];
+
+#define RPDO_PARAM(n) \
+  {CO_KEY(0x1400 + n, 0, CO_OBJ_____RW), CO_TUNSIGNED8 , (CO_DATA)rpdo_buf[n] + 0}, \
+  {CO_KEY(0x1400 + n, 1, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA)rpdo_buf[n] + 1}, \
+  {CO_KEY(0x1400 + n, 2, CO_OBJ_____RW), CO_TUNSIGNED8 , (CO_DATA)rpdo_buf[n] + 5}, \
+  {CO_KEY(0x1400 + n, 3, CO_OBJ_____RW), CO_TUNSIGNED16, (CO_DATA)rpdo_buf[n] + 6}
+
+#define RPDO_MAPPING(n) \
+  {CO_KEY(0x1600 + n, 0, CO_OBJ_____RW), CO_TUNSIGNED8 , (CO_DATA)rpdo_buf[n] + 8}, \
+  {CO_KEY(0x1600 + n, 1, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA)rpdo_buf[n] + 9}, \
+  {CO_KEY(0x1600 + n, 2, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA)rpdo_buf[n] + 13}, \
+  {CO_KEY(0x1600 + n, 3, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA)rpdo_buf[n] + 17}, \
+  {CO_KEY(0x1600 + n, 4, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA)rpdo_buf[n] + 21}, \
+  {CO_KEY(0x1600 + n, 5, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA)rpdo_buf[n] + 25}, \
+  {CO_KEY(0x1600 + n, 6, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA)rpdo_buf[n] + 29}, \
+  {CO_KEY(0x1600 + n, 7, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA)rpdo_buf[n] + 33}, \
+  {CO_KEY(0x1600 + n, 8, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA)rpdo_buf[n] + 37}
+
 /* define the static object dictionary */
 static struct CO_OBJ_T ClockOD[APP_OBJ_N] = {
     {CO_KEY(0x1000, 0, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA)(&Obj1000_00_20)},
@@ -64,16 +83,55 @@ static struct CO_OBJ_T ClockOD[APP_OBJ_N] = {
     {CO_KEY(0x1200, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(2)             },
     {CO_KEY(0x1200, 1, CO_OBJ__N__R_), CO_TUNSIGNED32, (CO_DATA)(&Obj1200_01_20)},
     {CO_KEY(0x1200, 2, CO_OBJ__N__R_), CO_TUNSIGNED32, (CO_DATA)(&Obj1200_02_20)},
+    # if CO_RPDO_N > 0
+    RPDO_PARAM(0),
+    # endif
+    # if CO_RPDO_N > 1
+    RPDO_PARAM(1),
+    # endif
+    # if CO_RPDO_N > 2
+    RPDO_PARAM(2),
+    # endif
+    # if CO_RPDO_N > 3
+    RPDO_PARAM(3),
+    # endif
+    # if CO_RPDO_N > 4
+    RPDO_PARAM(4),
+    # endif
+    # if CO_RPDO_N > 5
+    RPDO_PARAM(5),
+    # endif
+    # if CO_RPDO_N > 6
+    RPDO_PARAM(6),
+    # endif
+    # if CO_RPDO_N > 7
+    RPDO_PARAM(7),
+    # endif
 
-    {CO_KEY(0x1400, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
-    {CO_KEY(0x1401, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
-    {CO_KEY(0x1402, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
-    {CO_KEY(0x1403, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
-
-    {CO_KEY(0x1600, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
-    {CO_KEY(0x1601, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
-    {CO_KEY(0x1602, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
-    {CO_KEY(0x1603, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
+    # if CO_RPDO_N > 0
+    RPDO_MAPPING(0),
+    # endif
+    # if CO_RPDO_N > 1
+    RPDO_MAPPING(1),
+    # endif
+    # if CO_RPDO_N > 2
+    RPDO_MAPPING(2),
+    # endif
+    # if CO_RPDO_N > 3
+    RPDO_MAPPING(3),
+    # endif
+    # if CO_RPDO_N > 4
+    RPDO_MAPPING(4),
+    # endif
+    # if CO_RPDO_N > 5
+    RPDO_MAPPING(5),
+    # endif
+    # if CO_RPDO_N > 6
+    RPDO_MAPPING(6),
+    # endif
+    # if CO_RPDO_N > 7
+    RPDO_MAPPING(7),
+    # endif
 
     {CO_KEY(0x1800, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
     {CO_KEY(0x1801, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(0)             },
