@@ -57,6 +57,8 @@ CONFIG_SCHEMA = cv.Schema({
     }),
     cv.Optional("state_update_delay", "50ms"): cv.positive_time_period_microseconds,
     cv.Optional("heartbeat_interval", "5000ms"): cv.positive_time_period_milliseconds,
+    cv.Optional("sw_version"): cv.string,
+    cv.Optional("hw_version"): cv.string
 }).extend(cv.COMPONENT_SCHEMA)
 
 def to_code(config):
@@ -67,6 +69,13 @@ def to_code(config):
     canopen = cg.new_Pvariable(config[CONF_ID], canbus, node_id)
     cg.add(canopen.set_state_update_delay(config["state_update_delay"]))
     cg.add(canopen.set_heartbeat_interval(config["heartbeat_interval"]))
+    hw_version = config.get("hw_version")
+    sw_version = config.get("sw_version")
+    if hw_version:
+        cg.add(canopen.od_set_string(0x1009, 0, hw_version))
+    if sw_version:
+        cg.add(canopen.od_set_string(0x100a, 0, sw_version))
+
     yield cg.register_component(canopen, config)
 
     entities = sorted(config.get(CONF_ENTITIES, []), key=lambda x: x['index'])

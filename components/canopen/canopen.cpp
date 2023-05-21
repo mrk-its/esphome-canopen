@@ -453,6 +453,10 @@ namespace esphome {
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1280 + num, 3, CO_OBJ_D___R_), CO_TUNSIGNED8, node_id);
     }
 
+    void CanopenComponent::od_set_string(uint32_t index, uint32_t sub, const char *value) {
+      ODAddUpdate(NodeSpec.Dict, CO_KEY(index, sub, CO_OBJ_____R_), CO_TSTRING, (CO_DATA)od_string(value));
+    }
+
     void CanopenComponent::setup() {
       ESP_LOGCONFIG(TAG, "Setting up CANopen...");
       ESP_LOGD(TAG, "CO_TPDO_N: %d", CO_TPDO_N);
@@ -461,10 +465,12 @@ namespace esphome {
       FirmwareObj.domain.Size = 1024 * 1024;
       FirmwareObj.backend = esphome::ota::make_ota_backend();
 
-      ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1008, 0, CO_OBJ_____R_), CO_TSTRING,     (CO_DATA)(&ManufacturerDeviceNameObj));
       if(heartbeat_interval_ms) {
         ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1017, 0, CO_OBJ_D___RW), CO_THB_PROD, (CO_DATA)(heartbeat_interval_ms));
       }
+
+      // manufacturer device name
+      od_set_string(0x1008, 0, App.get_name().c_str());
 
       for(uint8_t i=0; i<8; i++) {
         ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + i, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32, i < 4 ? CO_COBID_TPDO_DEFAULT(i) : CO_COBID_TPDO_DEFAULT(i - 4) + 0x80);

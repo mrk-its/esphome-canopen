@@ -168,6 +168,7 @@ namespace esphome {
       uint32_t od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size, int8_t tpdo);
       uint32_t od_add_cmd(uint32_t entity_id, std::function< void(void *, uint32_t)> cb, const CO_OBJ_TYPE *type=CO_TCMD8);
 
+      void od_set_string(uint32_t index, uint32_t sub, const char *value);
       void set_state_update_delay(uint32_t delay_ms);
       void set_heartbeat_interval(uint16_t interval_ms);
       void initiate_recovery();
