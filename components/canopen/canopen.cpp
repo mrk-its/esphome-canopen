@@ -458,6 +458,14 @@ namespace esphome {
       ESP_LOGD(TAG, "CO_TPDO_N: %d", CO_TPDO_N);
       ESP_LOGD(TAG, "CO_RPDO_N: %d", CO_RPDO_N);
 
+      uint32_t hash = fnv1_hash("canopen_comm_state_v2");
+      this->comm_state = global_preferences->make_preference<uint8_t[CO_RPDO_N * 41]>(hash, true);
+      if(this->comm_state.load(&rpdo_buf)) {
+        ESP_LOGI(TAG, "loaded RPDO config from preferences");
+      } else {
+        ESP_LOGI(TAG, "can't load RPDO config from preferences, using defaults");
+      }
+
       FirmwareObj.domain.Size = 1024 * 1024;
       FirmwareObj.backend = esphome::ota::make_ota_backend();
 
@@ -587,6 +595,20 @@ namespace esphome {
 
     void CanopenComponent::start() {
       twai_start();
+    }
+
+    void CanopenComponent::store_comm_params() {
+      if(comm_state.save(&rpdo_buf)) {
+        global_preferences->sync();
+        ESP_LOGI(TAG, "Stored communication params in NVM");
+      } else {
+        ESP_LOGE(TAG, "Can't store communication params in NVM");
+      }
+    }
+
+    void CanopenComponent::reset_comm_params() {
+      global_preferences->reset();
+      ESP_LOGI(TAG, "Reseted communication params in NVM");
     }
 
     void CanopenComponent::loop() {

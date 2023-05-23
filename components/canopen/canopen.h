@@ -89,6 +89,8 @@ namespace esphome {
       std::vector<QueuedState> queued_states;
       uint32_t state_update_delay_us;
       uint16_t heartbeat_interval_ms;
+
+      ESPPreferenceObject comm_state;
       public:
       CanStatus status;
       std::map<uint32_t, std::function< void(void *, uint32_t)>> can_cmd_handlers;
@@ -175,6 +177,8 @@ namespace esphome {
       void start();
       void od_set_state(uint32_t key, void *state, uint8_t size);
       void on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
+      void store_comm_params();
+      void reset_comm_params();
       void loop() override;
       bool get_can_status(CanStatus &status_info);
     };

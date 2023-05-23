@@ -17,6 +17,7 @@
 
 #include "node_spec.h"
 #include "driver_can.h"
+#include "co_storage.h"
 
 /******************************************************************************
 * PRIVATE DEFINES
@@ -72,6 +73,13 @@ uint8_t rpdo_buf[CO_RPDO_N][41];
 static struct CO_OBJ_T ClockOD[APP_OBJ_N] = {
     {CO_KEY(0x1000, 0, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA)(&Obj1000_00_20)},
     {CO_KEY(0x1001, 0, CO_OBJ_____R_), CO_TUNSIGNED8 , (CO_DATA)(&Obj1001_00_08)},
+    {CO_KEY(0x1010, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)2 },
+    {CO_KEY(0x1010, 1, CO_OBJ_D___RW), CO_TSTORE,      (CO_DATA)0},
+    {CO_KEY(0x1010, 2, CO_OBJ_D___RW), CO_TSTORE,      (CO_DATA)0},
+    {CO_KEY(0x1011, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)2 },
+    {CO_KEY(0x1011, 1, CO_OBJ_D___RW), CO_TRESET,      (CO_DATA)0},
+    {CO_KEY(0x1011, 2, CO_OBJ_D___RW), CO_TRESET,      (CO_DATA)0},
+
     {CO_KEY(0x1014, 0, CO_OBJ__N__R_), CO_TEMCY_ID,    (CO_DATA)(&Obj1014_00_20)},
 
     {CO_KEY(0x1018, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(4)             },
