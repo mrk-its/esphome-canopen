@@ -41,6 +41,10 @@ ENTITY_SCHEMA = cv.Schema({
     cv.Optional("tpdo"): cv.int_,
     cv.Optional("rpdo"): cv.ensure_list(RPDO_SCHEMA),
 })
+HB_CLIENT_SCHEMA = cv.Schema({
+    cv.Required("node_id"): cv.int_,
+    cv.Required("timeout"): cv.positive_time_period_milliseconds,
+})
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(CanopenComponent),
@@ -57,6 +61,7 @@ CONFIG_SCHEMA = cv.Schema({
     }),
     cv.Optional("state_update_delay", "50ms"): cv.positive_time_period_microseconds,
     cv.Optional("heartbeat_interval", "5000ms"): cv.positive_time_period_milliseconds,
+    cv.Optional("heartbeat_clients"): cv.ensure_list(HB_CLIENT_SCHEMA),
     cv.Optional("sw_version"): cv.string,
     cv.Optional("hw_version"): cv.string
 }).extend(cv.COMPONENT_SCHEMA)
@@ -93,6 +98,8 @@ def to_code(config):
 
     for num, csdo in enumerate(config.get("csdo", ())):
         cg.add(canopen.setup_csdo(num, csdo["node_id"], csdo["tx_id"], csdo["rx_id"]))
+    for num, client in enumerate(config.get("heartbeat_clients", ()), 1):
+        cg.add(canopen.setup_heartbeat_client(num, client["node_id"], client["timeout"]))
 
     for conf in config.get("on_operational", []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])

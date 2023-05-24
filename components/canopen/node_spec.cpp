@@ -81,6 +81,7 @@ static struct CO_OBJ_T ClockOD[APP_OBJ_N] = {
     {CO_KEY(0x1011, 2, CO_OBJ_D___RW), CO_TRESET,      (CO_DATA)0},
 
     {CO_KEY(0x1014, 0, CO_OBJ__N__R_), CO_TEMCY_ID,    (CO_DATA)(&Obj1014_00_20)},
+    {CO_KEY(0x1016, 0, CO_OBJ_D___R_), CO_TUNSIGNED8,  (CO_DATA)0x00000000},
 
     {CO_KEY(0x1018, 0, CO_OBJ_D___R_), CO_TUNSIGNED8 , (CO_DATA)(4)             },
     {CO_KEY(0x1018, 1, CO_OBJ_D___R_), CO_TUNSIGNED32, (CO_DATA)(VENDOR_ID)},

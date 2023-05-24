@@ -173,6 +173,8 @@ namespace esphome {
       void od_set_string(uint32_t index, uint32_t sub, const char *value);
       void set_state_update_delay(uint32_t delay_ms);
       void set_heartbeat_interval(uint16_t interval_ms);
+      void setup_heartbeat_client(uint8_t subidx, uint8_t node_id, uint16_t timeout_ms);
+      int16_t get_heartbeat_events(uint8_t node_id);
       void initiate_recovery();
       void start();
       void od_set_state(uint32_t key, void *state, uint8_t size);

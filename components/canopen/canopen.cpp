@@ -611,6 +611,19 @@ namespace esphome {
       ESP_LOGI(TAG, "Reseted communication params in NVM");
     }
 
+    int16_t CanopenComponent::get_heartbeat_events(uint8_t node_id) {
+      return CONmtGetHbEvents(&node.Nmt, node_id);
+    }
+
+    void CanopenComponent::setup_heartbeat_client(uint8_t subidx, uint8_t node_id, uint16_t timeout_ms) {
+      CO_HBCONS *thb_cons = new CO_HBCONS;
+      memset(thb_cons, 0, sizeof(CO_HBCONS));
+      thb_cons->Time = timeout_ms;
+      thb_cons->NodeId = node_id;
+      ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1016, subidx, CO_OBJ_____RW), CO_THB_CONS, (CO_DATA)thb_cons);
+    }
+
+
     void CanopenComponent::loop() {
       COTmrService(&node.Tmr);
       COTmrProcess(&node.Tmr);
