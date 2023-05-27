@@ -55,7 +55,7 @@ static int16_t DrvCanRead (CO_IF_FRM *frm) {
         global_canopen->recv_frame.reset();
         ESP_LOGV(
             TAG,
-            "DrvCanRead: frame read, id: %03x, len: %d, data:%s",
+            "DrvCanRead id: %03x, len: %d, data:%s",
             frm->Identifier, frm->DLC, can_data_str(frm->Data, frm->DLC)
         );
         return sizeof(CO_IF_FRM);

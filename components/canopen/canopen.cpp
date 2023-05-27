@@ -643,15 +643,20 @@ namespace esphome {
 
       if(abs(tv_now.tv_sec - status_time.tv_sec) >= status_update_interval) {
         if(get_can_status(status)) {
-          if(memcmp(&status, &last_status, sizeof(status)) != 0) {
-            ESP_LOGD(
+          if(status.tx_err > last_status.tx_err
+             || status.rx_err > last_status.rx_err
+             || status.tx_failed > last_status.tx_failed
+             || status.rx_miss > last_status.rx_miss
+             || status.arb_lost > last_status.arb_lost
+             || status.bus_err > last_status.bus_err
+          ) {
+            ESP_LOGW(
               TAG,
               "tx_err: %d rx_err: %d tx_failed: %d rx_miss: %d arb_lost: %d bus_err: %d",
               status.tx_err, status.rx_err, status.tx_failed, status.rx_miss, status.arb_lost, status.bus_err
             );
-
-            last_status = status;
           }
+          last_status = status;
         }
         status_time = tv_now;
       }
