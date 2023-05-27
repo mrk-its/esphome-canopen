@@ -108,7 +108,7 @@ static uint32_t DrvTimerDelay(void) {
     ESP_LOGV(TAG_TM, "DrvTimerDelay: %d", dt);
 
     /* return remaining ticks until interrupt occurs */
-    return (uint32_t)dt;
+    return (uint32_t)(dt > 0 ? dt : 0);
 }
 
 static void DrvTimerReload(uint32_t reload) {
