@@ -1,3 +1,8 @@
+# 2024-05-27, v0.3.0
+* add support for heartbeat consumers
+* fix serious timer driver bug
+
+
 # 2023-05-23, v0.2.1
 * add support for up to 8 TPDOs (TPDO 4..7 use RPDO 0..3 CAN ids)
 * heartbeat interval is configurable via canopen.heartbeat_interval configuration property
