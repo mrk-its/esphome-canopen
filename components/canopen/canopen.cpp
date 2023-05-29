@@ -12,6 +12,12 @@ extern "C" {
     }
 }
 
+void CONmtHbConsEvent(CO_NMT *nmt, uint8_t nodeId) {
+  if(esphome::global_canopen && esphome::global_canopen->on_hb_cons_event) {
+    esphome::global_canopen->on_hb_cons_event->trigger(nodeId);
+  };
+}
+
 namespace esphome {
   namespace ota {
     std::unique_ptr<OTABackend> make_ota_backend();
@@ -49,6 +55,8 @@ namespace esphome {
       this->canbus = canbus;
       on_operational = 0;
       on_pre_operational = 0;
+      on_hb_cons_event = 0;
+
       state_update_delay_us=0;
       heartbeat_interval_ms=0;
       memset(&status, 0, sizeof(status));

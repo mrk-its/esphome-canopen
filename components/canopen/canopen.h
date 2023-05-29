@@ -76,6 +76,7 @@ namespace esphome {
 
     class OperationalTrigger : public Trigger<> {};
     class PreOperationalTrigger : public Trigger<> {};
+    class HbConsumerEventTrigger : public Trigger<uint8_t> {};
 
     class CanopenComponent : public Component {
       CO_NODE node;
@@ -92,6 +93,7 @@ namespace esphome {
 
       ESPPreferenceObject comm_state;
       public:
+      HbConsumerEventTrigger *on_hb_cons_event;
       CanStatus status;
       std::map<uint32_t, std::function< void(void *, uint32_t)>> can_cmd_handlers;
 
@@ -105,6 +107,9 @@ namespace esphome {
       }
       void add_trigger(PreOperationalTrigger *trigger) {
         on_pre_operational = trigger;
+      }
+      void add_trigger(HbConsumerEventTrigger *trigger) {
+        on_hb_cons_event = trigger;
       }
       void set_pre_operational_mode();
       void set_operational_mode();

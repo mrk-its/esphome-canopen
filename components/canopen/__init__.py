@@ -14,6 +14,7 @@ CanopenComponent = ns.class_(
 
 PreOperationalTrigger = ns.class_("PreOperationalTrigger", automation.Trigger.template())
 OperationalTrigger = ns.class_("OperationalTrigger", automation.Trigger.template())
+HbConsumerEventTrigger = ns.class_("HbConsumerEventTrigger", automation.Trigger.template())
 
 CONF_ENTITIES = "entities"
 
@@ -58,6 +59,9 @@ CONFIG_SCHEMA = cv.Schema({
     }),
     cv.Optional("on_operational"): automation.validate_automation({
         cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(OperationalTrigger),
+    }),
+    cv.Optional("on_hb_consumer_event"): automation.validate_automation({
+        cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(HbConsumerEventTrigger),
     }),
     cv.Optional("state_update_delay", "50ms"): cv.positive_time_period_microseconds,
     cv.Optional("heartbeat_interval", "5000ms"): cv.positive_time_period_milliseconds,
@@ -110,6 +114,12 @@ def to_code(config):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
         yield automation.build_automation(trigger, [], conf)
         cg.add(canopen.add_trigger(trigger))
+
+    for conf in config.get("on_hb_consumer_event", []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
+        yield automation.build_automation(trigger, [(cg.uint8, "node_id"),], conf)
+        cg.add(canopen.add_trigger(trigger))
+
 
     rpdo_entities = [
         {**rpdo, "entity_index": entity["index"]}
