@@ -131,12 +131,12 @@ static void DrvNvmInit(void) {
 
 static uint32_t DrvNvmRead(uint32_t start, uint8_t *buffer, uint32_t size)
 {
-    ESP_LOGI(TAG, "DrvNvmRead, start: %08x, buf: %08x, size: %08x", start, buffer, size);
+    ESP_LOGI(TAG, "DrvNvmRead, start: %08x, buf: %p, size: %08x", start, buffer, size);
     return 0;
 }
 
 static uint32_t DrvNvmWrite(uint32_t start, uint8_t *buffer, uint32_t size) {
-    ESP_LOGI(TAG, "DrvNvmWrite, start: %08x, buf: %08x, size: %08x", start, buffer, size);
+    ESP_LOGI(TAG, "DrvNvmWrite, start: %08x, buf: %p, size: %08x", start, buffer, size);
     return 0;
 }
 
