@@ -529,7 +529,7 @@ namespace esphome {
           if(size == 1) value &= 0xff;
           else if(size == 2) value &= 0xffff;
         }
-        ESP_LOGD(TAG, "OD Index: %02x Key: %08x Data: %08x Type: %08x", index, od->Key, value, od->Type);
+        ESP_LOGD(TAG, "OD Index: %02x Key: %08x Data: %08x Type: %p", index, od->Key, value, od->Type);
         index++;
         od++;
       }

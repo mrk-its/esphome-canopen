@@ -37,6 +37,7 @@ CO_OBJ_TYPE Cmd8 = {
     Cmd8Init,
     Cmd8Read,
     Cmd8Write,
+    0,
 };
 
 uint32_t Cmd32Size (CO_OBJ *obj, CO_NODE *node, uint32_t width) {
@@ -74,4 +75,5 @@ CO_OBJ_TYPE Cmd32 = {
     Cmd32Init,
     Cmd32Read,
     Cmd32Write,
+    0,
 };

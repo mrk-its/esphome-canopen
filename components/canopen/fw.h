@@ -29,7 +29,7 @@ struct Firmware {
 uint32_t FwCtrlSize (CO_OBJ *obj, CO_NODE *node, uint32_t width);
 CO_ERR   FwCtrlWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size);
 
-const CO_OBJ_TYPE FwCtrl = { FwCtrlSize, 0, 0, FwCtrlWrite };
+const CO_OBJ_TYPE FwCtrl = { FwCtrlSize, 0, 0, FwCtrlWrite, 0 };
 
 #define FW_CTRL ((CO_OBJ_TYPE*)&FwCtrl)
 
