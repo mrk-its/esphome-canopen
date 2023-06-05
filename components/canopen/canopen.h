@@ -20,6 +20,9 @@ const int8_t ENTITY_TYPE_COVER = 4;
 const int8_t ENTITY_TYPE_LIGHT = 5;
 const int8_t ENTITY_TYPE_SENSOR_UINT8 = 6;
 const int8_t ENTITY_TYPE_SENSOR_UINT16 = 7;
+const int8_t ENTITY_TYPE_NUMBER = 8;
+const int8_t ENTITY_TYPE_NUMBER_UINT8 = 9;
+const int8_t ENTITY_TYPE_NUMBER_UINT16 = 10;
 const uint8_t ENTITY_TYPE_CAN_STATUS = 254;
 
 const uint8_t ENTITY_INDEX_NAME = 1;
@@ -145,6 +148,10 @@ namespace esphome {
       // void add_status(uint32_t entity_id, uint32_t update_interval);
       #ifdef LOG_SENSOR
       void add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo, uint8_t size=4, float min_val=0, float max_val=0);
+      #endif
+
+      #ifdef LOG_NUMBER
+      void add_entity(esphome::number::Number *number, uint32_t entity_id, int8_t tpdo, uint8_t size=4, float min_val=0, float max_val=0);
       #endif
 
       #ifdef LOG_BINARY_SENSOR

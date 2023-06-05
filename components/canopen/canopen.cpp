@@ -298,6 +298,66 @@ namespace esphome {
     }
     #endif
 
+    #ifdef LOG_NUMBER
+    void CanopenComponent::add_entity(esphome::number::Number *number, uint32_t entity_id, int8_t tpdo, uint8_t size, float min_val, float max_val) {
+      float state = number->state;
+      od_add_metadata(
+        entity_id,
+        size == 1 ? ENTITY_TYPE_NUMBER_UINT8 : size == 2 ? ENTITY_TYPE_NUMBER_UINT16 : ENTITY_TYPE_NUMBER,
+        number->get_name(), number->traits.get_device_class(), "", ""
+      );
+
+      // this is the same as for sensor. Maybe, to make this function more general ?
+      od_add_sensor_metadata(entity_id, min_val, max_val);
+      uint32_t state_key;
+
+      const CO_OBJ_TYPE *type;
+      std::function<uint32_t(float state)> to_wire;
+      std::function<float(void *buf)> from_wire;
+
+      // probably make sense to make as functions and not lambdas. 
+      auto scale_to_wire = [=](float value, float n_levels) {
+        float result = n_levels * (value - min_val) / (max_val - min_val + 1);
+        return result < 0 ? 0 : (result > n_levels - 1 ? n_levels - 1 : result);
+      };
+      auto scale_from_wire = [=](float value, float n_levels) {
+        return value * (max_val - min_val + 1) / n_levels + min_val;
+      };
+
+      switch(size) {
+        case 1:
+          to_wire = [=](float state) { return (uint8_t)scale_to_wire(state, 256); };
+          from_wire = [=](void *buf) {return scale_from_wire((float)*(uint8_t *)buf, 256); };
+          type = CO_TUNSIGNED8;
+          break;
+        case 2:
+          to_wire = [=](float state) { return (uint16_t)scale_to_wire(state, 65536); };
+          from_wire = [=](void *buf) {return scale_from_wire((float)*(uint16_t *)buf, 65536); };
+          type = CO_TUNSIGNED16;
+          break;
+        case 4:
+          to_wire = [=](float state) { return *(uint32_t*)&state; };
+          from_wire = [=](void *buf) {return *(float *)buf; };
+          type = CO_TUNSIGNED32;
+          break;
+        default:
+          ESP_LOGE(TAG, "Unsupported number size: %d", size);
+          return;
+      }
+      auto casted_state = to_wire(state);
+      state_key = od_add_state(entity_id, type, &casted_state, size, tpdo);
+      number->add_on_state_callback([=](float value) {
+        auto casted_state = to_wire(value);
+        od_set_state(state_key, &casted_state, size);
+      });
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {    
+        auto call = number->make_call();
+        call.set_value(from_wire(buffer));
+        call.perform();
+      }, CO_TCMD32);
+    }
+    #endif
+
     #ifdef LOG_BINARY_SENSOR
     void CanopenComponent::add_entity(binary_sensor::BinarySensor *sensor, uint32_t entity_id, int8_t tpdo) {
       od_add_metadata(
