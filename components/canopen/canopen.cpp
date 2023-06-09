@@ -360,6 +360,41 @@ namespace esphome {
     }
     #endif
 
+    void CanopenComponent::add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<uint8_t> *trigger) {
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+          trigger->trigger(*((uint8_t *)buffer));
+      }, CO_TCMD8);
+    }
+
+    void CanopenComponent::add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<int8_t> *trigger) {
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+          trigger->trigger(*((int8_t *)buffer));
+      }, CO_TCMD8);
+    }
+
+    void CanopenComponent::add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<uint16_t> *trigger) {
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+          trigger->trigger(*((uint16_t *)buffer));
+      }, CO_TCMD16);
+    }
+
+    void CanopenComponent::add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<int16_t> *trigger) {
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+          trigger->trigger(*((int16_t *)buffer));
+      }, CO_TCMD16);
+    }
+
+    void CanopenComponent::add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<uint32_t> *trigger) {
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+          trigger->trigger(*((uint32_t *)buffer));
+      }, CO_TCMD32);
+    }
+
+    void CanopenComponent::add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<int32_t> *trigger) {
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+          trigger->trigger(*((int32_t *)buffer));
+      }, CO_TCMD32);
+    }
 
     #ifdef LOG_COVER
     uint8_t get_cover_state(esphome::cover::Cover* cover) {

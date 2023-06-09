@@ -78,6 +78,14 @@ namespace esphome {
     class PreOperationalTrigger : public Trigger<> {};
     class HbConsumerEventTrigger : public Trigger<uint8_t> {};
 
+    class CmdTriggerUInt8 : public Trigger<uint8_t> {};
+    class CmdTriggerUInt16 : public Trigger<uint16_t> {};
+    class CmdTriggerUInt32 : public Trigger<uint32_t> {};
+
+    class CmdTriggerInt8 : public Trigger<int8_t> {};
+    class CmdTriggerInt16 : public Trigger<int16_t> {};
+    class CmdTriggerInt32 : public Trigger<int32_t> {};
+
     class CanopenComponent : public Component {
       CO_NODE node;
       CanStatus last_status;
@@ -174,6 +182,13 @@ namespace esphome {
       void od_add_sensor_metadata(uint32_t entity_id, float min_value, float max_value);
       uint32_t od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size, int8_t tpdo);
       uint32_t od_add_cmd(uint32_t entity_id, std::function< void(void *, uint32_t)> cb, const CO_OBJ_TYPE *type=CO_TCMD8);
+
+      void add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<uint8_t> *trigger);
+      void add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<int8_t> *trigger);
+      void add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<uint16_t> *trigger);
+      void add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<int16_t> *trigger);
+      void add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<uint32_t> *trigger);
+      void add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<int32_t> *trigger);
 
       void od_set_string(uint32_t index, uint32_t sub, const char *value);
       void set_state_update_delay(uint32_t delay_ms);

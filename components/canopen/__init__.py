@@ -15,6 +15,12 @@ CanopenComponent = ns.class_(
 PreOperationalTrigger = ns.class_("PreOperationalTrigger", automation.Trigger.template())
 OperationalTrigger = ns.class_("OperationalTrigger", automation.Trigger.template())
 HbConsumerEventTrigger = ns.class_("HbConsumerEventTrigger", automation.Trigger.template())
+CmdTriggerUInt8 = ns.class_("CmdTriggerUInt8", automation.Trigger.template())
+CmdTriggerUInt16 = ns.class_("CmdTriggerUInt16", automation.Trigger.template())
+CmdTriggerUInt32 = ns.class_("CmdTriggerUInt32", automation.Trigger.template())
+CmdTriggerInt8 = ns.class_("CmdTriggerInt8", automation.Trigger.template())
+CmdTriggerInt16 = ns.class_("CmdTriggerInt16", automation.Trigger.template())
+CmdTriggerInt32 = ns.class_("CmdTriggerInt32", automation.Trigger.template())
 
 CONF_ENTITIES = "entities"
 
@@ -42,6 +48,34 @@ ENTITY_SCHEMA = cv.Schema({
     cv.Optional("tpdo"): cv.int_,
     cv.Optional("rpdo"): cv.ensure_list(RPDO_SCHEMA),
 })
+
+def template_entity_cmd_schema(type, trigger):
+    return cv.Schema({
+        cv.Required("type"): type,
+        cv.Required("handler"):
+            automation.validate_automation({
+                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(trigger),
+            }),
+    })
+
+TEMPLATE_ENTITY_STATE_SCHEMA = cv.Schema({
+    cv.Required("type"): cv.string,
+})
+
+TEMPLATE_ENTITY_CMD_SCHEMA = cv.vol.Union(
+    template_entity_cmd_schema("uint8", CmdTriggerUInt8),
+    template_entity_cmd_schema("uint16", CmdTriggerUInt16),
+    template_entity_cmd_schema("uint32", CmdTriggerUInt32),
+    discriminant=lambda val, alt: filter(lambda x: x.schema['type'] == val['type'], alt)
+)
+
+TEMPLATE_ENTITY = cv.Schema({
+    cv.Required("index"): cv.int_,
+    cv.Optional("tpdo"): cv.int_,
+    cv.Optional("commands"): cv.ensure_list(TEMPLATE_ENTITY_CMD_SCHEMA),
+    cv.Optional("states"): cv.ensure_list(TEMPLATE_ENTITY_STATE_SCHEMA),
+})
+
 HB_CLIENT_SCHEMA = cv.Schema({
     cv.Required("node_id"): cv.int_,
     cv.Required("timeout"): cv.positive_time_period_milliseconds,
@@ -54,6 +88,7 @@ CONFIG_SCHEMA = cv.Schema({
     # cv.Optional("status"): STATUS_ENTITY_SCHEMA,
     cv.Optional("csdo"): cv.ensure_list(CSDO_SCHEMA),
     cv.Required(CONF_ENTITIES): cv.ensure_list(ENTITY_SCHEMA),
+    cv.Optional("template_entities"): cv.ensure_list(TEMPLATE_ENTITY),
     cv.Optional("on_pre_operational"): automation.validate_automation({
         cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(PreOperationalTrigger),
     }),
@@ -99,6 +134,13 @@ def to_code(config):
             cg.add(canopen.add_entity(entity, entity_config["index"], tpdo, size, min_val, max_val))
         else:
             cg.add(canopen.add_entity(entity, entity_config["index"], tpdo))
+
+    for tmpl_entity in config.get("template_entities", []):
+        for cmd in tmpl_entity["commands"]:
+            for handler in cmd["handler"]:
+                trigger = cg.new_Pvariable(handler[CONF_TRIGGER_ID])
+                yield automation.build_automation(trigger, [(getattr(cg, cmd["type"]), "x"),], handler)
+                cg.add(canopen.add_entity_cmd(tmpl_entity["index"], tmpl_entity.get("tpdo", -1), trigger))
 
     for num, csdo in enumerate(config.get("csdo", ())):
         cg.add(canopen.setup_csdo(num, csdo["node_id"], csdo["tx_id"], csdo["rx_id"]))
