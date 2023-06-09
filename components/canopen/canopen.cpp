@@ -307,7 +307,6 @@ namespace esphome {
         number->get_name(), number->traits.get_device_class(), "", ""
       );
 
-      // this is the same as for sensor. Maybe, to make this function more general ?
       od_add_sensor_metadata(entity_id, min_val, max_val);
       uint32_t state_key;
 
@@ -315,7 +314,6 @@ namespace esphome {
       std::function<uint32_t(float state)> to_wire;
       std::function<float(void *buf)> from_wire;
 
-      // probably make sense to make as functions and not lambdas. 
       auto scale_to_wire = [=](float value, float n_levels) {
         float result = n_levels * (value - min_val) / (max_val - min_val + 1);
         return result < 0 ? 0 : (result > n_levels - 1 ? n_levels - 1 : result);
