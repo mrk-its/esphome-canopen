@@ -396,6 +396,7 @@ namespace esphome {
     void CanopenComponent::add_entity(esphome::light::LightState* light, uint32_t entity_id, int8_t tpdo) {
       bool state = bool(light->remote_values.get_state());
       uint8_t brightness = (uint8_t)(light->remote_values.get_brightness() * 255);
+      uint16_t colortemp = (uint16_t)(light->remote_values.get_color_temperature());
       od_add_metadata(
          entity_id,
          ENTITY_TYPE_LIGHT,
@@ -403,11 +404,14 @@ namespace esphome {
       );
       auto state_key = od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
       auto brightness_key = od_add_state(entity_id, CO_TUNSIGNED8, &brightness, 1, tpdo);
+      auto colortemp_key = od_add_state(entity_id, CO_TUNSIGNED16, &colortemp, 2, tpdo);
       light->add_new_remote_values_callback([=]() {
         bool value = bool(light->remote_values.get_state());
         uint8_t brightness = (uint8_t)(light->remote_values.get_brightness() * 255);
+        uint16_t colortemp = (uint16_t)(light->remote_values.get_color_temperature());
         od_set_state(state_key, &value, 1);
         od_set_state(brightness_key, &brightness, 1);
+        od_set_state(colortemp_key, &colortemp, 2);
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
           light->make_call().set_state(((uint8_t *)buffer)[0]).perform();
@@ -415,6 +419,9 @@ namespace esphome {
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
           light->make_call().set_brightness_if_supported(float(((uint8_t *)buffer)[0]) / 255.0).perform();
       });
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+          light->make_call().set_color_temperature_if_supported(float(((uint16_t *)buffer)[0])).perform();
+      }, CO_TCMD16);
     }
     #endif
 
