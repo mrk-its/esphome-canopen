@@ -139,7 +139,8 @@ namespace esphome {
       state_sub_index += 1;
 
       uint32_t value = 0;
-      memcpy(&value, state, size);
+      if(state && size)
+        memcpy(&value, state, size);
       ODAddUpdate(NodeSpec.Dict, CO_KEY(entity_index + 1, state_sub_index, async_pdo_mask | CO_OBJ_D___R_), type, value);
 
       if(tpdo >= 0) {

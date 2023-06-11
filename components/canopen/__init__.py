@@ -58,6 +58,14 @@ def template_entity_cmd_schema(type, trigger):
             }),
     })
 
+TEMPLATE_ENTITY_METADATA_SCHEMA = cv.Schema({
+    cv.Required("type"): cv.int_,
+    cv.Optional("name", ""): cv.string,
+    cv.Optional("device_class", ""): cv.string,
+    cv.Optional("unit", ""): cv.string,
+    cv.Optional("state_class", ""): cv.string,
+})
+
 TEMPLATE_ENTITY_STATE_SCHEMA = cv.Schema({
     cv.Required("type"): cv.string,
 })
@@ -71,9 +79,10 @@ TEMPLATE_ENTITY_CMD_SCHEMA = cv.vol.Union(
 
 TEMPLATE_ENTITY = cv.Schema({
     cv.Required("index"): cv.int_,
-    cv.Optional("tpdo"): cv.int_,
+    cv.Optional("tpdo", -1): cv.int_,
     cv.Optional("commands"): cv.ensure_list(TEMPLATE_ENTITY_CMD_SCHEMA),
     cv.Optional("states"): cv.ensure_list(TEMPLATE_ENTITY_STATE_SCHEMA),
+    cv.Optional("metadata"): TEMPLATE_ENTITY_METADATA_SCHEMA,
 })
 
 HB_CLIENT_SCHEMA = cv.Schema({
@@ -104,6 +113,15 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("sw_version"): cv.string,
     cv.Optional("hw_version"): cv.string
 }).extend(cv.COMPONENT_SCHEMA)
+
+TYPE_TO_CANOPEN_TYPE = {
+    "uint8": (cg.RawExpression("CO_TUNSIGNED8"), 1),
+    "uint16": (cg.RawExpression("CO_TUNSIGNED16"), 2),
+    "uint32": (cg.RawExpression("CO_TUNSIGNED32"), 4),
+    "int8": (cg.RawExpression("CO_TSIGNED8"), 1),
+    "int16": (cg.RawExpression("CO_TSIGNED16"), 2),
+    "int32": (cg.RawExpression("CO_TSIGNED32"), 4),
+}
 
 def to_code(config):
     cg.add_library("canopenstack=https://github.com/mrk-its/canopen-stack#dev", "0.0.0")
@@ -136,11 +154,19 @@ def to_code(config):
             cg.add(canopen.add_entity(entity, entity_config["index"], tpdo))
 
     for tmpl_entity in config.get("template_entities", []):
-        for cmd in tmpl_entity["commands"]:
+        index = tmpl_entity["index"]
+        metadata = tmpl_entity.get("metadata")
+        if metadata:
+            cg.add(canopen.od_add_metadata(index, metadata["type"], metadata["name"], metadata["device_class"], metadata["unit"], metadata["state_class"]))
+        for state in tmpl_entity.get("states", ()):
+            _type, size = TYPE_TO_CANOPEN_TYPE[state["type"]]
+            cg.add(canopen.od_add_state(index, _type, 0, size, tmpl_entity["tpdo"]))
+            pass
+        for cmd in tmpl_entity.get("commands", ()):
             for handler in cmd["handler"]:
                 trigger = cg.new_Pvariable(handler[CONF_TRIGGER_ID])
                 yield automation.build_automation(trigger, [(getattr(cg, cmd["type"]), "x"),], handler)
-                cg.add(canopen.add_entity_cmd(tmpl_entity["index"], tmpl_entity.get("tpdo", -1), trigger))
+                cg.add(canopen.add_entity_cmd(index, tmpl_entity.get("tpdo", -1), trigger))
 
     for num, csdo in enumerate(config.get("csdo", ())):
         cg.add(canopen.setup_csdo(num, csdo["node_id"], csdo["tx_id"], csdo["rx_id"]))

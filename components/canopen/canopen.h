@@ -205,6 +205,9 @@ namespace esphome {
       void initiate_recovery();
       void start();
       void od_set_state(uint32_t key, void *state, uint8_t size);
+      void set_entity_state(uint32_t entity_id, uint32_t state, void *data, uint8_t size) {
+        od_set_state(ENTITY_STATE_KEY(entity_id, state), data, size);
+      }
       void on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
       void store_comm_params();
       void reset_comm_params();
