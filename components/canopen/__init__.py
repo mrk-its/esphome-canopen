@@ -43,8 +43,8 @@ ENTITY_SCHEMA = cv.Schema({
     cv.Required("id"): cv.use_id(cg.EntityBase),
     cv.Required("index"): cv.int_,
     cv.Optional("size"): cv.int_,
-    cv.Optional("min_value", 0): cv.float_,
-    cv.Optional("max_value", 0): cv.float_,
+    cv.Optional("min_value"): cv.float_,
+    cv.Optional("max_value"): cv.float_,
     cv.Optional("tpdo"): cv.int_,
     cv.Optional("rpdo"): cv.ensure_list(RPDO_SCHEMA),
 })

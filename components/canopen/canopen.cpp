@@ -254,7 +254,7 @@ namespace esphome {
       od_add_sensor_metadata(entity_id, min_val, max_val);
       uint32_t state_key;
 
-      const CO_OBJ_TYPE *type;
+      const CO_OBJ_TYPE *type, *cmd_type;
       std::function<uint32_t(float state)> to_wire;
       std::function<float(void *buf)> from_wire;
 
@@ -271,16 +271,19 @@ namespace esphome {
           to_wire = [=](float state) { return (uint8_t)scale_to_wire(state, 256); };
           from_wire = [=](void *buf) {return scale_from_wire((float)*(uint8_t *)buf, 256); };
           type = CO_TUNSIGNED8;
+          cmd_type = CO_TCMD8;
           break;
         case 2:
           to_wire = [=](float state) { return (uint16_t)scale_to_wire(state, 65536); };
           from_wire = [=](void *buf) {return scale_from_wire((float)*(uint16_t *)buf, 65536); };
           type = CO_TUNSIGNED16;
+          cmd_type = CO_TCMD16;
           break;
         case 4:
           to_wire = [=](float state) { return *(uint32_t*)&state; };
           from_wire = [=](void *buf) {return *(float *)buf; };
           type = CO_TUNSIGNED32;
+          cmd_type = CO_TCMD32;
           break;
         default:
           ESP_LOGE(TAG, "Unsupported sensor size: %d", size);
@@ -294,7 +297,7 @@ namespace esphome {
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
         sensor->publish_state(from_wire(buffer));
-      }, CO_TCMD32);
+      }, cmd_type);
     }
     #endif
 
@@ -310,7 +313,7 @@ namespace esphome {
       od_add_sensor_metadata(entity_id, min_val, max_val);
       uint32_t state_key;
 
-      const CO_OBJ_TYPE *type;
+      const CO_OBJ_TYPE *type, *cmd_type;
       std::function<uint32_t(float state)> to_wire;
       std::function<float(void *buf)> from_wire;
 
@@ -327,16 +330,19 @@ namespace esphome {
           to_wire = [=](float state) { return (uint8_t)scale_to_wire(state, 256); };
           from_wire = [=](void *buf) {return scale_from_wire((float)*(uint8_t *)buf, 256); };
           type = CO_TUNSIGNED8;
+          cmd_type = CO_TCMD8;
           break;
         case 2:
           to_wire = [=](float state) { return (uint16_t)scale_to_wire(state, 65536); };
           from_wire = [=](void *buf) {return scale_from_wire((float)*(uint16_t *)buf, 65536); };
           type = CO_TUNSIGNED16;
+          cmd_type = CO_TCMD16;
           break;
         case 4:
           to_wire = [=](float state) { return *(uint32_t*)&state; };
           from_wire = [=](void *buf) {return *(float *)buf; };
           type = CO_TUNSIGNED32;
+          cmd_type = CO_TCMD32;
           break;
         default:
           ESP_LOGE(TAG, "Unsupported number size: %d", size);
@@ -348,11 +354,9 @@ namespace esphome {
         auto casted_state = to_wire(value);
         od_set_state(state_key, &casted_state, size);
       });
-      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {    
-        auto call = number->make_call();
-        call.set_value(from_wire(buffer));
-        call.perform();
-      }, CO_TCMD32);
+      od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+        number->publish_state(from_wire(buffer));
+      }, cmd_type);
     }
     #endif
 
