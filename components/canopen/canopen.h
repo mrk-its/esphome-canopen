@@ -4,6 +4,7 @@
 using namespace esphome;
 
 #include "esphome/core/component.h"
+#include "esphome/core/defines.h"
 #include "esphome/components/canbus/canbus.h"
 #include <vector>
 #include <map>
@@ -12,6 +13,14 @@ using namespace esphome;
 #include "node_spec.h"
 #include "co_if.h"
 #include "co_cmd.h"
+
+#ifdef USE_SWITCH
+namespace esphome {
+	namespace switch_ {
+		class Switch;
+	}  // namespace switch_
+}  // namespace esphome
+#endif
 
 const int8_t ENTITY_TYPE_DISABLED = 0;
 const int8_t ENTITY_TYPE_SENSOR = 1;
