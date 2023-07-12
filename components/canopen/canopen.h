@@ -14,12 +14,52 @@ using namespace esphome;
 #include "co_if.h"
 #include "co_cmd.h"
 
+#ifdef USE_SENSOR
+namespace esphome {
+	namespace sensor {
+		class Sensor;
+	}
+}
+#endif
+
+#ifdef USE_NUMBER
+namespace esphome {
+	namespace number {
+		class Number;
+	}
+}
+#endif
+
+#ifdef USE_BINARY_SENSOR
+namespace esphome {
+	namespace binary_sensor {
+		class BinarySensor;
+	}
+}
+#endif
+
 #ifdef USE_SWITCH
 namespace esphome {
 	namespace switch_ {
 		class Switch;
-	}  // namespace switch_
-}  // namespace esphome
+	}
+}
+#endif
+
+#ifdef USE_LIGHT
+namespace esphome {
+	namespace light {
+		class LightState;
+	}
+}
+#endif
+
+#ifdef USE_COVER
+namespace esphome {
+	namespace cover {
+		class Cover;
+	}
+}
 #endif
 
 const int8_t ENTITY_TYPE_DISABLED = 0;
