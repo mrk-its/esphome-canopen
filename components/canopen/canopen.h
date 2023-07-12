@@ -6,6 +6,7 @@ using namespace esphome;
 #include "esphome/core/component.h"
 #include "esphome/components/canbus/canbus.h"
 #include <vector>
+#include <map>
 #include <driver/twai.h>
 
 #include "node_spec.h"
