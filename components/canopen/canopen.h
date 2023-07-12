@@ -155,29 +155,14 @@ namespace esphome {
       void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd);
 
       // void add_status(uint32_t entity_id, uint32_t update_interval);
-      #ifdef LOG_SENSOR
+
       void add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo, uint8_t size=4, float min_val=0, float max_val=0);
-      #endif
-
-      #ifdef LOG_NUMBER
       void add_entity(esphome::number::Number *number, uint32_t entity_id, int8_t tpdo, uint8_t size=4, float min_val=0, float max_val=0);
-      #endif
-
-      #ifdef LOG_BINARY_SENSOR
       void add_entity(binary_sensor::BinarySensor *sensor, uint32_t entity_id, int8_t tpdo);
-      #endif
-
-      #ifdef LOG_SWITCH
       void add_entity(esphome::switch_::Switch* switch_, uint32_t entity_id, int8_t tpdo);
-      #endif
-
-      #ifdef USE_LIGHT
       void add_entity(esphome::light::LightState* light, uint32_t entity_id, int8_t tpdo);
-      #endif
-
-      #ifdef LOG_COVER
       void add_entity(esphome::cover::Cover* cover, uint32_t entity_id, int8_t tpdo);
-      #endif
+
 
       void od_add_metadata(
         uint32_t entity_id,

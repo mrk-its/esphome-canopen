@@ -243,7 +243,7 @@ namespace esphome {
       rpdo_map_append(idx, index + 2, cmd + 1, 8);
     }
 
-    #ifdef LOG_SENSOR
+
     void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo, uint8_t size, float min_val, float max_val) {
       float state = sensor->get_state();
       od_add_metadata(
@@ -300,9 +300,9 @@ namespace esphome {
         sensor->publish_state(from_wire(buffer));
       }, cmd_type);
     }
-    #endif
 
-    #ifdef LOG_NUMBER
+
+
     void CanopenComponent::add_entity(esphome::number::Number *number, uint32_t entity_id, int8_t tpdo, uint8_t size, float min_val, float max_val) {
       float state = number->state;
       od_add_metadata(
@@ -359,9 +359,9 @@ namespace esphome {
         number->publish_state(from_wire(buffer));
       }, cmd_type);
     }
-    #endif
 
-    #ifdef LOG_BINARY_SENSOR
+
+
     void CanopenComponent::add_entity(binary_sensor::BinarySensor *sensor, uint32_t entity_id, int8_t tpdo) {
       od_add_metadata(
         entity_id,
@@ -373,9 +373,8 @@ namespace esphome {
         od_set_state(state_key, &x, 1);
       });
     }
-    #endif
 
-    #ifdef LOG_SWITCH
+
     void CanopenComponent::add_entity(esphome::switch_::Switch* switch_, uint32_t entity_id, int8_t tpdo) {
       auto state = switch_->get_initial_state_with_restore_mode().value_or(false);
       od_add_metadata(
@@ -395,9 +394,7 @@ namespace esphome {
           }
       });
     }
-    #endif
 
-    #ifdef USE_LIGHT
     void CanopenComponent::add_entity(esphome::light::LightState* light, uint32_t entity_id, int8_t tpdo) {
       bool state = bool(light->remote_values.get_state());
       uint8_t brightness = (uint8_t)(light->remote_values.get_brightness() * 255);
@@ -428,7 +425,7 @@ namespace esphome {
           light->make_call().set_color_temperature_if_supported(float(((uint16_t *)buffer)[0])).perform();
       }, CO_TCMD16);
     }
-    #endif
+
 
     void CanopenComponent::add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<uint8_t> *trigger) {
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
