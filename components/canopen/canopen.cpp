@@ -243,7 +243,7 @@ namespace esphome {
       rpdo_map_append(idx, index + 2, cmd + 1, 8);
     }
 
-    #ifdef LOG_SENSOR
+    #ifdef USE_SENSOR
     void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo, uint8_t size, float min_val, float max_val) {
       float state = sensor->get_state();
       od_add_metadata(
@@ -302,7 +302,7 @@ namespace esphome {
     }
     #endif
 
-    #ifdef LOG_NUMBER
+    #ifdef USE_NUMBER
     void CanopenComponent::add_entity(esphome::number::Number *number, uint32_t entity_id, int8_t tpdo, uint8_t size, float min_val, float max_val) {
       float state = number->state;
       od_add_metadata(
@@ -361,7 +361,7 @@ namespace esphome {
     }
     #endif
 
-    #ifdef LOG_BINARY_SENSOR
+    #ifdef USE_BINARY_SENSOR
     void CanopenComponent::add_entity(binary_sensor::BinarySensor *sensor, uint32_t entity_id, int8_t tpdo) {
       od_add_metadata(
         entity_id,
@@ -375,7 +375,7 @@ namespace esphome {
     }
     #endif
 
-    #ifdef LOG_SWITCH
+    #ifdef USE_SWITCH
     void CanopenComponent::add_entity(esphome::switch_::Switch* switch_, uint32_t entity_id, int8_t tpdo) {
       auto state = switch_->get_initial_state_with_restore_mode().value_or(false);
       od_add_metadata(
@@ -466,7 +466,7 @@ namespace esphome {
       }, CO_TCMD32);
     }
 
-    #ifdef LOG_COVER
+    #ifdef USE_COVER
     uint8_t get_cover_state(esphome::cover::Cover* cover) {
       switch(cover->current_operation) {
         case esphome::cover::COVER_OPERATION_OPENING: return 1;

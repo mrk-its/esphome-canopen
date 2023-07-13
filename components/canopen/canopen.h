@@ -4,13 +4,63 @@
 using namespace esphome;
 
 #include "esphome/core/component.h"
+#include "esphome/core/defines.h"
 #include "esphome/components/canbus/canbus.h"
 #include <vector>
+#include <map>
 #include <driver/twai.h>
 
 #include "node_spec.h"
 #include "co_if.h"
 #include "co_cmd.h"
+
+#ifdef USE_SENSOR
+namespace esphome {
+	namespace sensor {
+		class Sensor;
+	}
+}
+#endif
+
+#ifdef USE_NUMBER
+namespace esphome {
+	namespace number {
+		class Number;
+	}
+}
+#endif
+
+#ifdef USE_BINARY_SENSOR
+namespace esphome {
+	namespace binary_sensor {
+		class BinarySensor;
+	}
+}
+#endif
+
+#ifdef USE_SWITCH
+namespace esphome {
+	namespace switch_ {
+		class Switch;
+	}
+}
+#endif
+
+#ifdef USE_LIGHT
+namespace esphome {
+	namespace light {
+		class LightState;
+	}
+}
+#endif
+
+#ifdef USE_COVER
+namespace esphome {
+	namespace cover {
+		class Cover;
+	}
+}
+#endif
 
 const int8_t ENTITY_TYPE_DISABLED = 0;
 const int8_t ENTITY_TYPE_SENSOR = 1;
@@ -152,21 +202,25 @@ namespace esphome {
       void add_rpdo_dummy(uint8_t idx, uint8_t size);
       void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
       void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd);
+	  
+	  void add_entity(EntityBase *entity, uint32_t entity_id, int8_t tpdo, uint8_t size=4, float min_val=0, float max_val=0);
+	  
+	  void add_entity(EntityBase *sensor, uint32_t entity_id, int8_t tpdo);
 
       // void add_status(uint32_t entity_id, uint32_t update_interval);
-      #ifdef LOG_SENSOR
+      #ifdef USE_SENSOR
       void add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo, uint8_t size=4, float min_val=0, float max_val=0);
       #endif
 
-      #ifdef LOG_NUMBER
+      #ifdef USE_NUMBER
       void add_entity(esphome::number::Number *number, uint32_t entity_id, int8_t tpdo, uint8_t size=4, float min_val=0, float max_val=0);
       #endif
 
-      #ifdef LOG_BINARY_SENSOR
+      #ifdef USE_BINARY_SENSOR
       void add_entity(binary_sensor::BinarySensor *sensor, uint32_t entity_id, int8_t tpdo);
       #endif
 
-      #ifdef LOG_SWITCH
+      #ifdef USE_SWITCH
       void add_entity(esphome::switch_::Switch* switch_, uint32_t entity_id, int8_t tpdo);
       #endif
 
@@ -174,7 +228,7 @@ namespace esphome {
       void add_entity(esphome::light::LightState* light, uint32_t entity_id, int8_t tpdo);
       #endif
 
-      #ifdef LOG_COVER
+      #ifdef USE_COVER
       void add_entity(esphome::cover::Cover* cover, uint32_t entity_id, int8_t tpdo);
       #endif
 
