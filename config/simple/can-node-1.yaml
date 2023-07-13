@@ -1,0 +1,45 @@
+<<: !include {file: common.yaml}
+
+wifi:
+  <<: !include {file: wifi.yaml}
+  manual_ip:
+    static_ip: 192.168.1.201
+    subnet: 255.255.255.0
+    gateway: 192.168.1.1
+
+esphome:
+  name: can-node-1
+
+  on_boot:
+    priority: 600
+    then:
+      - logger.log: "on_boot"
+      - delay: 1s
+      - lambda: id(can_gate).trig_tpdo();
+
+canopen:
+  setup_priority: 999
+  id: can_gate
+  canbus_id: can_bus
+  node_id: 1
+  sw_version: 0.0.1
+  hw_version: 0.0.1
+
+  heartbeat_interval: 1s
+  heartbeat_clients:
+    - node_id: 2
+      timeout: 2s
+
+  on_hb_consumer_event:
+    then:
+      - lambda: |
+          ESP_LOGW("canopen", "missed heartbeat from node %d", node_id);
+
+  entities:
+    - id: gpio_led
+      index: 1
+      tpdo: 0
+      rpdo:
+        - node_id: 2
+          tpdo: 0
+          offset: 0

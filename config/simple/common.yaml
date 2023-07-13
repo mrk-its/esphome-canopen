@@ -1,0 +1,154 @@
+esp32:
+  board: esp32dev
+  framework:
+    #type: arduino
+    type: esp-idf
+
+canbus:
+  - platform: esp32_can
+    setup_priority: 1000
+    id: can_bus
+    tx_pin: GPIO22
+    rx_pin: GPIO23
+    can_id: 0
+    bit_rate: 250kbps
+
+# Enable logging
+logger:
+  level: INFO
+  logs:
+    timer_driver: INFO
+    # debug: INFO
+    canbus: INFO
+    sensor: INFO
+    text_sensor: INFO
+    can_driver: INFO
+    # canopen: INFO
+    wifi: WARN
+
+# Enable Home Assistant API
+api:
+ password: ""
+ reboot_timeout: 0s
+
+ota:
+ password: ""
+ safe_mode: false
+
+external_components:
+  - source: github://mrk-its/esphome-canopen
+    refresh: 10s
+# external_components:
+#   - source: ../components
+
+button:
+  - platform: factory_reset
+    name: Restart with Factory Default Settings
+
+
+sensor:
+  - platform: uptime
+    id: uptime_sensor
+    name: "Uptime"
+
+  - platform: template
+    name: "Arb Lost Count"
+    id: can_status_arb_lost
+    lambda: return id(can_gate).status.arb_lost;
+    accuracy_decimals: 0
+    update_interval: 5s
+
+  - platform: template
+    name: "Bus Error Count"
+    id: can_status_bus_err
+    lambda: return id(can_gate).status.bus_err;
+    accuracy_decimals: 0
+    update_interval: 5s
+
+  - platform: template
+    name: "Tx Err"
+    id: can_status_tx_err
+    lambda: return id(can_gate).status.tx_err;
+    accuracy_decimals: 0
+    update_interval: 5s
+
+  - platform: template
+    name: "Rx Err"
+    id: can_status_rx_err
+    lambda: return id(can_gate).status.rx_err;
+    accuracy_decimals: 0
+    update_interval: 5s
+
+  - platform: template
+    name: "Tx Failed"
+    id: can_status_tx_failed
+    lambda: return id(can_gate).status.tx_failed;
+    accuracy_decimals: 0
+    update_interval: 5s
+
+  - platform: template
+    name: "Rx Miss"
+    id: can_status_rx_miss
+    lambda: return id(can_gate).status.rx_miss;
+    accuracy_decimals: 0
+    update_interval: 5s
+
+  - platform: template
+    name: "Node1 Missed Heartbeats"
+    id: can_status_node1_heartbeat
+    lambda: return id(can_gate).get_heartbeat_events(1);
+    accuracy_decimals: 0
+    update_interval: 10s
+
+text_sensor:
+  - platform: template
+    name: "CANOpen Status"
+    id: canopen_status
+    lambda: |
+      static std::string states[] = {"STOPPED", "RUNNING", "BUS_OFF", "RECOVERING"};
+      return states[id(can_gate).status.state];
+    update_interval: 5s
+
+    on_value:
+      - if:
+          condition:
+            for:
+              time: 60s
+              condition:
+                text_sensor.state:
+                  id: canopen_status
+                  state: BUS_OFF
+          then:
+            - logger.log:
+                level: WARN
+                format: "Bus off for 60s, resetting"
+            - lambda: id(can_gate).initiate_recovery();
+      - if:
+          condition:
+            for:
+              time: 30s
+              condition:
+                text_sensor.state:
+                  id: canopen_status
+                  state: STOPPED
+          then:
+            - logger.log:
+                level: WARN
+                format: "starting"
+            - lambda: id(can_gate).start();
+
+switch:
+  - platform: gpio
+    name: "Led"
+    id: gpio_led
+    pin: GPIO2
+
+binary_sensor:
+  - platform: gpio
+    name: "GPIO binary sensor"
+    id: gpio_binary_sensor
+    pin:
+      number: GPIO0
+      inverted: true
+    on_click:
+      - switch.toggle: gpio_led
