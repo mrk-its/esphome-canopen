@@ -1,0 +1,184 @@
+
+# Enable logging
+logger:
+  level: VERBOSE
+  logs:
+    timer_driver: INFO
+  #   # debug: INFO
+  #   canbus: INFO
+  #   sensor: INFO
+  #   text_sensor: INFO
+  #   can_driver: INFO
+  #   # canopen: INFO
+  #   wifi: WARN
+
+# Enable Home Assistant API
+api:
+ password: ""
+ reboot_timeout: 0s
+
+ota:
+ password: ""
+ safe_mode: false
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+    # type: esp-idf
+
+wifi:
+  <<: !include {file: wifi.yaml}
+  manual_ip:
+    static_ip: 192.168.1.203
+    subnet: 255.255.255.0
+    gateway: 192.168.1.1
+
+esphome:
+  name: pwm1
+
+canbus:
+  - platform: esp32_can
+    setup_priority: 1000
+    id: can_bus
+    tx_pin: GPIO10  # 39 / 40 doesn't work
+    rx_pin: GPIO9
+    can_id: 0
+    bit_rate: 250kbps
+
+external_components:
+  - source: ../components
+
+output:
+  - platform: ledc
+    pin: GPIO11
+    id: ledc1
+    frequency: 300Hz
+    min_power: 7%
+    zero_means_zero: true
+
+  - platform: ledc
+    pin: GPIO12
+    id: ledc2
+    frequency: 300Hz
+    min_power: 7%
+    zero_means_zero: true
+
+  - platform: ledc
+    pin: GPIO14
+    id: ledc3
+    frequency: 300Hz
+    min_power: 7%
+    zero_means_zero: true
+
+  - platform: ledc
+    pin: GPIO15
+    id: ledc4
+    frequency: 300Hz
+    min_power: 7%
+    zero_means_zero: true
+
+
+light:
+  # - platform: cwww
+  #   name: "Minalox Panel"
+  #   warm_white: warm_white_led
+  #   cold_white: cold_white_led
+  #   warm_white_color_temperature: 500mireds
+  #   cold_white_color_temperature: 153mireds
+  #   id: minalox_panel
+  #   gamma_correct: 1
+  #   default_transition_length: 0ms
+  #   restore_mode: ALWAYS_ON
+
+  - platform: monochromatic
+    name: Light1
+    output: ledc1
+    id: light1
+    gamma_correct: 1
+    default_transition_length: 0ms
+    restore_mode: ALWAYS_ON   
+
+  - platform: monochromatic
+    name: Light2
+    output: ledc2
+    id: light2
+    gamma_correct: 1
+    default_transition_length: 0ms
+    restore_mode: ALWAYS_ON   
+
+  - platform: monochromatic
+    name: Light3
+    output: ledc3
+    id: light3
+    gamma_correct: 1
+    default_transition_length: 0ms
+    restore_mode: ALWAYS_ON   
+
+  - platform: monochromatic
+    name: Light4
+    output: ledc4
+    id: light4
+    gamma_correct: 1
+    default_transition_length: 0ms
+    restore_mode: ALWAYS_ON   
+
+
+# switch:
+#   - platform: gpio
+#     name: gpio13
+#     id: gpio13
+#     pin: GPIO13
+
+#   - platform: gpio
+#     name: gpio14
+#     id: gpio14
+#     pin: GPIO14
+
+#   - platform: gpio
+#     name: gpio15
+#     id: gpio15
+#     pin: GPIO15
+
+canopen:
+  setup_priority: 999
+  id: can_gate
+  canbus_id: can_bus
+  node_id: 3
+  sw_version: 0.0.1
+  hw_version: 0.0.1
+
+  heartbeat_interval: 1s
+
+  csdo:
+    - node_id: 1
+
+  entities:
+    # - id: minalox_panel
+    #   index: 1
+    #   tpdo: 0
+    - id: light1
+      index: 1
+      tpdo: 0
+      rpdo:
+        - node_id: 1
+          tpdo: 0
+          offset: 0
+          cmd: 0
+        - node_id: 1
+          tpdo: 0
+          offset: 1
+          cmd: 1
+
+    - id: light2
+      index: 2
+      tpdo: 0
+      rpdo:
+        - node_id: 1
+          tpdo: 0
+          offset: 6
+          cmd: 0
+        - node_id: 1
+          tpdo: 0
+          offset: 7
+          cmd: 1

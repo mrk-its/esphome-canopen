@@ -1,0 +1,450 @@
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+    # type: esp-idf
+
+debug:
+  update_interval: 5s
+
+text_sensor:
+  - platform: debug
+    device:
+      name: "Device Info"
+    reset_reason:
+      name: "Reset Reason"
+
+sensor:
+  - platform: debug
+    free:
+      name: "Heap Free"
+    block:
+      name: "Heap Max Block"
+    loop_time:
+      name: "Loop Time"
+
+  - platform: template
+    id: brightness1
+    name: brightness1
+
+  - platform: template
+    id: brightness2
+    name: brightness2
+
+  - platform: template
+    id: brightness3
+    name: brightness3
+
+  - platform: template
+    id: brightness4
+    name: brightness4
+
+button:
+  - platform: restart
+    name: Restart
+
+  - platform: factory_reset
+    name: Restart with Factory Default Settings
+
+globals:
+  - id: adjust_mode
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+esphome:
+  name: wall-switch-1
+
+  on_boot:
+    then:
+      - output.turn_off: buzzer
+      - script.execute: beep
+      - script.execute: reset_brightness
+
+external_components:
+  - source: ../components
+
+api:
+  password: ""
+  reboot_timeout: 0s
+
+ota:
+  password: ""
+  safe_mode: false
+
+wifi:
+  <<: !include {file: wifi.yaml}
+  manual_ip:
+    static_ip: 192.168.1.201
+    subnet: 255.255.255.0
+    gateway: 192.168.1.1
+
+logger:
+
+canbus:
+  - platform: esp32_can
+    id: can_bus
+    rx_pin: GPIO22
+    tx_pin: GPIO23
+    can_id: 0
+    bit_rate: 250kbps
+
+canopen:
+  id: can_gate
+  canbus_id: can_bus
+  node_id: 1
+
+  csdo:
+    - node_id: 3
+
+  entities:
+    - id: switch1
+      index: 1
+      tpdo: 0
+      rpdo:
+        - node_id: 3
+          tpdo: 0
+          offset: 0
+    - id: brightness1
+      index: 2
+      tpdo: 0
+      size: 1
+      rpdo:
+        - node_id: 3
+          tpdo: 0
+          offset: 1
+
+    - id: switch2
+      index: 3
+      tpdo: 0
+    - id: brightness2
+      index: 4
+      tpdo: 0
+      size: 1
+
+    - id: switch3
+      index: 5
+      tpdo: 0
+    - id: brightness3
+      index: 6
+      tpdo: 0
+      size: 1
+
+    - id: switch4
+      index: 7
+      tpdo: 0
+      rpdo:
+        - node_id: 3
+          tpdo: 0
+          offset: 4
+          
+    - id: brightness4
+      index: 8
+      tpdo: 0
+      size: 1
+      rpdo:
+        - node_id: 3
+          tpdo: 0
+          offset: 5
+
+      
+
+    # - id: touch2
+    #   index: 2
+    #   tpdo: 0
+
+    # - id: touch3
+    #   index: 3
+    #   tpdo: 0
+      
+    # - id: touch4
+    #   index: 4
+    #   tpdo: 0     
+
+output:
+  - platform: ledc
+    pin: GPIO18
+    id: led1
+    channel: 0
+
+  - platform: ledc
+    pin: GPIO19
+    id: led2
+    channel: 1
+
+  - platform: ledc
+    pin: GPIO21
+    id: led3
+    channel: 2
+
+  - platform: ledc
+    pin: GPIO27
+    id: led4
+    channel: 3
+
+  - platform: ledc
+    pin: GPIO32
+    id: buzzer
+    channel: 6
+
+script:
+  - id: beep
+    mode: queued
+    then:
+      - output.ledc.set_frequency:
+          id: buzzer
+          frequency: !lambda return id(buzzer_pwm_freq).state;
+      - lambda: 'id(buzzer).set_level(id(buzzer_volume).state);'
+      # - output.set_level:
+      #     id: buzzer
+      #     level: "1%"
+      - delay: 100ms
+      - output.turn_off: buzzer
+
+  - id: set_adjust_mode
+    parameters:
+      n: int
+    mode: restart
+    then:
+      - logger.log: "Adjust Mode: Start"
+      - if:
+          condition:
+            lambda: 'return n>0;'
+          then:
+          - lambda: |
+              id(adjust_mode) = n;
+              esphome::template_::TemplateSwitch* ctl[4] = {id(switch1), id(switch2), id(switch3), id(switch4)};
+              ctl[n-1]->turn_on();
+          - repeat:
+              count: 10
+              then:
+              - delay: 250ms
+              - output.set_level:
+                  id: led2
+                  level: '0'
+              - output.set_level:
+                  id: led3
+                  level: !lambda return id(led_min_brightness).state;
+              - delay: 250ms
+              - output.set_level:
+                  id: led2
+                  level: !lambda return id(led_min_brightness).state;    
+              - output.set_level:
+                  id: led3
+                  level: '0'
+      - lambda: id(adjust_mode) = 0;
+      - logger.log: "Adjust Mode: Done"
+      - script.execute: reset_brightness
+
+  - id: adjust
+    mode: queued
+    parameters:
+      delta: int
+    then:
+    - lambda: |
+        if(int(id(adjust_mode))) {
+          esphome::template_::TemplateSensor* ctl[4] = {id(brightness1), id(brightness2), id(brightness3), id(brightness4)};
+          int idx = int(id(adjust_mode))-1;
+          auto br = ctl[idx]->state += delta;
+          ctl[idx]->publish_state(br >= 1 ? (br <=255 ? br : 255) : 1);
+          id(set_adjust_mode).execute(idx + 1);  
+        }
+
+  - id: reset_brightness
+    mode: restart
+    then:
+      - output.ledc.set_frequency:
+          id: led1
+          frequency: 1000Hz
+      - output.ledc.set_frequency:
+          id: led2
+          frequency: 1000Hz
+      - output.ledc.set_frequency:
+          id: led3
+          frequency: 1000Hz
+      - output.ledc.set_frequency:
+          id: led4
+          frequency: 1000Hz
+      - output.set_level:
+          id: led1
+          level: !lambda return id(led_min_brightness).state;
+      - output.set_level:
+          id: led2
+          level: !lambda return id(led_min_brightness).state;    
+      - output.set_level:
+          id: led3
+          level: !lambda return id(led_min_brightness).state;
+      - output.set_level:
+          id: led4
+          level: !lambda return id(led_min_brightness).state;    
+
+switch:
+  - platform: template
+    id: switch1
+    name: switch1
+    optimistic: true
+  - platform: template
+    id: switch2
+    name: switch2
+    optimistic: true
+  - platform: template
+    id: switch3
+    name: switch3
+    optimistic: true
+  - platform: template
+    id: switch4
+    name: switch4
+    optimistic: true
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO12
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    id: touch1
+    on_press:
+      then:
+      - script.execute: beep
+
+    on_multi_click:
+    - timing:
+        - ON for at least 1s
+      then:
+        - script.execute: beep
+        - lambda: id(set_adjust_mode).execute(1);
+
+    - timing:
+        - ON for at most 1s
+        - OFF for at least 0.2s
+      then:
+      - if:
+          condition:
+            lambda: return int(id(adjust_mode));
+          then:
+          - lambda: id(set_adjust_mode).execute(0);
+          else:
+          - switch.toggle: switch1
+
+  - platform: gpio
+    pin:
+      number: GPIO13
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    id: touch2
+    on_press:
+      then:
+      - script.execute: beep
+      - lambda: id(adjust).execute(-64);
+
+    on_multi_click:
+    - timing:
+        - ON for at least 1s
+      then:
+        - script.execute: beep
+        - lambda: id(set_adjust_mode).execute(2);
+    - timing:
+        - ON for at most 1s
+        - OFF for at least 0.2s
+      then:
+        - switch.toggle: switch2
+
+  - platform: gpio
+    pin:
+      number: GPIO14
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    id: touch3
+    on_press:
+      then:
+      - script.execute: beep
+      - lambda: id(adjust).execute(64);
+
+    on_multi_click:
+    - timing:
+        - ON for at least 1s
+      then:
+        - script.execute: beep
+        - lambda: id(set_adjust_mode).execute(3);
+    - timing:
+        - ON for at most 1s
+        - OFF for at least 0.2s
+      then:
+        - switch.toggle: switch3
+
+  - platform: gpio
+    pin:
+      number: GPIO15
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    id: touch4
+    on_press:
+      then:
+      - script.execute: beep
+    on_multi_click:
+    - timing:
+        - ON for at least 1s
+      then:
+        - script.execute: beep
+        - lambda: id(set_adjust_mode).execute(4);
+    - timing:
+        - ON for at most 1s
+        - OFF for at least 0.2s
+      then:
+      - if:
+          condition:
+            lambda: return int(id(adjust_mode));
+          then:
+          - lambda: id(set_adjust_mode).execute(0);
+          else:
+          - switch.toggle: switch4
+
+
+number:
+  - platform: template
+    name: "Buzzer Volume"
+    id: buzzer_volume
+    min_value: 0.0
+    max_value: 1.0
+    initial_value: 0.1
+    step: 0.01
+    optimistic: true
+    restore_value: true
+    on_value:
+      then:
+        - script.execute: beep
+
+  - platform: template
+    name: "Buzzer PWM Freq"
+    id: buzzer_pwm_freq
+    min_value: 10
+    max_value: 100000
+    initial_value: 1000
+    step: 1
+    optimistic: true
+    restore_value: true
+    on_value:
+      then:
+        - script.execute: beep
+
+
+  - platform: template
+    name: "LED Min Brightness"
+    id: led_min_brightness
+    min_value: 0.0
+    max_value: 1.0
+    initial_value: 0.1
+    step: 0.01
+    optimistic: true
+    restore_value: true
+    on_value:
+      then:
+        - script.execute: reset_brightness
