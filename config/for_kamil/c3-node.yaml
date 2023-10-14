@@ -1,0 +1,46 @@
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+esphome:
+  name: c3-node
+
+external_components:
+  - source: github://mrk-its/esphome-canopen
+
+api:
+  password: ""
+  reboot_timeout: 0s
+
+ota:
+  password: ""
+  safe_mode: false
+
+wifi:
+  power_save_mode: none
+
+  <<: !include {file: wifi.yaml}
+  manual_ip:
+    static_ip: 192.168.1.203
+    subnet: 255.255.255.0
+    gateway: 192.168.1.1
+
+logger:
+
+sensor:
+
+canbus:
+  - platform: esp32_can
+    id: can_bus
+    rx_pin: GPIO6
+    tx_pin: GPIO7
+    can_id: 0
+    bit_rate: 250kbps
+
+canopen:
+  id: can_gate
+  canbus_id: can_bus
+  node_id: 3
+
+  entities: []

@@ -1,0 +1,45 @@
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+esphome:
+  name: wall-switch-1
+
+external_components:
+  - source: github://mrk-its/esphome-canopen
+  # - source: ../components
+
+api:
+  password: ""
+  reboot_timeout: 0s
+
+ota:
+  password: ""
+  safe_mode: false
+
+wifi:
+  <<: !include {file: wifi.yaml}
+  manual_ip:
+    static_ip: 192.168.1.227
+    subnet: 255.255.255.0
+    gateway: 192.168.1.1
+
+logger:
+
+sensor:
+
+canbus:
+  - platform: esp32_can
+    id: can_bus
+    rx_pin: GPIO22
+    tx_pin: GPIO23
+    can_id: 0
+    bit_rate: 250kbps
+
+canopen:
+  id: can_gate
+  canbus_id: can_bus
+  node_id: 7
+
+  entities: []

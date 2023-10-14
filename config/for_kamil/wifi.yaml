@@ -1,0 +1,5 @@
+ssid: "SSID"
+password: "PASSWORD"
+fast_connect: true
+reboot_timeout: 0s
+
