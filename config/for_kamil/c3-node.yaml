@@ -22,7 +22,7 @@ wifi:
 
   <<: !include {file: wifi.yaml}
   manual_ip:
-    static_ip: 192.168.1.203
+    static_ip: 192.168.1.205
     subnet: 255.255.255.0
     gateway: 192.168.1.1
 
@@ -41,6 +41,6 @@ canbus:
 canopen:
   id: can_gate
   canbus_id: can_bus
-  node_id: 3
+  node_id: 5
 
   entities: []
