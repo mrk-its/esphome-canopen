@@ -41,7 +41,7 @@ namespace esphome {
     }
 
     CanopenComponent::CanopenComponent(canbus::Canbus *canbus, uint32_t node_id) {
-      ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03x", node_id);
+      ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03lx", node_id);
       memset(rpdo_buf, 0, sizeof(rpdo_buf));
 
       NodeSpec.NodeId = node_id;
@@ -634,7 +634,7 @@ namespace esphome {
           if(size == 1) value &= 0xff;
           else if(size == 2) value &= 0xffff;
         }
-        ESP_LOGD(TAG, "OD Index: %02x Key: %08x Data: %08x Type: %p", index, od->Key, value, od->Type);
+        ESP_LOGD(TAG, "OD Index: %02x Key: %08lx Data: %08lx Type: %p", index, od->Key, value, od->Type);
         index++;
         od++;
       }
@@ -765,7 +765,7 @@ namespace esphome {
           ) {
             ESP_LOGW(
               TAG,
-              "tx_err: %d rx_err: %d tx_failed: %d rx_miss: %d arb_lost: %d bus_err: %d",
+              "tx_err: %ld rx_err: %ld tx_failed: %ld rx_miss: %ld arb_lost: %ld bus_err: %ld",
               status.tx_err, status.rx_err, status.tx_failed, status.rx_miss, status.arb_lost, status.bus_err
             );
           }
