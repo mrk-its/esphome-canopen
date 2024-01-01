@@ -34,7 +34,7 @@ char *can_data_str(uint8_t *data, uint8_t len) {
 }
 
 static int16_t DrvCanSend(CO_IF_FRM *frm) {
-    if(global_canopen && global_canopen->canbus) {
+    if(global_canopen) {
         auto len = frm->DLC;
         std::vector<uint8_t> data(frm->Data, frm->Data + len);
         ESP_LOGV(
@@ -42,7 +42,16 @@ static int16_t DrvCanSend(CO_IF_FRM *frm) {
             "DrvCanSend id: %03x, len: %d, data:%s",
             frm->Identifier, len, can_data_str(frm->Data, len)
         );
-        global_canopen->canbus->send_data(frm->Identifier, false, data);
+
+#ifdef USE_CANBUS
+        if(global_canopen->canbus) {
+            global_canopen->canbus->send_data(frm->Identifier, false, data);
+        }
+#endif
+
+#ifdef USE_MQTT
+        global_canopen->mqtt_send_frame(frm->Identifier, data);
+#endif
         return 0;
     } else {
         return -1;
