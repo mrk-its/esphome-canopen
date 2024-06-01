@@ -1,5 +1,7 @@
-#include "fw.h"
 #include "esphome.h"
+#ifdef USE_OTA
+
+#include "fw.h"
 
 #define TAG "fw"
 
@@ -110,3 +112,4 @@ CO_ERR   FwImageReset(CO_OBJ *obj, CO_NODE *node, uint32_t para) {
   }
   return CO_ERR_NONE;
 }
+# endif
