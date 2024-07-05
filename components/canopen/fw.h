@@ -2,7 +2,7 @@
 #define FW_H
 
 #include "esphome.h"
-#ifdef USE_OTA
+#ifdef USE_CAN_OTA
 
 #include "esphome/components/ota/ota_backend.h"
 #include "esphome/components/ota/ota_component.h"
