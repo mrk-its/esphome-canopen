@@ -147,7 +147,7 @@ namespace esphome {
           auto data = std::vector<uint8_t>(payload.begin(), payload.end());
 #ifdef USE_CANBUS
           if((can_id & 0x7f) != this->node_id) {
-            // canbus->send_data(can_id, false, data);
+            canbus->send_data(can_id, false, data);
           }
 #endif
           this->on_frame(can_id, false, data);
