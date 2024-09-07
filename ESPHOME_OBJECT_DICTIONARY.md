@@ -1,3 +1,4 @@
+# Object Dictionary Layout
 
 Each ESPHome entity exposed via CANOpen is mapped to CANOpen Object Dictionary (OD), the mapping is defined in `canopen.entities` list in ESPHome config (yaml):
 ```
