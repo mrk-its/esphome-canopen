@@ -1,5 +1,5 @@
 #include "esphome.h"
-#ifdef USE_OTA
+#ifdef USE_CAN_OTA
 
 #include "fw.h"
 

@@ -19,7 +19,7 @@ void CONmtHbConsEvent(CO_NMT *nmt, uint8_t nodeId) {
 }
 
 namespace esphome {
-  #ifdef USE_OTA
+  #ifdef USE_CAN_OTA
   namespace ota {
     std::unique_ptr<OTABackend> make_ota_backend();
   }
@@ -635,7 +635,7 @@ namespace esphome {
     CO_OBJ_STR ManufacturerDeviceNameObj = {0, (uint8_t *)"ESPHome"};
 
 
-    #ifdef USE_OTA
+    #ifdef USE_CAN_OTA
     Firmware FirmwareObj;
     uint8_t FirmwareMD5Data[32];
 
@@ -683,7 +683,7 @@ namespace esphome {
         ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + i, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA)254);
       }
 
-      #ifdef USE_OTA
+      #ifdef USE_CAN_OTA
       FirmwareObj.domain.Size = 1024 * 1024;
       FirmwareObj.backend = esphome::ota::make_ota_backend();
 
