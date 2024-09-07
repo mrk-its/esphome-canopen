@@ -22,10 +22,7 @@ CO_ERR StoreCommParamsWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t s
 }
 
 CO_OBJ_TYPE StoreCommParams = {
-    StoreCommParamsSize,
-    StoreCommParamsInit,
-    StoreCommParamsRead,
-    StoreCommParamsWrite,
+    StoreCommParamsSize, StoreCommParamsInit, StoreCommParamsRead, StoreCommParamsWrite, NULL,
 };
 
 uint32_t ResetCommParamsSize(CO_OBJ *obj, CO_NODE *node, uint32_t width) { return CO_ERR_OBJ_READ; }
@@ -45,9 +42,5 @@ CO_ERR ResetCommParamsWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t s
   return CO_ERR_OBJ_WRITE;
 }
 
-CO_OBJ_TYPE ResetCommParams = {
-    ResetCommParamsSize,
-    ResetCommParamsInit,
-    ResetCommParamsRead,
-    ResetCommParamsWrite,
-};
+CO_OBJ_TYPE ResetCommParams = {ResetCommParamsSize, ResetCommParamsInit, ResetCommParamsRead, ResetCommParamsWrite,
+                               NULL};

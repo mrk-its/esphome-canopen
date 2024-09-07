@@ -172,7 +172,7 @@ def to_code(config):
         size = entity_config.get("size")
         if size in (1, 2):
             min_val = entity_config.get("min_value", 0)
-            max_val = entity_config.get("max_value", 255 if size == 1 else 65535)
+            max_val = entity_config.get("max_value", 254 if size == 1 else 65534)  # 255 / 65535 reserved for NaN
             cg.add(canopen.add_entity(entity, entity_config["index"], tpdo, size, min_val, max_val))
         else:
             cg.add(canopen.add_entity(entity, entity_config["index"], tpdo))

@@ -175,10 +175,13 @@ void CanopenComponent::od_add_metadata(uint32_t entity_id, uint8_t type, const s
 
 void CanopenComponent::od_add_sensor_metadata(uint32_t entity_id, float min_value, float max_value) {
   uint32_t index = get_entity_index(entity_id);
+  // temporary pointers to get rid of aliasing warning
+  uint32_t *min_value_ptr = (uint32_t *) &min_value;
+  uint32_t *max_value_ptr = (uint32_t *) &max_value;
   ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_SENSOR_MIN_VALUE, CO_OBJ_D___R_), CO_TUNSIGNED32,
-              (CO_DATA) * (uint32_t *) &min_value);
+              (CO_DATA) *min_value_ptr);
   ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_SENSOR_MAX_VALUE, CO_OBJ_D___R_), CO_TUNSIGNED32,
-              (CO_DATA) * (uint32_t *) &max_value);
+              (CO_DATA) *max_value_ptr);
 }
 
 uint32_t CanopenComponent::od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size,
@@ -302,6 +305,19 @@ void CanopenComponent::add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8
   rpdo_map_append(idx, index + 2, cmd + 1, 8);
 }
 
+float scale_to_wire(float value, float min_val, float max_val, float n_levels) {
+  if (std::isnan(value))
+    return n_levels;
+  float result = n_levels * (value - min_val) / (max_val - min_val + 1);
+  return result < 0 ? 0 : (result > n_levels - 1 ? n_levels - 1 : result);
+}
+
+float scale_from_wire(float value, float min_val, float max_val, float n_levels) {
+  if (int(value) == int(n_levels))
+    return NAN;
+  return value * (max_val - min_val + 1) / n_levels + min_val;
+}
+
 #ifdef USE_SENSOR
 void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo, uint8_t size, float min_val,
                                   float max_val) {
@@ -318,25 +334,16 @@ void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, in
   std::function<uint32_t(float state)> to_wire;
   std::function<float(void *buf)> from_wire;
 
-  auto scale_to_wire = [=](float value, float n_levels) {
-    float result = n_levels * (value - min_val) / (max_val - min_val + 1);
-    ESP_LOGD(TAG, "scale_to_wire, input: %f, n_levels: %f, result: %f", value, n_levels, result);
-    return result < 0 ? 0 : (result > n_levels - 1 ? n_levels - 1 : result);
-  };
-  auto scale_from_wire = [=](float value, float n_levels) {
-    return value * (max_val - min_val + 1) / n_levels + min_val;
-  };
-
   switch (size) {
     case 1:
-      to_wire = [=](float state) { return (uint8_t) scale_to_wire(state, 256); };
-      from_wire = [=](void *buf) { return scale_from_wire((float) *(uint8_t *) buf, 256); };
+      to_wire = [=](float state) { return (uint8_t) scale_to_wire(state, min_val, max_val, 255); };
+      from_wire = [=](void *buf) { return scale_from_wire((float) *(uint8_t *) buf, min_val, max_val, 255); };
       type = CO_TUNSIGNED8;
       cmd_type = CO_TCMD8;
       break;
     case 2:
-      to_wire = [=](float state) { return (uint16_t) scale_to_wire(state, 65536); };
-      from_wire = [=](void *buf) { return scale_from_wire((float) *(uint16_t *) buf, 65536); };
+      to_wire = [=](float state) { return (uint16_t) scale_to_wire(state, min_val, max_val, 65535); };
+      from_wire = [=](void *buf) { return scale_from_wire((float) *(uint16_t *) buf, min_val, max_val, 65535); };
       type = CO_TUNSIGNED16;
       cmd_type = CO_TCMD16;
       break;
@@ -387,24 +394,16 @@ void CanopenComponent::add_entity(esphome::number::Number *number, uint32_t enti
   std::function<uint32_t(float state)> to_wire;
   std::function<float(void *buf)> from_wire;
 
-  auto scale_to_wire = [=](float value, float n_levels) {
-    float result = n_levels * (value - min_val) / (max_val - min_val + 1);
-    return result < 0 ? 0 : (result > n_levels - 1 ? n_levels - 1 : result);
-  };
-  auto scale_from_wire = [=](float value, float n_levels) {
-    return value * (max_val - min_val + 1) / n_levels + min_val;
-  };
-
   switch (size) {
     case 1:
-      to_wire = [=](float state) { return (uint8_t) scale_to_wire(state, 256); };
-      from_wire = [=](void *buf) { return scale_from_wire((float) *(uint8_t *) buf, 256); };
+      to_wire = [=](float state) { return (uint8_t) scale_to_wire(state, min_val, max_val, 255); };
+      from_wire = [=](void *buf) { return scale_from_wire((float) *(uint8_t *) buf, min_val, max_val, 255); };
       type = CO_TUNSIGNED8;
       cmd_type = CO_TCMD8;
       break;
     case 2:
-      to_wire = [=](float state) { return (uint16_t) scale_to_wire(state, 65536); };
-      from_wire = [=](void *buf) { return scale_from_wire((float) *(uint16_t *) buf, 65536); };
+      to_wire = [=](float state) { return (uint16_t) scale_to_wire(state, min_val, max_val, 65535); };
+      from_wire = [=](void *buf) { return scale_from_wire((float) *(uint16_t *) buf, min_val, max_val, 65535); };
       type = CO_TUNSIGNED16;
       cmd_type = CO_TCMD16;
       break;
