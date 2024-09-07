@@ -364,13 +364,6 @@ void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, in
   sensor->add_on_state_callback([=](float value) {
     auto casted_state = to_wire(value);
     od_set_state(state_key, &casted_state, size);
-    if (size == 1) {
-      ESP_LOGI(TAG, "value on wire: %02x", *(uint8_t *) &casted_state);
-    } else if (size == 2) {
-      ESP_LOGI(TAG, "value on wire: %04x", *(uint16_t *) &casted_state);
-    } else {
-      ESP_LOGI(TAG, "value on wire: %08x (value: %f)", casted_state, value);
-    }
   });
   od_add_cmd(
       entity_id, [=](void *buffer, uint32_t size) { sensor->publish_state(from_wire(buffer)); }, cmd_type);
