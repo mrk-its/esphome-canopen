@@ -27,6 +27,7 @@ CO_ERR FwCtrlWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
 }
 
 uint32_t FwImageSize(CO_OBJ *obj, CO_NODE *node, uint32_t width) {
+  ESP_LOGI(TAG, "FwImageSize: %d", width);
   Firmware *firmware = (Firmware *) (obj->Data);
   auto domain = &firmware->domain;
   uint32_t size = domain->Size;
@@ -34,6 +35,7 @@ uint32_t FwImageSize(CO_OBJ *obj, CO_NODE *node, uint32_t width) {
   /* allow firmware image smaller or equal to the domain memory area */
   if ((width < size) && (width > 0)) {
     size = width;
+    firmware->ota_size = size;
   }
   return size;
 }
@@ -66,11 +68,11 @@ CO_ERR FwImageWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
   domain->Offset += size;
   if ((prev ^ domain->Offset) & ~1023) {
     uint32_t progress =
-        firmware->size > 0 && domain->Offset <= firmware->size ? domain->Offset * 100 / firmware->size : 0;
+        firmware->ota_size > 0 && domain->Offset <= firmware->ota_size ? domain->Offset * 100 / firmware->ota_size : 0;
     ESP_LOGI(TAG, "FwImageWrite, %ld kB (%ld%%)", (domain->Offset >> 10), progress);
   }
 
-  if (domain->Offset == firmware->size) {
+  if (domain->Offset == firmware->ota_size) {
     char buf[33] = "";
     for (int i = 0; i < 16; i++) {
       sprintf(buf + i * 2, "%02x", firmware->md5[i]);

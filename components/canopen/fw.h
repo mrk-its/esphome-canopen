@@ -24,6 +24,7 @@ struct Firmware {
   CO_OBJ_DOM domain;
   // std::unique_ptr<esphome::ota::OTABackend> backend;
   uint32_t size;
+  uint32_t ota_size;
   uint8_t md5[32];
 };
 #pragma pack(pop)

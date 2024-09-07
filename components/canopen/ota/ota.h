@@ -3,6 +3,8 @@
 
 // #ifdef USE_OTA
 
+#include "miniz.h"
+
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
 
@@ -18,7 +20,15 @@ namespace canopen {
 class OtaFinishedTrigger : public Trigger<> {};
 
 class CanopenOTAComponent : public ota::OTAComponent {
+  const char *TAG = "canopen_ota";
+  const static uint32_t BUF_SIZE = 8 * 1024;
   OtaFinishedTrigger *ota_finished_trigger;
+  z_stream stream;
+  uint8_t s_outbuf[BUF_SIZE];
+  uint32_t size;
+  uint32_t written;
+
+  int decompress();
 
  public:
   std::unique_ptr<esphome::ota::OTABackend> backend;

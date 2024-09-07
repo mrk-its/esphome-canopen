@@ -28,38 +28,82 @@ void CanopenOTAComponent::setup() {
   App.register_component(delayaction_id);
   delayaction_id->set_delay(5000);
   auto lambdaaction_id = new LambdaAction<>([=]() -> void {
-    ESP_LOGI("main", "ota finished, rebooting");
+    ESP_LOGI(TAG, "ota finished, rebooting");
     App.safe_reboot();
   });
   automation_id->add_actions({delayaction_id, lambdaaction_id});
-
-  // ota_finished_trigger = new OtaFinishedTrigger();
-
-  // auto automation = new Automation<>(reboot_trigger);
-  // auto cb = [this]() -> void {
-  //   // this->on_frame(can_id, remote_transmission_request, x);
-  // };
-  // auto delay = new DelayAction<>();
-  // auto lambdaaction = new LambdaAction<>(cb);
-  // automation->add_actions({delay, lambdaaction});
 }
 
 void CanopenOTAComponent::loop() {}
 
 float CanopenOTAComponent::get_setup_priority() const { return setup_priority::LATE; }
 
-esphome::ota::OTAResponseTypes CanopenOTAComponent::begin(uint32_t size) { return backend->begin(size); }
-esphome::ota::OTAResponseTypes CanopenOTAComponent::write(uint8_t *data, size_t len) {
-  return backend->write(data, len);
-}
-esphome::ota::OTAResponseTypes CanopenOTAComponent::end(const char *expected_md5) {
-  backend->set_update_md5(expected_md5);
-  auto ret = backend->end();
-  if (!ret) {
-    ota_finished_trigger->trigger();
-    // esphome::delay(5000);  // NOLINT
-    // App.safe_reboot();
+esphome::ota::OTAResponseTypes CanopenOTAComponent::begin(uint32_t size) {
+  this->stream = z_stream{};
+  this->stream.next_out = this->s_outbuf;
+  this->stream.avail_out = BUF_SIZE;
+  this->stream.avail_in = 0;
+  this->written = 0;
+
+  if (mz_inflateInit(&this->stream)) {
+    ESP_LOGW(TAG, "cannot initialize decompressor");
   }
+  return backend->begin(size);
+}
+
+int CanopenOTAComponent::decompress() {
+  auto status = inflate(&this->stream, Z_SYNC_FLUSH);
+  if ((status == Z_STREAM_END) || (status == Z_OK && !this->stream.avail_out)) {
+    uint32_t n = BUF_SIZE - this->stream.avail_out;
+    this->written += n;
+    ESP_LOGI(TAG, "writing %d bytes to flash, total: %d", n, this->written);
+    auto ret = backend->write(this->s_outbuf, n);
+    if (ret != esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK) {
+      ESP_LOGW("ota", "write flash error: %d", ret);
+      return -10;
+    }
+    this->stream.next_out = this->s_outbuf;
+    this->stream.avail_out = BUF_SIZE;
+  }
+  return status;
+}
+
+esphome::ota::OTAResponseTypes CanopenOTAComponent::write(uint8_t *data, size_t len) {
+  this->stream.next_in = data;
+  this->stream.avail_in = len;
+
+  while (stream.avail_in) {
+    int status = this->decompress();
+    if (status == Z_STREAM_END) {
+      break;
+    }
+    if (status != Z_OK) {
+      ESP_LOGW(TAG, "decompression failed with %d", status);
+      return esphome::ota::OTAResponseTypes::OTA_RESPONSE_ERROR_UNKNOWN;
+    }
+  }
+  return esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK;
+}
+
+esphome::ota::OTAResponseTypes CanopenOTAComponent::end(const char *expected_md5) {
+  esphome::ota::OTAResponseTypes ret;
+  for (;;) {
+    auto status = this->decompress();
+    if (status == Z_STREAM_END) {
+      backend->set_update_md5(expected_md5);
+      ret = backend->end();
+      if (!ret) {
+        ESP_LOGI(TAG, "decompression finished successfully");
+        ota_finished_trigger->trigger();
+      }
+      break;
+    } else if (status != Z_OK) {
+      ESP_LOGW(TAG, "decompression failed with %d", status);
+      ret = esphome::ota::OTAResponseTypes::OTA_RESPONSE_ERROR_UNKNOWN;
+      break;
+    }
+  }
+  mz_deflateEnd(&this->stream);
   return ret;
 }
 
