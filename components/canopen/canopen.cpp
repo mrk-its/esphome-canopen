@@ -346,6 +346,7 @@ namespace esphome {
 
       auto scale_to_wire = [=](float value, float n_levels) {
         float result = n_levels * (value - min_val) / (max_val - min_val + 1);
+        ESP_LOGI(TAG, "scale_to_wire, input: %f, n_levels: %f, result: %f", value, n_levels, result);
         return result < 0 ? 0 : (result > n_levels - 1 ? n_levels - 1 : result);
       };
       auto scale_from_wire = [=](float value, float n_levels) {
@@ -380,6 +381,9 @@ namespace esphome {
       sensor->add_on_state_callback([=](float value) {
         auto casted_state = to_wire(value);
         od_set_state(state_key, &casted_state, size);
+        if(size == 2) {
+          ESP_LOGI(TAG, "value on wire: %04x", *(uint16_t *)&casted_state);
+        }
       });
       od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
         sensor->publish_state(from_wire(buffer));
