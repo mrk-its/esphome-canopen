@@ -1,9 +1,11 @@
 #ifndef FW_H
 #define FW_H
 
+#include "esphome.h"
+#ifdef USE_OTA
+
 #include "esphome/components/ota/ota_backend.h"
 #include "esphome/components/ota/ota_component.h"
-#include "esphome.h"
 
 #ifdef __cplusplus               /* for compatibility with C++ environments  */
 
@@ -43,6 +45,8 @@ const CO_OBJ_TYPE FwImage = { FwImageSize, FwImageInit, 0, FwImageWrite, FwImage
 
 #ifdef __cplusplus               /* for compatibility with C++ environments  */
 }
+#endif
+
 #endif
 
 #endif

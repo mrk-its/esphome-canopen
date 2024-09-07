@@ -19,9 +19,12 @@ void CONmtHbConsEvent(CO_NMT *nmt, uint8_t nodeId) {
 }
 
 namespace esphome {
+  #ifdef USE_OTA
   namespace ota {
     std::unique_ptr<OTABackend> make_ota_backend();
   }
+  #endif
+
   canopen::CanopenComponent *global_canopen = 0;
 
   namespace canopen {
@@ -628,6 +631,7 @@ namespace esphome {
     CO_OBJ_STR ManufacturerDeviceNameObj = {0, (uint8_t *)"ESPHome"};
 
 
+    #ifdef USE_OTA
     Firmware FirmwareObj;
     uint8_t FirmwareMD5Data[32];
 
@@ -636,6 +640,7 @@ namespace esphome {
       sizeof(FirmwareObj.md5),
       FirmwareObj.md5,
     };
+    #endif
 
     void CanopenComponent::setup_csdo(uint8_t num, uint8_t node_id, uint32_t tx_id, uint32_t rx_id) {
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1280 + num, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, 0);
@@ -656,13 +661,11 @@ namespace esphome {
       uint32_t hash = fnv1_hash("canopen_comm_state_v2");
       this->comm_state = global_preferences->make_preference<uint8_t[CO_RPDO_N * 41]>(hash, true);
       if(this->comm_state.load(&rpdo_buf)) {
+
         ESP_LOGI(TAG, "loaded RPDO config from preferences");
       } else {
         ESP_LOGI(TAG, "can't load RPDO config from preferences, using defaults");
       }
-
-      FirmwareObj.domain.Size = 1024 * 1024;
-      FirmwareObj.backend = esphome::ota::make_ota_backend();
 
       if(heartbeat_interval_ms) {
         ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1017, 0, CO_OBJ_D___RW), CO_THB_PROD, (CO_DATA)(heartbeat_interval_ms));
@@ -676,10 +679,15 @@ namespace esphome {
         ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + i, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA)254);
       }
 
+      #ifdef USE_OTA
+      FirmwareObj.domain.Size = 1024 * 1024;
+      FirmwareObj.backend = esphome::ota::make_ota_backend();
+
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 1, CO_OBJ_D____W), FW_CTRL, (CO_DATA)0);
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 2, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA)(&FirmwareObj.size));
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 3, CO_OBJ______W), CO_TDOMAIN, (CO_DATA)(&FirmwareMD5));
       ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 4, CO_OBJ______W), FW_IMAGE, (CO_DATA)(&FirmwareObj));
+      #endif
 
       CONodeInit(&node, &NodeSpec);
       auto err = CONodeGetErr(&node);

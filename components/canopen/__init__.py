@@ -25,7 +25,7 @@ CmdTriggerInt32 = ns.class_("CmdTriggerInt32", automation.Trigger.template())
 
 CONF_ENTITIES = "entities"
 
-DEPENDENCIES = ["ota"]
+DEPENDENCIES = []
 
 CSDO_SCHEMA = cv.Schema({
     cv.Required("node_id"): cv.int_,
