@@ -2,10 +2,11 @@
 #define FW_H
 
 #include "esphome.h"
-#ifdef USE_CAN_OTA
+#include "canopen.h"
+
+#ifdef USE_CANOPEN_OTA
 
 #include "esphome/components/ota/ota_backend.h"
-#include "esphome/components/ota/ota_component.h"
 
 #ifdef __cplusplus /* for compatibility with C++ environments  */
 
@@ -21,7 +22,7 @@ extern "C" {
 #pragma pack(push, 1)
 struct Firmware {
   CO_OBJ_DOM domain;
-  std::unique_ptr<esphome::ota::OTABackend> backend;
+  // std::unique_ptr<esphome::ota::OTABackend> backend;
   uint32_t size;
   uint8_t md5[32];
 };

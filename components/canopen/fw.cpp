@@ -1,5 +1,5 @@
 #include "esphome.h"
-#ifdef USE_CAN_OTA
+#ifdef USE_CANOPEN_OTA
 
 #include "fw.h"
 
@@ -53,10 +53,11 @@ CO_ERR FwImageWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
   CO_ERR result = CO_ERR_TYPE_WR;
   uint32_t address = (uint32_t) domain->Start + domain->Offset;
 
-  /* use your FLASH driver for writing the buffer to given address, e.g.: */
-  // success = MyFlashDriverWrite(address, (uint8_t *buffer), size);
-
-  auto ret = firmware->backend->write((uint8_t *) buffer, size);
+  if (!esphome::global_canopen->ota) {
+    ESP_LOGW(TAG, "FwImageWrite, ota not enabled");
+    return CO_ERR_NONE;
+  }
+  auto ret = esphome::global_canopen->ota->write((uint8_t *) buffer, size);
   if (ret) {
     ESP_LOGE(TAG, "FwImageWrite, ret: %x", ret);
     return CO_ERR_OBJ_WRITE;
@@ -74,20 +75,15 @@ CO_ERR FwImageWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
     for (int i = 0; i < 16; i++) {
       sprintf(buf + i * 2, "%02x", firmware->md5[i]);
     }
-    firmware->backend->set_update_md5(buf);
-    ret = firmware->backend->end();
+    ESP_LOGI(TAG, "FwImageWrite: upload complete, md5: %s", buf);
+
+    auto ret = esphome::global_canopen->ota->end(buf);
     if (ret) {
       ESP_LOGE(TAG, "FwImageWrite, can't end update, ret: %x", ret);
-    } else {
-      ESP_LOGI(TAG, "FwImageWrite: successfully flashed, rebooting");
-      esphome::delay(100);  // NOLINT
-      App.safe_reboot();
+      return CO_ERR_OBJ_WRITE;
     }
   }
-
-  result = CO_ERR_NONE;
-
-  return (result);
+  return CO_ERR_NONE;
 }
 
 CO_ERR FwImageReset(CO_OBJ *obj, CO_NODE *node, uint32_t para) {
@@ -98,11 +94,18 @@ CO_ERR FwImageReset(CO_OBJ *obj, CO_NODE *node, uint32_t para) {
   if (!firmware->size) {
     return CO_ERR_OBJ_WRITE;
   }
-  auto ret = firmware->backend->begin(firmware->size);
+  if (!esphome::global_canopen->ota) {
+    ESP_LOGW(TAG, "FwImageReset, ota not enabled");
+    return CO_ERR_NONE;
+  }
+  auto ret = esphome::global_canopen->ota->begin(firmware->size);
   if (ret) {
     ESP_LOGE(TAG, "FwImageReset, can't start OTA, ret: %x", ret);
     return CO_ERR_OBJ_WRITE;
   }
+  ESP_LOGI(TAG, "firmware upload started");
+
   return CO_ERR_NONE;
 }
+
 #endif

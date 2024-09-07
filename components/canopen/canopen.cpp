@@ -19,11 +19,6 @@ void CONmtHbConsEvent(CO_NMT *nmt, uint8_t nodeId) {
 }
 
 namespace esphome {
-#ifdef USE_CAN_OTA
-namespace ota {
-std::unique_ptr<OTABackend> make_ota_backend();
-}
-#endif
 
 canopen::CanopenComponent *global_canopen = 0;
 
@@ -99,7 +94,6 @@ void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> 
   CONodeProcess(&node);
 }
 
-#ifdef USE_CANBUS
 void CanopenComponent::set_canbus(canbus::Canbus *canbus) {
   Automation<std::vector<uint8_t>, uint32_t, bool> *automation;
   LambdaAction<std::vector<uint8_t>, uint32_t, bool> *lambdaaction;
@@ -120,7 +114,6 @@ void CanopenComponent::set_canbus(canbus::Canbus *canbus) {
   lambdaaction = new LambdaAction<std::vector<uint8_t>, uint32_t, bool>(cb);
   automation->add_actions({lambdaaction});
 }
-#endif
 
 #ifdef USE_MQTT
 void CanopenComponent::set_mqtt_client(esphome::mqtt::MQTTClientComponent *mqtt_client) {
@@ -312,7 +305,6 @@ void CanopenComponent::add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8
 #ifdef USE_SENSOR
 void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo, uint8_t size, float min_val,
                                   float max_val) {
-  float state = sensor->get_state();
   od_add_metadata(entity_id,
                   size == 1   ? ENTITY_TYPE_SENSOR_UINT8
                   : size == 2 ? ENTITY_TYPE_SENSOR_UINT16
@@ -328,7 +320,7 @@ void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, in
 
   auto scale_to_wire = [=](float value, float n_levels) {
     float result = n_levels * (value - min_val) / (max_val - min_val + 1);
-    ESP_LOGI(TAG, "scale_to_wire, input: %f, n_levels: %f, result: %f", value, n_levels, result);
+    ESP_LOGD(TAG, "scale_to_wire, input: %f, n_levels: %f, result: %f", value, n_levels, result);
     return result < 0 ? 0 : (result > n_levels - 1 ? n_levels - 1 : result);
   };
   auto scale_from_wire = [=](float value, float n_levels) {
@@ -358,13 +350,19 @@ void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, in
       ESP_LOGE(TAG, "Unsupported sensor size: %d", size);
       return;
   }
+  float state = NAN;
   auto casted_state = to_wire(state);
   state_key = od_add_state(entity_id, type, &casted_state, size, tpdo);
+
   sensor->add_on_state_callback([=](float value) {
     auto casted_state = to_wire(value);
     od_set_state(state_key, &casted_state, size);
-    if (size == 2) {
+    if (size == 1) {
+      ESP_LOGI(TAG, "value on wire: %02x", *(uint8_t *) &casted_state);
+    } else if (size == 2) {
       ESP_LOGI(TAG, "value on wire: %04x", *(uint16_t *) &casted_state);
+    } else {
+      ESP_LOGI(TAG, "value on wire: %08x (value: %f)", casted_state, value);
     }
   });
   od_add_cmd(
@@ -590,7 +588,7 @@ const char *SensorUnit = "deg";
 
 CO_OBJ_STR ManufacturerDeviceNameObj = {0, (uint8_t *) "ESPHome"};
 
-#ifdef USE_CAN_OTA
+#ifdef USE_CANOPEN_OTA
 Firmware FirmwareObj;
 uint8_t FirmwareMD5Data[32];
 
@@ -638,9 +636,8 @@ void CanopenComponent::setup() {
     ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + i, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 254);
   }
 
-#ifdef USE_CAN_OTA
+#ifdef USE_CANOPEN_OTA
   FirmwareObj.domain.Size = 1024 * 1024;
-  FirmwareObj.backend = esphome::ota::make_ota_backend();
 
   ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 1, CO_OBJ_D____W), FW_CTRL, (CO_DATA) 0);
   ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 2, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) (&FirmwareObj.size));
@@ -810,7 +807,7 @@ void CanopenComponent::loop() {
       if (status.tx_err > last_status.tx_err || status.rx_err > last_status.rx_err ||
           status.tx_failed > last_status.tx_failed || status.rx_miss > last_status.rx_miss ||
           status.arb_lost > last_status.arb_lost || status.bus_err > last_status.bus_err) {
-        ESP_LOGW(TAG, "tx_err: %ld rx_err: %ld tx_failed: %ld rx_miss: %ld arb_lost: %ld bus_err: %ld", status.tx_err,
+        ESP_LOGW(TAG, "tx_err: ld rx_err: %ld tx_failed: %ld rx_miss: %ld arb_lost: %ld bus_err: %ld", status.tx_err,
                  status.rx_err, status.tx_failed, status.rx_miss, status.arb_lost, status.bus_err);
       }
       last_status = status;

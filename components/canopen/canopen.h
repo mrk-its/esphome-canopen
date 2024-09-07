@@ -18,6 +18,10 @@ using namespace esphome;
 #include "co_if.h"
 #include "co_cmd.h"
 
+#ifdef USE_CANOPEN_OTA
+#include "ota/ota.h"
+#endif
+
 #ifdef USE_SENSOR
 namespace esphome {
 namespace sensor {
@@ -163,6 +167,11 @@ class CanopenComponent : public Component {
   std::map<uint32_t, std::function<void(void *, uint32_t)>> can_cmd_handlers;
 
   optional<CO_IF_FRM> recv_frame;
+
+#ifdef USE_CANOPEN_OTA
+  CanopenOTAComponent *ota;
+  void set_ota(CanopenOTAComponent *ota) { this->ota = ota; }
+#endif
 
 #ifdef USE_CANBUS
   canbus::Canbus *canbus;
