@@ -14,36 +14,36 @@
 #ifndef CLOCK_SPEC_H_
 #define CLOCK_SPEC_H_
 
-#ifdef __cplusplus               /* for compatibility with C++ environments  */
+#ifdef __cplusplus /* for compatibility with C++ environments  */
 extern "C" {
 #endif
 
 /******************************************************************************
-* INCLUDES
-******************************************************************************/
+ * INCLUDES
+ ******************************************************************************/
 
 #include "co_core.h"
 /******************************************************************************
-* PUBLIC DEFINES
-******************************************************************************/
+ * PUBLIC DEFINES
+ ******************************************************************************/
 
 /* Specify the EMCY-IDs for the application */
 enum EMCY_CODES {
-    APP_ERR_ID_EEPROM = 0,
+  APP_ERR_ID_EEPROM = 0,
 
-    APP_ERR_ID_NUM            /* number of EMCY error codes in application */
+  APP_ERR_ID_NUM /* number of EMCY error codes in application */
 };
 
 /******************************************************************************
-* PUBLIC SYMBOLS
-******************************************************************************/
+ * PUBLIC SYMBOLS
+ ******************************************************************************/
 
 extern struct CO_NODE_SPEC_T NodeSpec;
 extern uint8_t rpdo_buf[CO_RPDO_N][41];
 CO_OBJ *ODFind(CO_OBJ *od, uint32_t key);
-CO_OBJ * ODAddUpdate(CO_OBJ *od, uint32_t key, const CO_OBJ_TYPE *type, CO_DATA data);
+CO_OBJ *ODAddUpdate(CO_OBJ *od, uint32_t key, const CO_OBJ_TYPE *type, CO_DATA data);
 
-#ifdef __cplusplus               /* for compatibility with C++ environments  */
+#ifdef __cplusplus /* for compatibility with C++ environments  */
 }
 #endif
 
