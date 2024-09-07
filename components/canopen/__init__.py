@@ -4,7 +4,8 @@ import esphome.codegen as cg
 from esphome import automation
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.components.canbus import CanbusComponent
-
+from esphome.components.mqtt import MQTTClientComponent
+from esphome.core import coroutine_with_priority
 
 ns = cg.esphome_ns.namespace('canopen')
 CanopenComponent = ns.class_(
@@ -92,7 +93,8 @@ HB_CLIENT_SCHEMA = cv.Schema({
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(CanopenComponent),
-    cv.Required("canbus_id"): cv.use_id(CanbusComponent),
+    cv.Optional("canbus_id"): cv.use_id(CanbusComponent),
+    cv.Optional("mqtt_id"): cv.use_id(MQTTClientComponent),
     cv.Required("node_id"): cv.int_,
     # cv.Optional("status"): STATUS_ENTITY_SCHEMA,
     cv.Optional("csdo"): cv.ensure_list(CSDO_SCHEMA),
@@ -107,7 +109,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("on_hb_consumer_event"): automation.validate_automation({
         cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(HbConsumerEventTrigger),
     }),
-    cv.Optional("state_update_delay", "50ms"): cv.positive_time_period_microseconds,
+    cv.Optional("state_update_delay", "100ms"): cv.positive_time_period_microseconds,
     cv.Optional("heartbeat_interval", "5000ms"): cv.positive_time_period_milliseconds,
     cv.Optional("heartbeat_clients"): cv.ensure_list(HB_CLIENT_SCHEMA),
     cv.Optional("sw_version"): cv.string,
@@ -123,12 +125,26 @@ TYPE_TO_CANOPEN_TYPE = {
     "int32": (cg.RawExpression("CO_TSIGNED32"), 4),
 }
 
+# @coroutine_with_priority(100.0)
+# async def to_code(config):
+#     cg.add_define("USE_CANBUS")
+
+
 def to_code(config):
     cg.add_library("canopenstack=https://github.com/mrk-its/canopen-stack#dev", "0.0.0")
     # cg.add_library("canopenstack=file:///home/mrk/canopen-stack", "0.0.0")
-    canbus = yield cg.get_variable(config["canbus_id"])
     node_id = config["node_id"]
-    canopen = cg.new_Pvariable(config[CONF_ID], canbus, node_id)
+    canopen = cg.new_Pvariable(config[CONF_ID], node_id)
+
+    if "canbus_id" in config:
+        cg.add_define("USE_CANBUS")
+        canbus = yield cg.get_variable(config["canbus_id"])
+        cg.add(canopen.set_canbus(canbus))
+
+    if "mqtt_id" in config:
+        mqtt_client = yield cg.get_variable(config["mqtt_id"])
+        cg.add(canopen.set_mqtt_client(mqtt_client))
+
     cg.add(canopen.set_state_update_delay(config["state_update_delay"]))
     cg.add(canopen.set_heartbeat_interval(config["heartbeat_interval"]))
     hw_version = config.get("hw_version")

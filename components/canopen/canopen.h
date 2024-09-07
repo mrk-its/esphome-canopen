@@ -5,10 +5,14 @@ using namespace esphome;
 
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
-#include "esphome/components/canbus/canbus.h"
+// #include "esphome/components/canbus/canbus.h"
+#ifdef USE_MQTT
+#include "esphome/components/mqtt/mqtt_client.h"
+#endif
 #include <vector>
 #include <map>
 #include <driver/twai.h>
+#include <sstream>
 
 #include "node_spec.h"
 #include "co_if.h"
@@ -141,6 +145,7 @@ namespace esphome {
 
     class CanopenComponent : public Component {
       CO_NODE node;
+      uint32_t node_id;
       CanStatus last_status;
       struct timeval status_time;
 
@@ -158,10 +163,22 @@ namespace esphome {
       CanStatus status;
       std::map<uint32_t, std::function< void(void *, uint32_t)>> can_cmd_handlers;
 
-      canbus::Canbus *canbus;
       optional<CO_IF_FRM> recv_frame;
 
-      CanopenComponent(canbus::Canbus *canbus, uint32_t node_id);
+      #ifdef USE_CANBUS
+      canbus::Canbus *canbus;
+      void set_canbus(canbus::Canbus *canbus);
+      #endif
+
+      #ifdef USE_MQTT
+      optional<esphome::mqtt::MQTTClientComponent *> mqtt_client;
+
+      void set_mqtt_client(esphome::mqtt::MQTTClientComponent *mqtt_client);
+
+      void mqtt_send_frame(uint16_t addr, std::vector<uint8_t> data);
+      #endif
+
+      CanopenComponent(uint32_t node_id);
 
       void add_trigger(OperationalTrigger *trigger) {
         on_operational = trigger;
