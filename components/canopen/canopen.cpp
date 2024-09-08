@@ -327,7 +327,7 @@ void CanopenComponent::add_entity(sensor::Sensor *sensor, uint32_t entity_id, in
                   size == 1   ? ENTITY_TYPE_SENSOR_UINT8
                   : size == 2 ? ENTITY_TYPE_SENSOR_UINT16
                               : ENTITY_TYPE_SENSOR,
-                  sensor->get_name(), sensor->get_device_class(), "",
+                  sensor->get_name(), sensor->get_device_class(), sensor->get_unit_of_measurement(),
                   esphome::sensor::state_class_to_string(sensor->get_state_class()));
   od_add_sensor_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
@@ -380,7 +380,7 @@ void CanopenComponent::add_entity(esphome::number::Number *number, uint32_t enti
                   size == 1   ? ENTITY_TYPE_NUMBER_UINT8
                   : size == 2 ? ENTITY_TYPE_NUMBER_UINT16
                               : ENTITY_TYPE_NUMBER,
-                  number->get_name(), number->traits.get_device_class(), "", "");
+                  number->get_name(), number->traits.get_device_class(), number->get_unit_of_measurement(), "");
 
   od_add_sensor_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
