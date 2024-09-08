@@ -84,6 +84,8 @@ CanopenComponent::CanopenComponent(uint32_t node_id) {
   heartbeat_interval_ms = 0;
   memset(&status, 0, sizeof(status));
   memset(&last_status, 0, sizeof(last_status));
+  CO_OBJ_STR *esphome_ver_str = od_string(ESPHOME_VERSION " " + App.get_compilation_time());
+  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x100a, 0, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) esphome_ver_str);
 }
 void CanopenComponent::set_state_update_delay(uint32_t delay_us) { state_update_delay_us = delay_us; }
 void CanopenComponent::set_heartbeat_interval(uint16_t interval_ms) { heartbeat_interval_ms = interval_ms; }
