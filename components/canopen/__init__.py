@@ -134,7 +134,16 @@ TYPE_TO_CANOPEN_TYPE = {
 
 
 def to_code(config):
-    cg.add_library("canopenstack=https://github.com/mrk-its/canopen-stack#dev", None)
+    cg.add_platformio_option("build_flags", [
+        "-DCO_SSDO_N=1",
+        "-DCO_CSDO_N=1",
+        "-DCO_RPDO_N=4",
+        "-DCO_TPDO_N=8",
+        "-DUSE_LSS=0",
+        "-DUSE_CSDO=0",
+    ])
+
+    cg.add_library("canopenstack=https://github.com/mrk-its/canopen-stack#test", None)
     cg.add_library("micro_miniz=https://github.com/rzeldent/micro-miniz#main", None)
     # cg.add_library("canopenstack=file:///home/mrk/canopen-stack", "0.0.0")
     node_id = config["node_id"]
