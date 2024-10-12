@@ -22,53 +22,51 @@ using namespace esphome;
 #include "ota/ota.h"
 #endif
 
-#ifdef USE_SENSOR
 namespace esphome {
+
+#ifdef USE_SENSOR
 namespace sensor {
 class Sensor;
 }
-}  // namespace esphome
 #endif
 
 #ifdef USE_NUMBER
-namespace esphome {
 namespace number {
 class Number;
 }
-}  // namespace esphome
 #endif
 
 #ifdef USE_BINARY_SENSOR
-namespace esphome {
 namespace binary_sensor {
 class BinarySensor;
 }
-}  // namespace esphome
 #endif
 
 #ifdef USE_SWITCH
-namespace esphome {
 namespace switch_ {
 class Switch;
 }
-}  // namespace esphome
 #endif
 
 #ifdef USE_LIGHT
-namespace esphome {
 namespace light {
 class LightState;
 }
-}  // namespace esphome
 #endif
 
 #ifdef USE_COVER
-namespace esphome {
 namespace cover {
 class Cover;
 }
-}  // namespace esphome
 #endif
+
+#ifdef USE_ALARM_CONTROL_PANEL
+namespace template_ {
+class TemplateAlarmControlPanel;
+}
+#endif
+}  // namespace esphome
+
 
 const int8_t ENTITY_TYPE_DISABLED = 0;
 const int8_t ENTITY_TYPE_SENSOR = 1;
@@ -81,6 +79,8 @@ const int8_t ENTITY_TYPE_SENSOR_UINT16 = 7;
 const int8_t ENTITY_TYPE_NUMBER = 8;
 const int8_t ENTITY_TYPE_NUMBER_UINT8 = 9;
 const int8_t ENTITY_TYPE_NUMBER_UINT16 = 10;
+const int8_t ENTITY_TYPE_ALARM = 16;
+
 const uint8_t ENTITY_TYPE_CAN_STATUS = 254;
 
 const uint8_t ENTITY_INDEX_NAME = 1;
@@ -242,6 +242,10 @@ class CanopenComponent : public Component {
 
 #ifdef USE_COVER
   void add_entity(esphome::cover::Cover *cover, uint32_t entity_id, int8_t tpdo);
+#endif
+
+#ifdef USE_ALARM_CONTROL_PANEL
+  void add_entity(esphome::template_::TemplateAlarmControlPanel *alarm, uint32_t entity_id, int8_t tpdo);
 #endif
 
   void od_add_metadata(uint32_t entity_id, uint8_t type, const std::string &name, const std::string &device_class,

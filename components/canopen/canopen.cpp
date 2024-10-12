@@ -559,6 +559,45 @@ void CanopenComponent::add_entity(esphome::cover::Cover *cover, uint32_t entity_
 }
 #endif
 
+#ifdef USE_ALARM_CONTROL_PANEL
+void CanopenComponent::add_entity(esphome::template_::TemplateAlarmControlPanel *alarm, uint32_t entity_id, int8_t tpdo) {
+  od_add_metadata(entity_id, ENTITY_TYPE_ALARM, alarm->get_name(), "", "", "");
+  auto state = alarm->get_state();
+  auto state_key = od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
+  alarm->add_on_state_callback([=]() {
+    auto state = alarm->get_state();
+    od_set_state(state_key, &state, 1);
+   });
+
+  od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+    auto cmd = ((uint8_t *) buffer)[0];
+    switch(cmd) {
+      case 0:
+        alarm -> disarm();
+        break;
+      case 1:
+        alarm -> arm_away();
+        break;
+      case 2:
+        alarm -> arm_home();
+        break;
+      case 3:
+        alarm -> arm_night();
+        break;
+      case 4:
+        alarm -> arm_vacation();
+        break;
+      case 5:
+        alarm -> arm_custom_bypass();
+        break;
+      case 127:
+        alarm -> publish_state(esphome::alarm_control_panel::AlarmControlPanelState::ACP_STATE_TRIGGERED);
+        break;
+    }
+  });
+}
+#endif
+
 // void CanopenComponent::add_status(uint32_t entity_id, uint32_t update_interval) {
 //   struct timeval tv_now;
 //   gettimeofday(&tv_now, NULL);
