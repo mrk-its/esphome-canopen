@@ -151,3 +151,27 @@ EntityTypeCode: 10
 |||||||
 | 0x2001 + 0x10 * N | 0x01     | Number #N State         | UINT16 | R      | value = state * (max_value - min_value + 1) / 65536 |
 
+## Alarm Control Panel
+
+EntityTypeCode: 16
+
+| Index             | SubIndex | Object Name             | Type   | Access | Description     |
+|-------------------|----------|-------------------------|--------|:------:|-----------------|
+| 0x2001 + 0x10 * N | 0x01     | Alarm #N State          | UINT8  | R      | 0 - disarmed  |
+|||||| 1 - armed_home |
+|||||| 2 - armed_away |
+|||||| 3 - armed_night |
+|||||| 4 - armed_vacation |
+|||||| 5 - armed_custom_bypass |
+|||||| 6 - pending |
+|||||| 7 - arming |
+|||||| 8 - disarming |
+|||||| 9 - triggered |
+|||||||
+| 0x2002 + 0x10 * N | 0x01     | Alarm #N Command        | UINT8  | W      | 0 - DISARM |
+|||||| 1 - ARM_AWAY |
+|||||| 2 - ARM_HOME |
+|||||| 3 - ARM_NIGHT |
+|||||| 4 - ARM_VACATION |
+|||||| 5 - ARM_CUSTOM_BYPASS |
+|||||| 127 - TRIGGER |
