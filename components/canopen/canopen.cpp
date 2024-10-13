@@ -380,7 +380,7 @@ void CanopenComponent::add_entity(esphome::number::Number *number, uint32_t enti
                   size == 1   ? ENTITY_TYPE_NUMBER_UINT8
                   : size == 2 ? ENTITY_TYPE_NUMBER_UINT16
                               : ENTITY_TYPE_NUMBER,
-                  number->get_name(), number->traits.get_device_class(), number->get_unit_of_measurement(), "");
+                  number->get_name(), number->traits.get_device_class(), "", "");
 
   od_add_sensor_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
