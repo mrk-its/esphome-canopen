@@ -169,7 +169,7 @@ def to_code(config):
     hw_version = config.get("hw_version")
     sw_version = config.get("sw_version")
 
-    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d.%H%M%D")
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d.%H%M%S")
 
     cg.add(cg.RawStatement(f"""const char * version_str = "node_id: {node_id:02x}, ver: " ESPHOME_VERSION ".{ts}";"""))
 
