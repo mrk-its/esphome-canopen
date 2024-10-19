@@ -1,4 +1,6 @@
+import datetime
 from itertools import groupby
+
 import esphome.config_validation as cv
 import esphome.codegen as cg
 from esphome import automation
@@ -166,10 +168,17 @@ def to_code(config):
     cg.add(canopen.set_heartbeat_interval(config["heartbeat_interval"]))
     hw_version = config.get("hw_version")
     sw_version = config.get("sw_version")
+
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d.%H%M%D")
+
+    cg.add(cg.RawStatement(f"""const char * version_str = "node_id: {node_id:02x}, ver: " ESPHOME_VERSION ".{ts}";"""))
+
+    sw_version = 'version_str + 18'
+
     if hw_version:
         cg.add(canopen.od_set_string(0x1009, 0, hw_version))
     if sw_version:
-        cg.add(canopen.od_set_string(0x100a, 0, sw_version))
+        cg.add(canopen.od_set_string(0x100a, 0, cg.RawExpression(sw_version)))
 
     yield cg.register_component(canopen, config)
 
