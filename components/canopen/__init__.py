@@ -9,8 +9,6 @@ from esphome.components.canbus import CanbusComponent
 from esphome.components.mqtt import MQTTClientComponent
 from esphome.core import coroutine_with_priority
 
-# from .ota import CanopenOTAComponent
-
 ns = cg.esphome_ns.namespace('canopen')
 CanopenComponent = ns.class_(
     'CanopenComponent',
@@ -130,11 +128,6 @@ TYPE_TO_CANOPEN_TYPE = {
     "int32": (cg.RawExpression("CO_TSIGNED32"), 4),
 }
 
-# @coroutine_with_priority(100.0)
-# async def to_code(config):
-#     cg.add_define("USE_CANBUS")
-
-
 def to_code(config):
     cg.add_platformio_option("build_flags", [
         "-DCO_SSDO_N=1",
@@ -155,10 +148,6 @@ def to_code(config):
         cg.add_define("USE_CANBUS")
         canbus = yield cg.get_variable(config["canbus_id"])
         cg.add(canopen.set_canbus(canbus))
-
-    # if "ota_id" in config:
-    #     ota = yield cg.get_variable(config["ota_id"])
-    #     cg.add(canopen.set_ota(ota))
 
     if "mqtt_id" in config:
         mqtt_client = yield cg.get_variable(config["mqtt_id"])
