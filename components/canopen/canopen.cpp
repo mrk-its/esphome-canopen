@@ -847,7 +847,7 @@ void CanopenComponent::loop() {
       if (status.tx_err > last_status.tx_err || status.rx_err > last_status.rx_err ||
           status.tx_failed > last_status.tx_failed || status.rx_miss > last_status.rx_miss ||
           status.arb_lost > last_status.arb_lost || status.bus_err > last_status.bus_err) {
-        ESP_LOGW(TAG, "tx_err: ld rx_err: %ld tx_failed: %ld rx_miss: %ld arb_lost: %ld bus_err: %ld", status.tx_err,
+        ESP_LOGW(TAG, "tx_err: %ld rx_err: %ld tx_failed: %ld rx_miss: %ld arb_lost: %ld bus_err: %ld", status.tx_err,
                  status.rx_err, status.tx_failed, status.rx_miss, status.arb_lost, status.bus_err);
       }
       last_status = status;
