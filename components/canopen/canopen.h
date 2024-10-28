@@ -114,6 +114,113 @@ static const char *const TAG = "canopen";
 
 namespace esphome {
 namespace canopen {
+
+class CanopenComponent;
+
+class BaseCanopenEntity {
+  public:
+  uint32_t entity_id;
+  int8_t tpdo;
+  BaseCanopenEntity(uint32_t entity_id, int8_t tpdo) {
+    this->entity_id = entity_id;
+    this->tpdo = tpdo;
+  }
+  virtual void setup(CanopenComponent *canopen) = 0;
+};
+
+
+#ifdef USE_SENSOR
+  class SensorEntity: public BaseCanopenEntity {
+    public:
+    sensor::Sensor *sensor;
+    uint8_t size;
+    float min_val;
+    float max_val;
+    SensorEntity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo,
+                 uint8_t size = 4, float min_val = 0, float max_val = 0) : BaseCanopenEntity(entity_id, tpdo) {
+      this->sensor = sensor;
+      this->size = size;
+      this->min_val = min_val;
+      this->max_val = max_val;
+    }
+    void setup(CanopenComponent *canopen) override;
+  };
+#endif
+
+#ifdef USE_NUMBER
+  class NumberEntity: public BaseCanopenEntity {
+    public:
+    esphome::number::Number *number;
+    uint8_t size;
+    float min_val;
+    float max_val;
+    NumberEntity(esphome::number::Number *number, uint32_t entity_id, int8_t tpdo,
+                 uint8_t size = 4, float min_val = 0, float max_val = 0) : BaseCanopenEntity(entity_id, tpdo) {
+      this->number = number;
+      this->size = size;
+      this->min_val = min_val;
+      this->max_val = max_val;
+    }
+    void setup(CanopenComponent *canopen) override;
+  };
+#endif
+
+#ifdef USE_BINARY_SENSOR
+  class BinarySensorEntity: public BaseCanopenEntity {
+    public:
+    binary_sensor::BinarySensor *sensor;
+    BinarySensorEntity(binary_sensor::BinarySensor *sensor, uint32_t entity_id, int8_t tpdo) : BaseCanopenEntity(entity_id, tpdo) {
+      this->sensor = sensor;
+    }
+    void setup(CanopenComponent *canopen) override;
+  };
+#endif
+
+#ifdef USE_SWITCH
+  class SwitchEntity: public BaseCanopenEntity {
+    public:
+    esphome::switch_::Switch *switch_;
+    SwitchEntity(esphome::switch_::Switch *switch_, uint32_t entity_id, int8_t tpdo) : BaseCanopenEntity(entity_id, tpdo) {
+      this->switch_ = switch_;
+    }
+    void setup(CanopenComponent *canopen) override;
+  };
+#endif
+
+#ifdef USE_LIGHT
+  class LightStateEntity: public BaseCanopenEntity {
+    public:
+    esphome::light::LightState *light;
+    LightStateEntity(esphome::light::LightState *light, uint32_t entity_id, int8_t tpdo) : BaseCanopenEntity(entity_id, tpdo) {
+      this->light = light;
+    }
+    void setup(CanopenComponent *canopen) override;
+  };
+#endif
+
+#ifdef USE_COVER
+  class CoverEntity: public BaseCanopenEntity {
+    public:
+    esphome::cover::Cover *cover;
+    CoverEntity(esphome::cover::Cover *cover, uint32_t entity_id, int8_t tpdo) : BaseCanopenEntity(entity_id, tpdo) {
+      this->cover = cover;
+    }
+    void setup(CanopenComponent *canopen) override;
+  };
+#endif
+
+#ifdef USE_ALARM_CONTROL_PANEL
+  class AlarmEntity: public BaseCanopenEntity {
+    public:
+    esphome::template_::TemplateAlarmControlPanel *alarm;
+    AlarmEntity(esphome::template_::TemplateAlarmControlPanel *alarm, uint32_t entity_id, int8_t tpdo) : BaseCanopenEntity(entity_id, tpdo) {
+      this->alarm = alarm;
+    }
+    void setup(CanopenComponent *canopen) override;
+  };
+#endif
+
+
 struct CanStatus {
   uint8_t state;
   uint32_t tx_err;
@@ -156,6 +263,8 @@ class CanopenComponent : public Component {
   OperationalTrigger *on_operational;
   PreOperationalTrigger *on_pre_operational;
   std::vector<QueuedState> queued_states;
+  std::vector<BaseCanopenEntity *> entities;
+
   uint32_t state_update_delay_us;
   uint16_t heartbeat_interval_ms;
 
@@ -205,7 +314,7 @@ class CanopenComponent : public Component {
   void csdo_send_u32(uint8_t num, uint32_t key, uint32_t value) { csdo_send_data(num, key, (uint8_t *) (&value), 4); }
   void csdo_send_float(uint8_t num, uint32_t key, float value) { csdo_send_data(num, key, (uint8_t *) (&value), 4); }
 
-  float get_setup_priority() const override { return setup_priority::HARDWARE - 1.0; }
+  float get_setup_priority() const override { return setup_priority::LATE;}
   void setup();
   bool is_initialized() { return node.Nmt.Mode == CO_PREOP || node.Nmt.Mode == CO_OPERATIONAL; }
   void add_rpdo_dummy(uint8_t idx, uint8_t size);
@@ -220,32 +329,47 @@ class CanopenComponent : public Component {
 // void add_status(uint32_t entity_id, uint32_t update_interval);
 #ifdef USE_SENSOR
   void add_entity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo, uint8_t size = 4, float min_val = 0,
-                  float max_val = 0);
+                  float max_val = 0) {
+    entities.push_back(new SensorEntity(sensor, entity_id, tpdo, size, min_val, max_val));
+  }
+                  
 #endif
 
 #ifdef USE_NUMBER
   void add_entity(esphome::number::Number *number, uint32_t entity_id, int8_t tpdo, uint8_t size = 4, float min_val = 0,
-                  float max_val = 0);
+                  float max_val = 0) {
+    entities.push_back(new NumberEntity(number, entity_id, tpdo, size, min_val, max_val));
+  }
 #endif
 
 #ifdef USE_BINARY_SENSOR
-  void add_entity(binary_sensor::BinarySensor *sensor, uint32_t entity_id, int8_t tpdo);
+  void add_entity(binary_sensor::BinarySensor *sensor, uint32_t entity_id, int8_t tpdo) {
+    entities.push_back(new BinarySensorEntity(sensor, entity_id, tpdo));
+  }
 #endif
 
 #ifdef USE_SWITCH
-  void add_entity(esphome::switch_::Switch *switch_, uint32_t entity_id, int8_t tpdo);
+  void add_entity(esphome::switch_::Switch *switch_, uint32_t entity_id, int8_t tpdo) {
+    entities.push_back(new SwitchEntity(switch_, entity_id, tpdo));
+  }
 #endif
 
 #ifdef USE_LIGHT
-  void add_entity(esphome::light::LightState *light, uint32_t entity_id, int8_t tpdo);
+  void add_entity(esphome::light::LightState *light, uint32_t entity_id, int8_t tpdo) {
+    entities.push_back(new LightStateEntity(light, entity_id, tpdo));
+  }
 #endif
 
 #ifdef USE_COVER
-  void add_entity(esphome::cover::Cover *cover, uint32_t entity_id, int8_t tpdo);
+  void add_entity(esphome::cover::Cover *cover, uint32_t entity_id, int8_t tpdo) {
+    entities.push_back(new CoverEntity(cover, entity_id, tpdo));
+  }
 #endif
 
 #ifdef USE_ALARM_CONTROL_PANEL
-  void add_entity(esphome::template_::TemplateAlarmControlPanel *alarm, uint32_t entity_id, int8_t tpdo);
+  void add_entity(esphome::template_::TemplateAlarmControlPanel *alarm, uint32_t entity_id, int8_t tpdo) {
+    entities.push_back(new AlarmEntity(alarm, entity_id, tpdo));
+  }
 #endif
 
   void od_add_metadata(uint32_t entity_id, uint8_t type, const std::string &name, const std::string &device_class,

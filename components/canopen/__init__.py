@@ -136,6 +136,7 @@ def to_code(config):
         "-DCO_TPDO_N=8",
         "-DUSE_LSS=0",
         "-DUSE_CSDO=0",
+        "-DMINIZ_NO_STDIO=1",
     ])
 
     cg.add_library("canopenstack=https://github.com/mrk-its/canopen-stack#test", None)

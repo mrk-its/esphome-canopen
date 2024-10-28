@@ -28,7 +28,7 @@
 #define APP_BAUDRATE 250000u       /* CAN baudrate                */
 #define APP_TMR_N 16u              /* Number of software timers   */
 #define APP_TICKS_PER_SEC 1000000u /* Timer clock frequency in Hz */
-#define APP_OBJ_N 256u             /* Object dictionary max size  */
+#define APP_OBJ_N 512u             /* Object dictionary max size  */
 
 /******************************************************************************
  * PRIVATE VARIABLES
