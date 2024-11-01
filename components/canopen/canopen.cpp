@@ -76,14 +76,10 @@ CanopenComponent::CanopenComponent(uint32_t node_id) {
   CODictInit(&node.Dict, &node, NodeSpec.Dict, NodeSpec.DictLen);
 
   global_canopen = this;
-  on_operational = 0;
-  on_pre_operational = 0;
-  on_hb_cons_event = 0;
 
-  state_update_delay_us = 0;
-  heartbeat_interval_ms = 0;
   memset(&status, 0, sizeof(status));
   memset(&last_status, 0, sizeof(last_status));
+
   CO_OBJ_STR *esphome_ver_str = od_string(ESPHOME_VERSION " " + App.get_compilation_time());
   ODAddUpdate(NodeSpec.Dict, CO_KEY(0x100a, 0, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) esphome_ver_str);
 }
@@ -651,6 +647,10 @@ void CanopenComponent::setup() {
   ESP_LOGD(TAG, "CO_TPDO_N: %d", CO_TPDO_N);
   ESP_LOGD(TAG, "CO_RPDO_N: %d", CO_RPDO_N);
 
+#ifdef USE_ESP32
+  twai_reconfigure_alerts(TWAI_ALERT_ABOVE_ERR_WARN | TWAI_ALERT_ERR_PASS | TWAI_ALERT_BUS_OFF, NULL);
+#endif
+
   uint32_t hash = fnv1_hash("canopen_comm_state_v2");
   this->comm_state = global_preferences->make_preference<uint8_t[CO_RPDO_N * 41]>(hash, true);
   if (this->comm_state.load(&rpdo_buf)) {
@@ -783,6 +783,7 @@ void CanopenComponent::csdo_send_data(uint8_t num, uint32_t key, uint8_t *data, 
 }
 
 bool CanopenComponent::get_can_status(CanStatus &status_info) {
+#ifdef USE_ESP32
   twai_status_info_t twai_status_info;
   if (twai_get_status_info(&twai_status_info) == ESP_OK) {
     status_info.state = twai_status_info.state;
@@ -794,12 +795,11 @@ bool CanopenComponent::get_can_status(CanStatus &status_info) {
     status_info.rx_miss = twai_status_info.rx_missed_count;
     return true;
   }
+#endif
   return false;
 }
 
 void CanopenComponent::initiate_recovery() { twai_initiate_recovery(); }
-
-void CanopenComponent::start() { twai_start(); }
 
 void CanopenComponent::store_comm_params() {
   if (comm_state.save(&rpdo_buf)) {
@@ -854,6 +854,46 @@ void CanopenComponent::loop() {
     }
     status_time = tv_now;
   }
+
+#ifdef USE_ESP32
+
+  uint32_t alerts;
+  if (twai_read_alerts(&alerts, 0) == ESP_OK) {
+    if (alerts & TWAI_ALERT_ABOVE_ERR_WARN) {
+      ESP_LOGI(TAG, "Surpassed Error Warning Limit");
+    }
+    if (alerts & TWAI_ALERT_ERR_PASS) {
+      ESP_LOGI(TAG, "Entered Error Passive state");
+    }
+    if (alerts & TWAI_ALERT_BUS_OFF) {
+      ESP_LOGI(TAG, "Bus Off state");
+      // Prepare to initiate bus recovery, reconfigure alerts to detect bus recovery completion
+      twai_reconfigure_alerts(TWAI_ALERT_BUS_RECOVERED, NULL);
+      waiting_for_bus_recovery = true;
+      gettimeofday(&bus_off_time, NULL);
+      ESP_LOGI(TAG, "Initiate bus recovery in %d seconds", recovery_delay_seconds);
+    }
+    if (alerts & TWAI_ALERT_BUS_RECOVERED) {
+      // Bus recovery was successful, exit control task to uninstall driver
+      ESP_LOGI(TAG, "Bus Recovered");
+      if (twai_start() == ESP_OK) {
+        ESP_LOGI(TAG, "Bus Running");
+        twai_reconfigure_alerts(TWAI_ALERT_ABOVE_ERR_WARN | TWAI_ALERT_ERR_PASS | TWAI_ALERT_BUS_OFF, NULL);
+      } else {
+        ESP_LOGE(TAG, "Can't start the Bus");
+      }
+    }
+  }
+
+  if (waiting_for_bus_recovery) {
+    waiting_for_bus_recovery = false;
+    auto t = abs(tv_now.tv_sec - bus_off_time.tv_sec);
+    if (t >= recovery_delay_seconds) {
+      twai_initiate_recovery();  // Needs 128 occurrences of bus free signal
+      ESP_LOGI(TAG, "Initiate bus recovery");
+    }
+  }
+#endif
 }
 }  // namespace canopen
 }  // namespace esphome

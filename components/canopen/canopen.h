@@ -253,25 +253,30 @@ class CmdTriggerInt16 : public Trigger<int16_t> {};
 class CmdTriggerInt32 : public Trigger<int32_t> {};
 
 class CanopenComponent : public Component {
+ protected:
   CO_NODE node;
   uint32_t node_id;
-  CanStatus last_status;
-  struct timeval status_time;
 
-  void rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t size);
+  CanStatus last_status = {};
+  struct timeval status_time = {};
+  struct timeval bus_off_time = {};
 
-  OperationalTrigger *on_operational;
-  PreOperationalTrigger *on_pre_operational;
+  bool waiting_for_bus_recovery = false;
+  int recovery_delay_seconds = 60;
+
+  OperationalTrigger *on_operational = {};
+  PreOperationalTrigger *on_pre_operational = {};
+
   std::vector<QueuedState> queued_states;
   std::vector<BaseCanopenEntity *> entities;
 
-  uint32_t state_update_delay_us;
-  uint16_t heartbeat_interval_ms;
+  uint32_t state_update_delay_us = 0;
+  uint16_t heartbeat_interval_ms = 0;
 
   ESPPreferenceObject comm_state;
 
  public:
-  HbConsumerEventTrigger *on_hb_cons_event;
+  HbConsumerEventTrigger *on_hb_cons_event = {};  // TODO: change visibility
   CanStatus status;
   std::map<uint32_t, std::function<void(void *, uint32_t)>> can_cmd_handlers;
 
@@ -391,7 +396,6 @@ class CanopenComponent : public Component {
   void setup_heartbeat_client(uint8_t subidx, uint8_t node_id, uint16_t timeout_ms);
   int16_t get_heartbeat_events(uint8_t node_id);
   void initiate_recovery();
-  void start();
   void od_set_state(uint32_t key, void *state, uint8_t size);
   void set_entity_state(uint32_t entity_id, uint32_t state, void *data, uint8_t size) {
     od_set_state(ENTITY_STATE_KEY(entity_id, state), data, size);
