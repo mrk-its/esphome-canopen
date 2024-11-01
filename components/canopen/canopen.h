@@ -67,7 +67,6 @@ class TemplateAlarmControlPanel;
 #endif
 }  // namespace esphome
 
-
 const int8_t ENTITY_TYPE_DISABLED = 0;
 const int8_t ENTITY_TYPE_SENSOR = 1;
 const int8_t ENTITY_TYPE_BINARY_SENSOR = 2;
@@ -118,7 +117,7 @@ namespace canopen {
 class CanopenComponent;
 
 class BaseCanopenEntity {
-  public:
+ public:
   uint32_t entity_id;
   int8_t tpdo;
   BaseCanopenEntity(uint32_t entity_id, int8_t tpdo) {
@@ -128,98 +127,102 @@ class BaseCanopenEntity {
   virtual void setup(CanopenComponent *canopen) = 0;
 };
 
-
 #ifdef USE_SENSOR
-  class SensorEntity: public BaseCanopenEntity {
-    public:
-    sensor::Sensor *sensor;
-    uint8_t size;
-    float min_val;
-    float max_val;
-    SensorEntity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo,
-                 uint8_t size = 4, float min_val = 0, float max_val = 0) : BaseCanopenEntity(entity_id, tpdo) {
-      this->sensor = sensor;
-      this->size = size;
-      this->min_val = min_val;
-      this->max_val = max_val;
-    }
-    void setup(CanopenComponent *canopen) override;
-  };
+class SensorEntity : public BaseCanopenEntity {
+ public:
+  sensor::Sensor *sensor;
+  uint8_t size;
+  float min_val;
+  float max_val;
+  SensorEntity(sensor::Sensor *sensor, uint32_t entity_id, int8_t tpdo, uint8_t size = 4, float min_val = 0,
+               float max_val = 0)
+      : BaseCanopenEntity(entity_id, tpdo) {
+    this->sensor = sensor;
+    this->size = size;
+    this->min_val = min_val;
+    this->max_val = max_val;
+  }
+  void setup(CanopenComponent *canopen) override;
+};
 #endif
 
 #ifdef USE_NUMBER
-  class NumberEntity: public BaseCanopenEntity {
-    public:
-    esphome::number::Number *number;
-    uint8_t size;
-    float min_val;
-    float max_val;
-    NumberEntity(esphome::number::Number *number, uint32_t entity_id, int8_t tpdo,
-                 uint8_t size = 4, float min_val = 0, float max_val = 0) : BaseCanopenEntity(entity_id, tpdo) {
-      this->number = number;
-      this->size = size;
-      this->min_val = min_val;
-      this->max_val = max_val;
-    }
-    void setup(CanopenComponent *canopen) override;
-  };
+class NumberEntity : public BaseCanopenEntity {
+ public:
+  esphome::number::Number *number;
+  uint8_t size;
+  float min_val;
+  float max_val;
+  NumberEntity(esphome::number::Number *number, uint32_t entity_id, int8_t tpdo, uint8_t size = 4, float min_val = 0,
+               float max_val = 0)
+      : BaseCanopenEntity(entity_id, tpdo) {
+    this->number = number;
+    this->size = size;
+    this->min_val = min_val;
+    this->max_val = max_val;
+  }
+  void setup(CanopenComponent *canopen) override;
+};
 #endif
 
 #ifdef USE_BINARY_SENSOR
-  class BinarySensorEntity: public BaseCanopenEntity {
-    public:
-    binary_sensor::BinarySensor *sensor;
-    BinarySensorEntity(binary_sensor::BinarySensor *sensor, uint32_t entity_id, int8_t tpdo) : BaseCanopenEntity(entity_id, tpdo) {
-      this->sensor = sensor;
-    }
-    void setup(CanopenComponent *canopen) override;
-  };
+class BinarySensorEntity : public BaseCanopenEntity {
+ public:
+  binary_sensor::BinarySensor *sensor;
+  BinarySensorEntity(binary_sensor::BinarySensor *sensor, uint32_t entity_id, int8_t tpdo)
+      : BaseCanopenEntity(entity_id, tpdo) {
+    this->sensor = sensor;
+  }
+  void setup(CanopenComponent *canopen) override;
+};
 #endif
 
 #ifdef USE_SWITCH
-  class SwitchEntity: public BaseCanopenEntity {
-    public:
-    esphome::switch_::Switch *switch_;
-    SwitchEntity(esphome::switch_::Switch *switch_, uint32_t entity_id, int8_t tpdo) : BaseCanopenEntity(entity_id, tpdo) {
-      this->switch_ = switch_;
-    }
-    void setup(CanopenComponent *canopen) override;
-  };
+class SwitchEntity : public BaseCanopenEntity {
+ public:
+  esphome::switch_::Switch *switch_;
+  SwitchEntity(esphome::switch_::Switch *switch_, uint32_t entity_id, int8_t tpdo)
+      : BaseCanopenEntity(entity_id, tpdo) {
+    this->switch_ = switch_;
+  }
+  void setup(CanopenComponent *canopen) override;
+};
 #endif
 
 #ifdef USE_LIGHT
-  class LightStateEntity: public BaseCanopenEntity {
-    public:
-    esphome::light::LightState *light;
-    LightStateEntity(esphome::light::LightState *light, uint32_t entity_id, int8_t tpdo) : BaseCanopenEntity(entity_id, tpdo) {
-      this->light = light;
-    }
-    void setup(CanopenComponent *canopen) override;
-  };
+class LightStateEntity : public BaseCanopenEntity {
+ public:
+  esphome::light::LightState *light;
+  LightStateEntity(esphome::light::LightState *light, uint32_t entity_id, int8_t tpdo)
+      : BaseCanopenEntity(entity_id, tpdo) {
+    this->light = light;
+  }
+  void setup(CanopenComponent *canopen) override;
+};
 #endif
 
 #ifdef USE_COVER
-  class CoverEntity: public BaseCanopenEntity {
-    public:
-    esphome::cover::Cover *cover;
-    CoverEntity(esphome::cover::Cover *cover, uint32_t entity_id, int8_t tpdo) : BaseCanopenEntity(entity_id, tpdo) {
-      this->cover = cover;
-    }
-    void setup(CanopenComponent *canopen) override;
-  };
+class CoverEntity : public BaseCanopenEntity {
+ public:
+  esphome::cover::Cover *cover;
+  CoverEntity(esphome::cover::Cover *cover, uint32_t entity_id, int8_t tpdo) : BaseCanopenEntity(entity_id, tpdo) {
+    this->cover = cover;
+  }
+  void setup(CanopenComponent *canopen) override;
+};
 #endif
 
 #ifdef USE_ALARM_CONTROL_PANEL
-  class AlarmEntity: public BaseCanopenEntity {
-    public:
-    esphome::template_::TemplateAlarmControlPanel *alarm;
-    AlarmEntity(esphome::template_::TemplateAlarmControlPanel *alarm, uint32_t entity_id, int8_t tpdo) : BaseCanopenEntity(entity_id, tpdo) {
-      this->alarm = alarm;
-    }
-    void setup(CanopenComponent *canopen) override;
-  };
+class AlarmEntity : public BaseCanopenEntity {
+ public:
+  esphome::template_::TemplateAlarmControlPanel *alarm;
+  AlarmEntity(esphome::template_::TemplateAlarmControlPanel *alarm, uint32_t entity_id, int8_t tpdo)
+      : BaseCanopenEntity(entity_id, tpdo) {
+    this->alarm = alarm;
+  }
+  void setup(CanopenComponent *canopen) override;
+};
 #endif
-
 
 struct CanStatus {
   uint8_t state;
@@ -308,6 +311,8 @@ class CanopenComponent : public Component {
   void set_pre_operational_mode();
   void set_operational_mode();
 
+  void rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t size);
+
   void trig_tpdo(int8_t num = -1);
 
   void setup_csdo(uint8_t num, uint8_t node_id, uint32_t tx_id, uint32_t rx_id);
@@ -319,8 +324,9 @@ class CanopenComponent : public Component {
   void csdo_send_u32(uint8_t num, uint32_t key, uint32_t value) { csdo_send_data(num, key, (uint8_t *) (&value), 4); }
   void csdo_send_float(uint8_t num, uint32_t key, float value) { csdo_send_data(num, key, (uint8_t *) (&value), 4); }
 
-  float get_setup_priority() const override { return setup_priority::LATE;}
-  void setup();
+  float get_setup_priority() const override;
+  void setup() override;
+
   bool is_initialized() { return node.Nmt.Mode == CO_PREOP || node.Nmt.Mode == CO_OPERATIONAL; }
   void add_rpdo_dummy(uint8_t idx, uint8_t size);
   void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
@@ -337,7 +343,7 @@ class CanopenComponent : public Component {
                   float max_val = 0) {
     entities.push_back(new SensorEntity(sensor, entity_id, tpdo, size, min_val, max_val));
   }
-                  
+
 #endif
 
 #ifdef USE_NUMBER

@@ -319,11 +319,11 @@ float scale_from_wire(float value, float min_val, float max_val, float n_levels)
 #ifdef USE_SENSOR
 void SensorEntity::setup(CanopenComponent *canopen) {
   canopen->od_add_metadata(entity_id,
-                  size == 1   ? ENTITY_TYPE_SENSOR_UINT8
-                  : size == 2 ? ENTITY_TYPE_SENSOR_UINT16
-                              : ENTITY_TYPE_SENSOR,
-                  sensor->get_name(), sensor->get_device_class(), sensor->get_unit_of_measurement(),
-                  esphome::sensor::state_class_to_string(sensor->get_state_class()));
+                           size == 1   ? ENTITY_TYPE_SENSOR_UINT8
+                           : size == 2 ? ENTITY_TYPE_SENSOR_UINT16
+                                       : ENTITY_TYPE_SENSOR,
+                           sensor->get_name(), sensor->get_device_class(), sensor->get_unit_of_measurement(),
+                           esphome::sensor::state_class_to_string(sensor->get_state_class()));
   canopen->od_add_sensor_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
 
@@ -421,7 +421,8 @@ void CanopenComponent::add_entity(esphome::number::Number *number, uint32_t enti
 #ifdef USE_BINARY_SENSOR
 
 void BinarySensorEntity::setup(CanopenComponent *canopen) {
-  canopen->od_add_metadata(entity_id, ENTITY_TYPE_BINARY_SENSOR, sensor->get_name(), sensor->get_device_class(), "", "");
+  canopen->od_add_metadata(entity_id, ENTITY_TYPE_BINARY_SENSOR, sensor->get_name(), sensor->get_device_class(), "",
+                           "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &sensor->state, 1, tpdo);
   sensor->add_on_state_callback([=](bool x) { canopen->od_set_state(state_key, &x, 1); });
 }
@@ -566,31 +567,31 @@ void AlarmEntity::setup(CanopenComponent *canopen) {
   alarm->add_on_state_callback([=]() {
     auto state = alarm->get_state();
     canopen->od_set_state(state_key, &state, 1);
-   });
+  });
 
   canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
     auto cmd = ((uint8_t *) buffer)[0];
-    switch(cmd) {
+    switch (cmd) {
       case 0:
-        alarm -> disarm();
+        alarm->disarm();
         break;
       case 1:
-        alarm -> arm_away();
+        alarm->arm_away();
         break;
       case 2:
-        alarm -> arm_home();
+        alarm->arm_home();
         break;
       case 3:
-        alarm -> arm_night();
+        alarm->arm_night();
         break;
       case 4:
-        alarm -> arm_vacation();
+        alarm->arm_vacation();
         break;
       case 5:
-        alarm -> arm_custom_bypass();
+        alarm->arm_custom_bypass();
         break;
       case 127:
-        alarm -> publish_state(esphome::alarm_control_panel::AlarmControlPanelState::ACP_STATE_TRIGGERED);
+        alarm->publish_state(esphome::alarm_control_panel::AlarmControlPanelState::ACP_STATE_TRIGGERED);
         break;
     }
   });
@@ -642,6 +643,8 @@ void CanopenComponent::od_set_string(uint32_t index, uint32_t sub, const char *v
   ODAddUpdate(NodeSpec.Dict, CO_KEY(index, sub, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) od_string(value));
 }
 
+float CanopenComponent::get_setup_priority() const { return setup_priority::LATE; }
+
 void CanopenComponent::setup() {
   ESP_LOGCONFIG(TAG, "Setting up CANopen...");
   ESP_LOGD(TAG, "CO_TPDO_N: %d", CO_TPDO_N);
@@ -681,7 +684,7 @@ void CanopenComponent::setup() {
   ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 4, CO_OBJ______W), FW_IMAGE, (CO_DATA) (&FirmwareObj));
 #endif
 
-  for (auto it = entities.begin(); it != entities.end();it++) {
+  for (auto it = entities.begin(); it != entities.end(); it++) {
     (*it)->setup(this);
   }
 
