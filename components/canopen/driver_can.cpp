@@ -17,7 +17,7 @@ struct timeval timer = {0, 0};
 
 static void DrvCanInit(void) { ESP_LOGI(TAG, "DrvCanInit"); }
 
-static void DrvCanEnable(uint32_t baudrate) { ESP_LOGI(TAG, "DrvCanEnable baudrate: %ld", baudrate); }
+static void DrvCanEnable(uint32_t baudrate) { ESP_LOGI(TAG, "DrvCanEnable baudrate: %d", baudrate); }
 
 char *can_data_str(uint8_t *data, uint8_t len) {
   static char buf[3 * 8 + 1] = "";
@@ -118,12 +118,12 @@ static void DrvTimerStop(void) {
 static void DrvNvmInit(void) { ESP_LOGI(TAG, "DrvNvmInit"); }
 
 static uint32_t DrvNvmRead(uint32_t start, uint8_t *buffer, uint32_t size) {
-  ESP_LOGI(TAG, "DrvNvmRead, start: %08lx, buf: %p, size: %08lx", start, buffer, size);
+  ESP_LOGI(TAG, "DrvNvmRead, start: %08x, buf: %p, size: %08x", start, buffer, size);
   return 0;
 }
 
 static uint32_t DrvNvmWrite(uint32_t start, uint8_t *buffer, uint32_t size) {
-  ESP_LOGI(TAG, "DrvNvmWrite, start: %08lx, buf: %p, size: %08lx", start, buffer, size);
+  ESP_LOGI(TAG, "DrvNvmWrite, start: %08x, buf: %p, size: %08x", start, buffer, size);
   return 0;
 }
 

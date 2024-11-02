@@ -69,7 +69,7 @@ CO_OBJ_STR *od_string(const std::string &str) {
 }
 
 CanopenComponent::CanopenComponent(uint32_t node_id) {
-  ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03lx", node_id);
+  ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03x", node_id);
   memset(rpdo_buf, 0, sizeof(rpdo_buf));
   this->node_id = node_id;
   NodeSpec.NodeId = node_id;
@@ -724,7 +724,7 @@ void CanopenComponent::set_operational_mode() {
       else if (size == 2)
         value &= 0xffff;
     }
-    ESP_LOGD(TAG, "OD Index: %02x Key: %08lx Data: %08lx Type: %p", index, od->Key, value, od->Type);
+    ESP_LOGD(TAG, "OD Index: %02x Key: %08x Data: %08x Type: %p", index, od->Key, value, od->Type);
     index++;
     od++;
   }
@@ -849,7 +849,7 @@ void CanopenComponent::loop() {
       if (status.tx_err > last_status.tx_err || status.rx_err > last_status.rx_err ||
           status.tx_failed > last_status.tx_failed || status.rx_miss > last_status.rx_miss ||
           status.arb_lost > last_status.arb_lost || status.bus_err > last_status.bus_err) {
-        ESP_LOGW(TAG, "tx_err: %ld rx_err: %ld tx_failed: %ld rx_miss: %ld arb_lost: %ld bus_err: %ld", status.tx_err,
+        ESP_LOGW(TAG, "tx_err: %d rx_err: %d tx_failed: %d rx_miss: %d arb_lost: %d bus_err: %d", status.tx_err,
                  status.rx_err, status.tx_failed, status.rx_miss, status.arb_lost, status.bus_err);
       }
       last_status = status;
