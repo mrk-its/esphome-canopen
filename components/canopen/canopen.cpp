@@ -368,16 +368,15 @@ void SensorEntity::setup(CanopenComponent *canopen) {
 #endif
 
 #ifdef USE_NUMBER
-void CanopenComponent::add_entity(esphome::number::Number *number, uint32_t entity_id, int8_t tpdo, uint8_t size,
-                                  float min_val, float max_val) {
+void NumberEntity::setup(CanopenComponent *canopen) {
   float state = number->state;
-  od_add_metadata(entity_id,
+  canopen->od_add_metadata(entity_id,
                   size == 1   ? ENTITY_TYPE_NUMBER_UINT8
                   : size == 2 ? ENTITY_TYPE_NUMBER_UINT16
                               : ENTITY_TYPE_NUMBER,
                   number->get_name(), number->traits.get_device_class(), "", "");
 
-  od_add_sensor_metadata(entity_id, min_val, max_val);
+  canopen->od_add_sensor_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
 
   const CO_OBJ_TYPE *type, *cmd_type;
@@ -408,12 +407,12 @@ void CanopenComponent::add_entity(esphome::number::Number *number, uint32_t enti
       return;
   }
   auto casted_state = to_wire(state);
-  state_key = od_add_state(entity_id, type, &casted_state, size, tpdo);
+  state_key = canopen->od_add_state(entity_id, type, &casted_state, size, tpdo);
   number->add_on_state_callback([=](float value) {
     auto casted_state = to_wire(value);
-    od_set_state(state_key, &casted_state, size);
+    canopen->od_set_state(state_key, &casted_state, size);
   });
-  od_add_cmd(
+  canopen->od_add_cmd(
       entity_id, [=](void *buffer, uint32_t size) { number->publish_state(from_wire(buffer)); }, cmd_type);
 }
 #endif
@@ -446,28 +445,28 @@ void SwitchEntity::setup(CanopenComponent *canopen) {
 #endif
 
 #ifdef USE_LIGHT
-void CanopenComponent::add_entity(esphome::light::LightState *light, uint32_t entity_id, int8_t tpdo) {
+void LightStateEntity::setup(CanopenComponent *canopen) {
   bool state = bool(light->remote_values.get_state());
   uint8_t brightness = (uint8_t) (light->remote_values.get_brightness() * 255);
   uint16_t colortemp = (uint16_t) (light->remote_values.get_color_temperature());
-  od_add_metadata(entity_id, ENTITY_TYPE_LIGHT, light->get_name(), "", "", "");
-  auto state_key = od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
-  auto brightness_key = od_add_state(entity_id, CO_TUNSIGNED8, &brightness, 1, tpdo);
-  auto colortemp_key = od_add_state(entity_id, CO_TUNSIGNED16, &colortemp, 2, tpdo);
+  canopen->od_add_metadata(entity_id, ENTITY_TYPE_LIGHT, light->get_name(), "", "", "");
+  auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
+  auto brightness_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &brightness, 1, tpdo);
+  auto colortemp_key = canopen->od_add_state(entity_id, CO_TUNSIGNED16, &colortemp, 2, tpdo);
   light->add_new_remote_values_callback([=]() {
     bool value = bool(light->remote_values.get_state());
     uint8_t brightness = (uint8_t) (light->remote_values.get_brightness() * 255);
     uint16_t colortemp = (uint16_t) (light->remote_values.get_color_temperature());
-    od_set_state(state_key, &value, 1);
-    od_set_state(brightness_key, &brightness, 1);
-    od_set_state(colortemp_key, &colortemp, 2);
+    canopen->od_set_state(state_key, &value, 1);
+    canopen->od_set_state(brightness_key, &brightness, 1);
+    canopen->od_set_state(colortemp_key, &colortemp, 2);
   });
-  od_add_cmd(entity_id,
+  canopen->od_add_cmd(entity_id,
              [=](void *buffer, uint32_t size) { light->make_call().set_state(((uint8_t *) buffer)[0]).perform(); });
-  od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+  canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
     light->make_call().set_brightness_if_supported(float(((uint8_t *) buffer)[0]) / 255.0).perform();
   });
-  od_add_cmd(
+  canopen->od_add_cmd(
       entity_id,
       [=](void *buffer, uint32_t size) {
         light->make_call().set_color_temperature_if_supported(float(((uint16_t *) buffer)[0])).perform();
@@ -643,7 +642,7 @@ void CanopenComponent::od_set_string(uint32_t index, uint32_t sub, const char *v
   ODAddUpdate(NodeSpec.Dict, CO_KEY(index, sub, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) od_string(value));
 }
 
-float CanopenComponent::get_setup_priority() const { return setup_priority::LATE; }
+float CanopenComponent::get_setup_priority() const { return setup_priority::PROCESSOR; }
 
 void CanopenComponent::setup() {
   ESP_LOGCONFIG(TAG, "Setting up CANopen...");
@@ -889,11 +888,11 @@ void CanopenComponent::loop() {
   }
 
   if (waiting_for_bus_recovery) {
-    waiting_for_bus_recovery = false;
     auto t = abs(tv_now.tv_sec - bus_off_time.tv_sec);
     if (t >= recovery_delay_seconds) {
       twai_initiate_recovery();  // Needs 128 occurrences of bus free signal
       ESP_LOGI(TAG, "Initiate bus recovery");
+      waiting_for_bus_recovery = false;
     }
   }
 #endif
