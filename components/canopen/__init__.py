@@ -130,6 +130,7 @@ TYPE_TO_CANOPEN_TYPE = {
 
 def to_code(config):
     cg.add_platformio_option("build_flags", [
+        "-DCO_SDO_BUF_SEG=63",
         "-DCO_SSDO_N=1",
         "-DCO_CSDO_N=1",
         "-DCO_RPDO_N=4",

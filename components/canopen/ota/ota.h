@@ -27,6 +27,7 @@ class CanopenOTAComponent : public ota::OTAComponent {
   uint8_t s_outbuf[BUF_SIZE];
   uint32_t size;
   uint32_t written;
+  bool dry_run = false;
 
   int decompress();
 

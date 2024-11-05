@@ -371,10 +371,10 @@ void SensorEntity::setup(CanopenComponent *canopen) {
 void NumberEntity::setup(CanopenComponent *canopen) {
   float state = number->state;
   canopen->od_add_metadata(entity_id,
-                  size == 1   ? ENTITY_TYPE_NUMBER_UINT8
-                  : size == 2 ? ENTITY_TYPE_NUMBER_UINT16
-                              : ENTITY_TYPE_NUMBER,
-                  number->get_name(), number->traits.get_device_class(), "", "");
+                           size == 1   ? ENTITY_TYPE_NUMBER_UINT8
+                           : size == 2 ? ENTITY_TYPE_NUMBER_UINT16
+                                       : ENTITY_TYPE_NUMBER,
+                           number->get_name(), number->traits.get_device_class(), "", "");
 
   canopen->od_add_sensor_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
@@ -461,8 +461,8 @@ void LightStateEntity::setup(CanopenComponent *canopen) {
     canopen->od_set_state(brightness_key, &brightness, 1);
     canopen->od_set_state(colortemp_key, &colortemp, 2);
   });
-  canopen->od_add_cmd(entity_id,
-             [=](void *buffer, uint32_t size) { light->make_call().set_state(((uint8_t *) buffer)[0]).perform(); });
+  canopen->od_add_cmd(
+      entity_id, [=](void *buffer, uint32_t size) { light->make_call().set_state(((uint8_t *) buffer)[0]).perform(); });
   canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
     light->make_call().set_brightness_if_supported(float(((uint8_t *) buffer)[0]) / 255.0).perform();
   });
