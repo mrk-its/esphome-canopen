@@ -24,36 +24,6 @@ canopen::CanopenComponent *global_canopen = 0;
 
 namespace canopen {
 
-#ifdef USE_MQTT
-mqtt::MQTTClientComponent *global_mqtt_client = nullptr;
-
-class CustomMQTTMessageTrigger : public Trigger<std::string, std::string>, public Component {
- public:
-  CustomMQTTMessageTrigger(std::string topic) : topic_(std::move(topic)) {}
-  void setup() override {
-    global_mqtt_client->subscribe(
-        this->topic_,
-        [this](const std::string &topic, const std::string &payload) {
-          if (this->payload_.has_value() && payload != *this->payload_) {
-            return;
-          }
-          this->trigger(topic, payload);
-        },
-        this->qos_);
-  }
-
-  void set_qos(uint8_t qos) { this->qos_ = qos; }
-  void set_payload(const std::string &payload) { this->payload_ = payload; }
-  // void dump_config() override;
-  float get_setup_priority() const override { return setup_priority::AFTER_CONNECTION; }
-
- protected:
-  std::string topic_;
-  uint8_t qos_{0};
-  optional<std::string> payload_;
-};
-#endif
-
 // extern "C" {
 //   void log_printf(char *fmt, ...) {
 //     ESP_LOGD(TAG, fmt);
@@ -105,52 +75,10 @@ void CanopenComponent::set_canbus(canbus::Canbus *canbus) {
   automation = new Automation<std::vector<uint8_t>, uint32_t, bool>(canbus_canbustrigger);
   auto cb = [this](std::vector<uint8_t> x, uint32_t can_id, bool remote_transmission_request) -> void {
     this->on_frame(can_id, remote_transmission_request, x);
-#ifdef USE_MQTT
-    this->mqtt_send_frame(can_id, x);
-#endif
   };
   lambdaaction = new LambdaAction<std::vector<uint8_t>, uint32_t, bool>(cb);
   automation->add_actions({lambdaaction});
 }
-
-#ifdef USE_MQTT
-void CanopenComponent::set_mqtt_client(esphome::mqtt::MQTTClientComponent *mqtt_client) {
-  this->mqtt_client = mqtt_client;
-  global_mqtt_client = mqtt_client;
-  // mqtt::MQTTMessageTrigger *mqtt_message_trigger = new mqtt::MQTTMessageTrigger("raw-can-frame/#");
-  CustomMQTTMessageTrigger *mqtt_message_trigger = new CustomMQTTMessageTrigger("canbus/#");
-  mqtt_message_trigger->set_component_source("mqtt");
-  App.register_component(mqtt_message_trigger);
-  auto automation = new Automation<std::string, std::string>(mqtt_message_trigger);
-  auto cb = [this](std::string topic, std::string payload) -> void {
-    uint32_t can_id = 0xffffffff, src_can_id = 0xffffffff;
-    sscanf(topic.c_str(), "canbus/%ld/%ld", &src_can_id, &can_id);
-    bool is_own = (src_can_id < 2048) && (src_can_id & 0x7f) == this->node_id;
-    ESP_LOGI(TAG, "received mqtt message on topic %s, len: %d, is_own: %d", topic.c_str(), payload.size(), is_own);
-    if (is_own)
-      return;
-    auto data = std::vector<uint8_t>(payload.begin(), payload.end());
-#ifdef USE_CANBUS
-    if ((can_id & 0x7f) != this->node_id) {
-      canbus->send_data(can_id, false, data);
-    }
-#endif
-    this->on_frame(can_id, false, data);
-    // this->on_frame(can_id, remote_transmission_request, x);
-  };
-  auto lambdaaction = new LambdaAction<std::string, std::string>(cb);
-  automation->add_actions({lambdaaction});
-}
-
-void CanopenComponent::mqtt_send_frame(uint16_t addr, std::vector<uint8_t> data) {
-  if (this->mqtt_client.has_value() && this->mqtt_client.value()->is_connected()) {
-    std::stringstream topic;
-    topic << "canbus/" << this->node_id << "/" << addr;
-    this->mqtt_client.value()->publish(
-        {.topic = topic.str(), .payload = std::string(data.begin(), data.end()), .qos = 0, .retain = false});
-  }
-}
-#endif
 
 uint32_t get_entity_index(uint32_t entity_id) { return 0x2000 + entity_id * 16; }
 

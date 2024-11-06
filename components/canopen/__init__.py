@@ -6,7 +6,6 @@ import esphome.codegen as cg
 from esphome import automation
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.components.canbus import CanbusComponent
-from esphome.components.mqtt import MQTTClientComponent
 from esphome.core import coroutine_with_priority
 
 ns = cg.esphome_ns.namespace('canopen')
@@ -95,9 +94,8 @@ HB_CLIENT_SCHEMA = cv.Schema({
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(CanopenComponent),
-    cv.Optional("canbus_id"): cv.use_id(CanbusComponent),
+    cv.Required("canbus_id"): cv.use_id(CanbusComponent),
     # cv.GenerateID("ota_id"): cv.use_id(CanopenOTAComponent),
-    cv.Optional("mqtt_id"): cv.use_id(MQTTClientComponent),
     cv.Required("node_id"): cv.int_,
     # cv.Optional("status"): STATUS_ENTITY_SCHEMA,
     cv.Optional("csdo"): cv.ensure_list(CSDO_SCHEMA),
@@ -146,14 +144,8 @@ def to_code(config):
     node_id = config["node_id"]
     canopen = cg.new_Pvariable(config[CONF_ID], node_id)
 
-    if "canbus_id" in config:
-        cg.add_define("USE_CANBUS")
-        canbus = yield cg.get_variable(config["canbus_id"])
-        cg.add(canopen.set_canbus(canbus))
-
-    if "mqtt_id" in config:
-        mqtt_client = yield cg.get_variable(config["mqtt_id"])
-        cg.add(canopen.set_mqtt_client(mqtt_client))
+    canbus = yield cg.get_variable(config["canbus_id"])
+    cg.add(canopen.set_canbus(canbus))
 
     cg.add(canopen.set_state_update_delay(config["state_update_delay"]))
     cg.add(canopen.set_heartbeat_interval(config["heartbeat_interval"]))

@@ -5,10 +5,6 @@ using namespace esphome;
 
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
-// #include "esphome/components/canbus/canbus.h"
-#ifdef USE_MQTT
-#include "esphome/components/mqtt/mqtt_client.h"
-#endif
 #include <vector>
 #include <map>
 #include <driver/twai.h>
@@ -290,18 +286,8 @@ class CanopenComponent : public Component {
   void set_ota(CanopenOTAComponent *ota) { this->ota = ota; }
 #endif
 
-#ifdef USE_CANBUS
   canbus::Canbus *canbus;
   void set_canbus(canbus::Canbus *canbus);
-#endif
-
-#ifdef USE_MQTT
-  optional<esphome::mqtt::MQTTClientComponent *> mqtt_client;
-
-  void set_mqtt_client(esphome::mqtt::MQTTClientComponent *mqtt_client);
-
-  void mqtt_send_frame(uint16_t addr, std::vector<uint8_t> data);
-#endif
 
   CanopenComponent(uint32_t node_id);
 
