@@ -39,7 +39,7 @@ CO_OBJ_STR *od_string(const std::string &str) {
 }
 
 CanopenComponent::CanopenComponent(uint32_t node_id) {
-  ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03x", node_id);
+  ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03lx", node_id);
   memset(rpdo_buf, 0, sizeof(rpdo_buf));
   this->node_id = node_id;
   NodeSpec.NodeId = node_id;
@@ -652,7 +652,7 @@ void CanopenComponent::set_operational_mode() {
       else if (size == 2)
         value &= 0xffff;
     }
-    ESP_LOGD(TAG, "OD Index: %02x Key: %08x Data: %08x Type: %p", index, od->Key, value, od->Type);
+    ESP_LOGD(TAG, "OD Index: %02x Key: %08lx Data: %08lx Type: %p", index, od->Key, value, od->Type);
     index++;
     od++;
   }
@@ -687,7 +687,7 @@ void CanopenComponent::csdo_recv(uint8_t num, uint32_t key, std::function<void(u
         csdo, key, (uint8_t *) &buffers[num], 4,
         [](CO_CSDO_T *csdo, uint16_t index, uint8_t sub, uint32_t code) {
           auto num = csdo - csdo0;
-          ESP_LOGV(TAG, "COCSdoRequestUpload cb: %04x %02x %08x", index, sub, code);
+          ESP_LOGV(TAG, "COCSdoRequestUpload cb: %04x %02x %08lx", index, sub, code);
           callbacks[num](buffers[num], code);
         },
         1000);
@@ -702,7 +702,7 @@ void CanopenComponent::csdo_send_data(uint8_t num, uint32_t key, uint8_t *data, 
     auto ret = COCSdoRequestDownload(
         csdo, key, data, len,
         [](CO_CSDO_T *csdo, uint16_t index, uint8_t sub, uint32_t code) {
-          ESP_LOGV(TAG, "COCSdoRequestDownload cb: %04x %02x %08x", index, sub, code);
+          ESP_LOGV(TAG, "COCSdoRequestDownload cb: %04x %02x %08lx", index, sub, code);
         },
         1000);
 
@@ -777,7 +777,7 @@ void CanopenComponent::loop() {
       if (status.tx_err > last_status.tx_err || status.rx_err > last_status.rx_err ||
           status.tx_failed > last_status.tx_failed || status.rx_miss > last_status.rx_miss ||
           status.arb_lost > last_status.arb_lost || status.bus_err > last_status.bus_err) {
-        ESP_LOGW(TAG, "tx_err: %d rx_err: %d tx_failed: %d rx_miss: %d arb_lost: %d bus_err: %d", status.tx_err,
+        ESP_LOGW(TAG, "tx_err: %ld rx_err: %ld tx_failed: %ld rx_miss: %ld arb_lost: %ld bus_err: %ld", status.tx_err,
                  status.rx_err, status.tx_failed, status.rx_miss, status.arb_lost, status.bus_err);
       }
       last_status = status;
