@@ -100,6 +100,7 @@ CONFIG_SCHEMA = cv.Schema({
     # cv.Optional("status"): STATUS_ENTITY_SCHEMA,
     cv.Optional("csdo"): cv.ensure_list(CSDO_SCHEMA),
     cv.Required(CONF_ENTITIES): cv.ensure_list(ENTITY_SCHEMA),
+    cv.Optional("sdo_block_transfer_size", 63): cv.All(cv.int_, cv.Range(min=1, max=127)),
     cv.Optional("template_entities"): cv.ensure_list(TEMPLATE_ENTITY),
     cv.Optional("on_pre_operational"): automation.validate_automation({
         cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(PreOperationalTrigger),
@@ -128,7 +129,7 @@ TYPE_TO_CANOPEN_TYPE = {
 
 def to_code(config):
     cg.add_platformio_option("build_flags", [
-        "-DCO_SDO_BUF_SEG=63",
+        "-DCO_SDO_BUF_SEG={}".format(config["sdo_block_transfer_size"]),
         "-DCO_SSDO_N=1",
         "-DCO_CSDO_N=1",
         "-DCO_RPDO_N=4",
