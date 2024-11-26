@@ -27,7 +27,7 @@ void CanopenOTAComponent::setup() {
   delayaction_id->set_component_source("canopen.ota");
   App.register_component(delayaction_id);
   delayaction_id->set_delay(5000);
-  auto lambdaaction_id = new LambdaAction<>([this]() -> void {
+  auto lambdaaction_id = new LambdaAction<>([=]() -> void {
     ESP_LOGI(TAG, "ota finished, rebooting");
     App.safe_reboot();
   });
@@ -56,7 +56,7 @@ int CanopenOTAComponent::decompress() {
   if ((status == Z_STREAM_END) || (status == Z_OK && !this->stream.avail_out)) {
     uint32_t n = BUF_SIZE - this->stream.avail_out;
     this->written += n;
-    ESP_LOGI(TAG, "writing %ld bytes to flash, total: %ld", n, this->written);
+    ESP_LOGI(TAG, "writing %d bytes to flash, total: %d", n, this->written);
     auto ret = !dry_run ? backend->write(this->s_outbuf, n) : esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK;
     if (ret != esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK) {
       ESP_LOGW("ota", "write flash error: %d", ret);
