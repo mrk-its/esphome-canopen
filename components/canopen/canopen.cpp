@@ -63,6 +63,9 @@ void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> 
   if((can_id & ~0x7f) == 0x500 && data.size() > 4 && data[0] == this -> node_id) {
     uint32_t key = ((uint32_t *)&data[0])[0] >> 8;
     uint32_t value = ((uint32_t *)&data[0])[1];
+    uint32_t index = key >> 8;
+    uint8_t subindex = (uint8_t)(key & 0xff);
+
     if(data.size() == 5) {
       value = value & 0xff;
     } else if(data.size() == 6) {
@@ -73,10 +76,12 @@ void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> 
     ESP_LOGI(TAG, "cmd from: %02x key: %06x value: %08x", can_id & 0x7f, key, value);
     auto obj = CODictFind(&node.Dict, (key << 8));
     if (!obj) {
-      ESP_LOGW(TAG, "can't find object");
+      ESP_LOGW(TAG, "Can't find object at %04x %02x", index, subindex);
       return;
     }
-    COObjWrValue(obj, &node, &data[4], data.size() - 4);
+    if(COObjWrValue(obj, &node, &data[4], data.size() - 4) != CO_ERR_NONE) {
+      ESP_LOGW(TAG, "Can't write %d bytes to %04x %02x", data.size() - 4, index, subindex);
+    }
   }
 }
 
@@ -98,12 +103,10 @@ void CanopenComponent::set_canbus(canbus::Canbus *canbus) {
   automation->add_actions({lambdaaction});
 }
 
-uint32_t get_entity_index(uint32_t entity_id) { return 0x2000 + entity_id * 16; }
-
 void CanopenComponent::od_add_metadata(uint32_t entity_id, uint8_t type, const std::string &name,
                                        const std::string &device_class, const std::string &unit,
                                        const std::string &state_class) {
-  uint32_t index = get_entity_index(entity_id);
+  uint32_t index = ENTITY_INDEX(entity_id);
   ODAddUpdate(NodeSpec.Dict, CO_KEY(0x2000, entity_id, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) type);
   if (name.size())
     ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_NAME, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) od_string(name));
@@ -118,7 +121,7 @@ void CanopenComponent::od_add_metadata(uint32_t entity_id, uint8_t type, const s
 }
 
 void CanopenComponent::od_add_sensor_metadata(uint32_t entity_id, float min_value, float max_value) {
-  uint32_t index = get_entity_index(entity_id);
+  uint32_t index = ENTITY_INDEX(entity_id);
   // temporary pointers to get rid of aliasing warning
   uint32_t *min_value_ptr = (uint32_t *) &min_value;
   uint32_t *max_value_ptr = (uint32_t *) &max_value;
@@ -132,7 +135,7 @@ uint32_t CanopenComponent::od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *t
                                         TPDO &tpdo) {
 
   uint32_t pdo_mask = tpdo.number >= 0 ? (tpdo.is_async ? CO_OBJ___A___ : 0) | CO_OBJ____P__ : 0;
-  uint32_t entity_index = get_entity_index(entity_id);
+  uint32_t entity_index = ENTITY_INDEX(entity_id);
 
   uint8_t state_sub_index = 0;
   auto obj = ODFind(NodeSpec.Dict, CO_DEV(entity_index + 1, 0));
@@ -191,7 +194,7 @@ void CanopenComponent::od_set_state(uint32_t key, void *state, uint8_t size) {
 
 uint32_t CanopenComponent::od_add_cmd(uint32_t entity_id, std::function<void(void *, uint32_t)> cb,
                                       const CO_OBJ_TYPE *type) {
-  uint32_t index = get_entity_index(entity_id);
+  uint32_t index = ENTITY_INDEX(entity_id);
 
   uint8_t max_index = 0;
   auto obj = ODFind(NodeSpec.Dict, CO_DEV(index + 2, 0));
@@ -250,7 +253,7 @@ void CanopenComponent::add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo)
 }
 
 void CanopenComponent::add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd) {
-  uint32_t index = get_entity_index(entity_id);
+  uint32_t index = ENTITY_INDEX(entity_id);
   rpdo_map_append(idx, index + 2, cmd + 1, 8);
 }
 
@@ -696,6 +699,29 @@ void CanopenComponent::trig_tpdo(int8_t num) {
       COTPdoTrigPdo(node.TPdo, tpdo);
     }
   }
+}
+
+bool CanopenComponent::remote_entity_write_od(uint8_t node_id, uint32_t index, uint8_t subindex, void *data, uint8_t size) {
+  if(size > 4 || node_id >= 128) {
+    return false;
+  }
+  if(node_id == this->node_id) {
+    uint32_t key = CO_KEY(index, subindex, 0);
+    auto obj = CODictFind(&node.Dict, (key << 8));
+    if (!obj) {
+      ESP_LOGW(TAG, "Can't find object at %04x %02x", index, subindex);
+      return false;
+    }
+    auto result = COObjWrValue(obj, &node, data, size);
+    if(result != CO_ERR_NONE) {
+      ESP_LOGW(TAG, "Can't write %d bytes to %04x %02x", size, index, subindex);
+    }
+  }
+  uint8_t buffer[8] = {node_id, subindex, (uint8_t)(index & 0xff), (uint8_t)((index >> 8) & 0xff)};
+  memcpy(buffer + 4, data, size);
+  std::vector<uint8_t> _data(buffer, buffer + 4 + size);
+  canbus->send_data(0x500 | node_id, false, _data);
+  return true;
 }
 
 void CanopenComponent::csdo_recv(uint8_t num, uint32_t key, std::function<void(uint32_t, uint32_t)> cb) {

@@ -104,8 +104,9 @@ const int32_t PROPERTY_CONFIG_UNIT = 11;
 
 static const char *const TAG = "canopen";
 
-#define ENTITY_STATE_KEY(entity_id, state_num) (CO_KEY(0x2000 + entity_id * 16 + 1, state_num + 1, 0))
-#define ENTITY_CMD_KEY(entity_id, cmd_num) (CO_KEY(0x2000 + entity_id * 16 + 2, cmd_num + 1, 0))
+#define ENTITY_INDEX(entity_id) (0x2000 + entity_id * 16)
+#define ENTITY_STATE_KEY(entity_id, state_num) (CO_KEY(ENTITY_INDEX(entity_id) + 1, state_num + 1, 0))
+#define ENTITY_CMD_KEY(entity_id, cmd_num) (CO_KEY(ENTITY_INDEX(entity_id) + 2, cmd_num + 1, 0))
 
 namespace esphome {
 namespace canopen {
@@ -323,10 +324,10 @@ class CanopenComponent : public Component {
   void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
   void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd);
 
-  void add_entity(EntityBase *entity, uint32_t entity_id, TPDO tpdo, uint8_t size = 4, float min_val = 0,
-                  float max_val = 0);
+  // void add_entity(EntityBase *entity, uint32_t entity_id, TPDO tpdo, uint8_t size = 4, float min_val = 0,
+  //                 float max_val = 0);
 
-  void add_entity(EntityBase *sensor, uint32_t entity_id, int8_t tpdo);
+  // void add_entity(EntityBase *sensor, uint32_t entity_id, int8_t tpdo);
 
 // void add_status(uint32_t entity_id, uint32_t update_interval);
 #ifdef USE_SENSOR
@@ -399,6 +400,29 @@ class CanopenComponent : public Component {
   void set_entity_state(uint32_t entity_id, uint32_t state, void *data, uint8_t size) {
     od_set_state(ENTITY_STATE_KEY(entity_id, state), data, size);
   }
+
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint8_t value, uint8_t cmd=1) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd, &value, 1);
+  }
+
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, bool value, uint8_t cmd=1) {
+    return send_entity_cmd(node_id, entity_index, (uint8_t)(value ? 1 : 0), cmd);
+  }
+
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint16_t value, uint8_t cmd=1) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd, &value, 2);
+  }
+
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint32_t value, uint8_t cmd=1) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd, &value, 4);
+  }
+
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, float value, uint8_t cmd=1) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd, &value, 4);
+  }
+
+  bool remote_entity_write_od(uint8_t node_id, uint32_t index, uint8_t subindex, void *data, uint8_t size);
+
   void on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
   void store_comm_params();
   void reset_comm_params();
