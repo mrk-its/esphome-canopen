@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 2
       matrix:
         framework_opts:
           - "type=esp-idf version=recommended platform_version=5.4.0"
