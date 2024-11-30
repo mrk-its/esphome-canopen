@@ -1,0 +1,20 @@
+name: "Test"
+
+on: [push, pull_request]
+
+jobs:
+  checkout:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+  build:
+    needs: checkout
+    name: Test build
+    runs-on: ubuntu-latest
+    container:
+      image: esphome/esphome
+        volumes: ${{ github.workspace }}:/config
+    steps:
+      run: esphome
+
