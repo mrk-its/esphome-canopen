@@ -377,6 +377,8 @@ class CanopenComponent : public Component {
   void od_add_metadata(uint32_t entity_id, uint8_t type, const std::string &name, const std::string &device_class,
                        const std::string &unit, const std::string &state_class);
   void od_add_sensor_metadata(uint32_t entity_id, float min_value, float max_value);
+
+  void od_setup_tpdo(uint32_t index, uint8_t sub_index, uint8_t size, TPDO &tpdo);
   uint32_t od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size, TPDO &tpdo);
   uint32_t od_add_cmd(uint32_t entity_id, std::function<void(void *, uint32_t)> cb, const CO_OBJ_TYPE *type = CO_TCMD8);
 

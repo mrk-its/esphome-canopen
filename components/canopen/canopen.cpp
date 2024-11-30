@@ -146,20 +146,24 @@ uint32_t CanopenComponent::od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *t
   ODAddUpdate(NodeSpec.Dict, CO_KEY(entity_index + 1, state_sub_index, pdo_mask | CO_OBJ_D___R_), type, value);
 
   if (tpdo.number >= 0) {
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo.number, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32,
-                tpdo.number < 4 ? CO_COBID_TPDO_DEFAULT(tpdo.number) : CO_COBID_TPDO_DEFAULT(tpdo.number - 4) + 0x80);
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo.number, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 254);
-
-    uint8_t tpdo_sub_index = 0;
-    auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1a00 + tpdo.number, 0));
-    if (obj)
-      tpdo_sub_index = obj->Data;
-    tpdo_sub_index += 1;
-    uint32_t bits = size * 8;
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1a00 + tpdo.number, tpdo_sub_index, CO_OBJ_D___R_), CO_TUNSIGNED32,
-                CO_LINK(entity_index + 1, state_sub_index, bits));
+    od_setup_tpdo(entity_index + 1, state_sub_index, size, tpdo);
   }
   return CO_KEY(entity_index + 1, state_sub_index, 0);
+}
+
+void CanopenComponent::od_setup_tpdo(uint32_t index, uint8_t sub_index, uint8_t size, TPDO &tpdo) {
+  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo.number, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32,
+              tpdo.number < 4 ? CO_COBID_TPDO_DEFAULT(tpdo.number) : CO_COBID_TPDO_DEFAULT(tpdo.number - 4) + 0x80);
+  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo.number, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 254);
+
+  uint8_t tpdo_sub_index = 0;
+  auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1a00 + tpdo.number, 0));
+  if (obj)
+    tpdo_sub_index = obj->Data;
+  tpdo_sub_index += 1;
+  uint32_t bits = size * 8;
+  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1a00 + tpdo.number, tpdo_sub_index, CO_OBJ_D___R_), CO_TUNSIGNED32,
+              CO_LINK(index, sub_index, bits));
 }
 
 void CanopenComponent::od_set_state(uint32_t key, void *state, uint8_t size) {
