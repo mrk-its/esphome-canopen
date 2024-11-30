@@ -3,9 +3,9 @@ external_components:
 
 esp32:
   framework:
-    type: $framework_type
-    version: ${framework_version}
-    platform_version: ${framework_platform_version}
+    type: ${type}
+    version: ${version}
+    platform_version: ${platform_version}
 
 ota:
   - platform: canopen
@@ -48,4 +48,3 @@ light:
     output: output1
     gamma_correct: 1
     default_transition_length: 0s
-  

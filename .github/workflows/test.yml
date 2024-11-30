@@ -4,16 +4,23 @@ on: [push, pull_request]
 
 jobs:
   build:
-    name: Build
+    name: ${{ matrix.file }} ${{ matrix.framework_opts }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        file: ["esp32_c3", "wt32"]
+        framework_opts:
+          - "type=esp-idf version=recommended platform_version=5.4.0"
+          - "type=arduino version=recommended platform_version=5.4.0"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Configure
-        run: framework_type=esp-idf framework_version=4.4.8 framework_platform_version=5.4.0 envsubst < test/common.yaml.template > test/common.yaml
+        run: ${{matrix.framework_opts}} envsubst < test/common.yaml.template > test/common.yaml
       - name: Compile
         uses: esphome/build-action@v4.0.4
         id: esphome-build
         with:
-          yaml-file: test/esp32_c3.yaml
-
+          yaml-file: test/${{ matrix.file }}.yaml
