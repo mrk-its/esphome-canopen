@@ -16,5 +16,6 @@ jobs:
       image: esphome/esphome
       volumes: ${{GITHUB_WORKFLOW}}:/config
     steps:
-      run: esphome
+      - name: compile
+        run: esphome
 
