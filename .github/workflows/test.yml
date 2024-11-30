@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   build:
-    name: ${{ matrix.file }} ${{ matrix.framework_opts }}
+    name: ${{ matrix.board }} ${{ matrix.framework_opts }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
