@@ -3,19 +3,15 @@ name: "Test"
 on: [push, pull_request]
 
 jobs:
-  checkout:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v3
   build:
-    needs: checkout
-    name: Test build
+    name: Build
     runs-on: ubuntu-latest
-    container:
-      image: esphome/esphome
-      volumes: ${{github.workflow}}:/config
     steps:
-      - name: compile
-        run: esphome
+      - name: Checkout code
+        used: actions/checkout@4.2.2
+      - name: Compile
+        uses: esphome/build-action@v4.0.4
+        id: esphome-build
+        with:
+          yaml-file: test/esp32_c3.yaml
 
