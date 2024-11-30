@@ -60,6 +60,24 @@ void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> 
   recv_frame = {{can_id, {}, (uint8_t) data.size()}};
   memcpy(recv_frame.value().Data, &data[0], data.size());
   CONodeProcess(&node);
+  if((can_id & ~0x7f) == 0x500 && data.size() > 4 && data[0] == this -> node_id) {
+    uint32_t key = ((uint32_t *)&data[0])[0] >> 8;
+    uint32_t value = ((uint32_t *)&data[0])[1];
+    if(data.size() == 5) {
+      value = value & 0xff;
+    } else if(data.size() == 6) {
+      value = value & 0xffff;
+    } else if(data.size() == 7) {
+      value = value & 0xffffff;
+    }
+    ESP_LOGI(TAG, "cmd from: %02x key: %06x value: %08x", can_id & 0x7f, key, value);
+    auto obj = CODictFind(&node.Dict, (key << 8));
+    if (!obj) {
+      ESP_LOGW(TAG, "can't find object");
+      return;
+    }
+    COObjWrValue(obj, &node, &data[4], data.size() - 4);
+  }
 }
 
 void CanopenComponent::set_canbus(canbus::Canbus *canbus) {
@@ -111,8 +129,9 @@ void CanopenComponent::od_add_sensor_metadata(uint32_t entity_id, float min_valu
 }
 
 uint32_t CanopenComponent::od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size,
-                                        int8_t tpdo) {
-  uint32_t async_pdo_mask = tpdo >= 0 ? CO_OBJ___A___ | CO_OBJ____P__ : 0;
+                                        TPDO &tpdo) {
+
+  uint32_t pdo_mask = tpdo.number >= 0 ? (tpdo.is_async ? CO_OBJ___A___ : 0) | CO_OBJ____P__ : 0;
   uint32_t entity_index = get_entity_index(entity_id);
 
   uint8_t state_sub_index = 0;
@@ -124,20 +143,20 @@ uint32_t CanopenComponent::od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *t
   uint32_t value = 0;
   if (state && size)
     memcpy(&value, state, size);
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(entity_index + 1, state_sub_index, async_pdo_mask | CO_OBJ_D___R_), type, value);
+  ODAddUpdate(NodeSpec.Dict, CO_KEY(entity_index + 1, state_sub_index, pdo_mask | CO_OBJ_D___R_), type, value);
 
-  if (tpdo >= 0) {
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32,
-                tpdo < 4 ? CO_COBID_TPDO_DEFAULT(tpdo) : CO_COBID_TPDO_DEFAULT(tpdo - 4) + 0x80);
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 254);
+  if (tpdo.number >= 0) {
+    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo.number, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32,
+                tpdo.number < 4 ? CO_COBID_TPDO_DEFAULT(tpdo.number) : CO_COBID_TPDO_DEFAULT(tpdo.number - 4) + 0x80);
+    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo.number, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 254);
 
     uint8_t tpdo_sub_index = 0;
-    auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1a00 + tpdo, 0));
+    auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1a00 + tpdo.number, 0));
     if (obj)
       tpdo_sub_index = obj->Data;
     tpdo_sub_index += 1;
     uint32_t bits = size * 8;
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1a00 + tpdo, tpdo_sub_index, CO_OBJ_D___R_), CO_TUNSIGNED32,
+    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1a00 + tpdo.number, tpdo_sub_index, CO_OBJ_D___R_), CO_TUNSIGNED32,
                 CO_LINK(entity_index + 1, state_sub_index, bits));
   }
   return CO_KEY(entity_index + 1, state_sub_index, 0);
@@ -352,6 +371,9 @@ void BinarySensorEntity::setup(CanopenComponent *canopen) {
                            "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &sensor->state, 1, tpdo);
   sensor->add_on_state_callback([=](bool x) { canopen->od_set_state(state_key, &x, 1); });
+  canopen->od_add_cmd(
+      entity_id, [=](void *buffer, uint32_t size) { sensor->publish_state(*(uint8_t *)buffer); }, CO_TCMD8);
+
 }
 
 #endif

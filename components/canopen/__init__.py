@@ -9,6 +9,9 @@ from esphome.components.canbus import CanbusComponent
 from esphome.core import coroutine_with_priority
 
 ns = cg.esphome_ns.namespace('canopen')
+
+TPDO = ns.struct("TPDO")
+
 CanopenComponent = ns.class_(
     'CanopenComponent',
     cg.Component,
@@ -41,13 +44,18 @@ RPDO_SCHEMA = cv.Schema({
     cv.Optional("cmd", 0): cv.int_
 })
 
+TPDO_SCHEMA = cv.Schema({
+    cv.Required("number"): cv.int_,
+    cv.Optional("is_async", default=True): cv.boolean,
+})
+
 ENTITY_SCHEMA = cv.Schema({
     cv.Required("id"): cv.use_id(cg.EntityBase),
     cv.Required("index"): cv.int_,
     cv.Optional("size"): cv.int_,
     cv.Optional("min_value"): cv.float_,
     cv.Optional("max_value"): cv.float_,
-    cv.Optional("tpdo"): cv.int_,
+    cv.Optional("tpdo"): cv.Any(cv.int_, TPDO_SCHEMA),
     cv.Optional("rpdo"): cv.ensure_list(RPDO_SCHEMA),
 })
 
@@ -171,13 +179,18 @@ def to_code(config):
     for entity_config in entities:
         entity = yield cg.get_variable(entity_config["id"])
         tpdo = entity_config.get("tpdo", -1)
+        if not isinstance(tpdo, dict):
+            tpdo = {"number": tpdo, "is_async": True}
+
+        tpdo_struct = cg.StructInitializer(TPDO, ("number", tpdo["number"]), ("is_async", tpdo["is_async"]))
+
         size = entity_config.get("size")
         if size in (1, 2):
             min_val = entity_config.get("min_value", 0)
             max_val = entity_config.get("max_value", 254 if size == 1 else 65534)  # 255 / 65535 reserved for NaN
-            cg.add(canopen.add_entity(entity, entity_config["index"], tpdo, size, min_val, max_val))
+            cg.add(canopen.add_entity(entity, entity_config["index"], tpdo_struct, size, min_val, max_val))
         else:
-            cg.add(canopen.add_entity(entity, entity_config["index"], tpdo))
+            cg.add(canopen.add_entity(entity, entity_config["index"], tpdo_struct))
 
     for tmpl_entity in config.get("template_entities", []):
         index = tmpl_entity["index"]
