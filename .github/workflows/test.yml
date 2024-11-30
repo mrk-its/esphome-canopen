@@ -10,7 +10,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Configure
-        run: framework_type=foo framework_version=x framework_platform_version=x envsubst < test/common.yaml
+        run: framework_type=esp-idf framework_version=4.4.8 framework_platform_version=5.4.0 envsubst < test/common.yaml.template > test/common.yaml
       - name: Compile
         uses: esphome/build-action@v4.0.4
         id: esphome-build
