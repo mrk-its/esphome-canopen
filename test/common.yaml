@@ -1,0 +1,51 @@
+external_components:
+  - source: ../components
+
+esp32:
+  framework:
+    type: $framework_type
+    version: ${framework_version}
+    platform_version: ${framework_platform_version}
+
+ota:
+  - platform: canopen
+
+logger:
+  level: VERBOSE
+
+esphome:
+  name: "test-node"
+
+canbus:
+  platform: esp32_can
+  id: can_bus
+  can_id: 1
+  bit_rate: 125kbps
+  tx_queue_len: 128
+  rx_queue_len: 128
+  rx_pin: GPIO5
+  tx_pin: GPIO4
+
+canopen:
+  canbus_id: can_bus
+  node_id: 1
+  entities:
+    - index: 1
+      id: light1
+      tpdo: 0 
+  
+output:
+  - platform: template
+    id: output1
+    type: float
+    write_action:
+      - lambda: ''
+
+light:
+  - platform: monochromatic
+    id: light1
+    name: "Test Light 1"
+    output: output1
+    gamma_correct: 1
+    default_transition_length: 0s
+  

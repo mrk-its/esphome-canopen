@@ -1,0 +1,5 @@
+packages:
+  common: !include common.yaml
+
+esp32:
+  board: wt32-eth01
