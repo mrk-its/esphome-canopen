@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: esphome/esphome
-        volumes: ${{ github.workspace }}:/config
+      volumes: ${{GITHUB_WORKFLOW}}:/config
     steps:
       run: esphome
 
