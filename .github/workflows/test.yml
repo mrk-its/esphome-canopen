@@ -9,6 +9,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Configure
+        run: framework_type=foo framework_version=x framework_platform_version=x envsubst < test/common.yaml
       - name: Compile
         uses: esphome/build-action@v4.0.4
         id: esphome-build
