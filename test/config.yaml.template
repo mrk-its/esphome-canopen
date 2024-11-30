@@ -7,7 +7,6 @@ esp32:
     version: ${version}
     platform_version: ${platform_version}
   board: ${board}
-  variant: esp32c3
 
 ota:
   - platform: canopen
