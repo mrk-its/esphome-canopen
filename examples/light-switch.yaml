@@ -73,6 +73,19 @@ binary_sensor:
               !state  // new state
             );
             id(can_open).send_entity_cmd(7, 2, !state);
+
+            // following edge case is possible:
+            // lights are already on, but our state is desynchronized (unknown or false)
+            // then we are sending turn_on command - remote state doesn't change, so TPDO will
+            // be not sent - so nothing will happen
+            // to prevent that update local state to expected values:
+
+            id(light1_state).publish_state(!state);
+            id(light2_state).publish_state(!state);
+
+            // the better solution would be to always sent state even if it didn't change
+
+
 sensor:
   - platform: template
     id: light1_brightness
