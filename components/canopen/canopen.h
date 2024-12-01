@@ -400,24 +400,24 @@ class CanopenComponent : public Component {
     od_set_state(ENTITY_STATE_KEY(entity_id, state), data, size);
   }
 
-  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint8_t value, uint8_t cmd=1) {
-    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd, &value, 1);
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint8_t value, uint8_t cmd=0) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd+1, &value, 1);
   }
 
-  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, bool value, uint8_t cmd=1) {
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, bool value, uint8_t cmd=0) {
     return send_entity_cmd(node_id, entity_index, (uint8_t)(value ? 1 : 0), cmd);
   }
 
-  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint16_t value, uint8_t cmd=1) {
-    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd, &value, 2);
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint16_t value, uint8_t cmd=0) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd+1, &value, 2);
   }
 
-  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint32_t value, uint8_t cmd=1) {
-    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd, &value, 4);
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint32_t value, uint8_t cmd=0) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd+1, &value, 4);
   }
 
-  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, float value, uint8_t cmd=1) {
-    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd, &value, 4);
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, float value, uint8_t cmd=0) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd+1, &value, 4);
   }
 
   bool remote_entity_write_od(uint8_t node_id, uint32_t index, uint8_t subindex, void *data, uint8_t size);

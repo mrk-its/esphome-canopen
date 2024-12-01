@@ -4,6 +4,45 @@ This project provides ESPHome external_component named `canopen` for easy conver
 
 The [can2mqtt](https://github.com/mrk-its/can2mqtt) project provides can2mqtt bridge exposing ESPHome CANopen entities onto MQTT topics. It follows MQTT Discovery protocol, so entities appear automatically in HomeAssistant.
 
+## Configuration
+`canopen` plafrom recognizes following parameters:
+* `node_id` (Required, int): canopen node_id, in 0..127 range
+* `heartbeat_interval` (Optional, time interval, default=5000ms): Heartbeat interval
+* `on_pre_operational` (Optional, Automation): An automation to perform when node enters pre_operational state
+* `on_operational` (Optional, Automation): An automation to perform when node enters  perational state
+* `on_hb_consumer_event` (Optional, Automation): An automation to perform when heartbeat clients are configured and heartbeat is received
+* `sdo_block_transfer_size` (Optional, int, defaults to 63): number of messages confirmed with single ACK for SDO block transfer mode
+* `heartbeat_clients` (Optional, list of 'heartbeat_client'): list of nodes to track hearbeat messages for, see below.
+
+* `pdo_od_writer` (Optional, bool, default=True): when enabled then `RPDO #3` is reserved for node to node communication (remote OD writes)
+* `entities` (Optional, list of `entity` objects): list of ESPHome entities exposed via CANOpen, see `entity` schema below
+
+### `entity` schema:
+* `id` (Required, string): id of ESPHome entity
+* `index` (Required, int): index of entity, range 1..64. Together with `node_id` forms unique id of CAN-exposed entity, so it should be changed with a care.
+* `tpdo` (Optional, `TPDO` schema (see below)): when defined then state changes will be broadcasted via TPDO
+* `rpdo` (Optional, `RPDO` schema (see below)): when defined then received TPDO frames will be automatically mapped to OD entity command entries
+
+### `TPDO` schema:
+Any of:
+- object with following properties:
+  * `number` (Required, integer): integer in 0..7 range (7 is typically reserved for node to node communication, unless `pdo_od_writer` is disabled, see above)
+  * `is_async` (Optinal, bool, default=true): When true then state is automaticall published on change. When false, TPDO transmission needs to be manually triggered
+- integer representing `number` defined above.
+
+### `RPDO` schema:
+* `node_id` (Required, integer): id of node sending mapped TPDO frame
+* `tpdo` (Required, integer): TPDO number
+* `offset` (Required, integer): TPDO offset, 0..7 range
+* `cmd` (Optional, defaults to 0): current entity command index (starting from 0) where received TPDO fragemnt is mapped to, it also determines size of mappend fragment.
+
+### `heartbeat_client` schema:
+* `node_id` (Required, int): tracked node id
+* `timeout` (Required, time interval): when exceeded `on_hb_consumer_event` automations will be triggered
+
+
+
+
 # How to start
 ## Hardware requirements
  * any ESP8266/ESP32 board with CAN controller. ESP32 boards are preferred, as they have [integrated can controller](https://esphome.io/components/canbus.html#esp32-can-component) (but still cheap external CAN transceiver is needed). For ESP8266 external [MCP2515](https://esphome.io/components/canbus.html#mcp2515-component) CAN controller can be used.
