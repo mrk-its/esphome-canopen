@@ -1,0 +1,80 @@
+packages:
+  common: !include common.yaml
+
+esphome:
+  name: misc
+
+canopen:
+  id: can_open
+  canbus_id: can_bus
+  node_id: 3
+  entities:
+    - id: boot_button
+      index: 1
+      tpdo: 0 # offset: 0, size: 1 (state)
+    - id: gpio_switch
+      index: 2
+      tpdo: 0 # offset: 1, size: 1 (state)
+    - id: cover1
+      index: 3
+      tpdo: 0 # offset: 2, size: 2 (state: byte, position: byte)
+    - id: uptime_sensor
+      index: 4
+      tpdo: 0 # offset: 4, size: 4 (state: float)
+    - id: pwm_light
+      index: 5
+      tpdo: 1 # offset: 0, size: 2 (state: 1 byte, brightness: 1 byte)
+
+sensor:
+  - platform: uptime
+    id: uptime_sensor
+    name: "Uptime 1"
+    update_interval: 5sec
+    internal: true
+
+binary_sensor:
+  - platform: gpio
+    name: "Boot Button"
+    id: boot_button
+    pin:
+      number: GPIO9
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+
+switch:
+  - platform: gpio
+    name: "GPIO Switch"
+    id: gpio_switch
+    internal: true
+    pin: GPIO3
+
+cover:
+  - platform: time_based
+    name: "Cover 1"
+    id: cover1
+    internal: true
+    device_class: shutter
+    has_built_in_endstop: true
+    open_action:
+      - logger.log: open_action
+    open_duration: 10s
+    close_action:
+      - logger.log: close_action
+    close_duration: 10s
+    stop_action:
+      - logger.log: stop_action
+
+output:
+  - platform: ledc
+    pin: GPIO2
+    id: pwm_output
+
+light:
+  - platform: monochromatic
+    name: "PWM Light"
+    output: pwm_output
+    id: pwm_light
+    default_transition_length: 500ms
+    internal: true

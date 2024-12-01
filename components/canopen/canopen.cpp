@@ -24,6 +24,9 @@ canopen::CanopenComponent *global_canopen = 0;
 
 namespace canopen {
 
+// use last RPDO for od_writer
+const uint32_t OD_WRITER_COB_ID_BASE = CO_COBID_RPDO_DEFAULT(3);
+
 // extern "C" {
 //   void log_printf(char *fmt, ...) {
 //     ESP_LOGD(TAG, fmt);
@@ -56,11 +59,8 @@ CanopenComponent::CanopenComponent(uint32_t node_id) {
 void CanopenComponent::set_state_update_delay(uint32_t delay_us) { state_update_delay_us = delay_us; }
 void CanopenComponent::set_heartbeat_interval(uint16_t interval_ms) { heartbeat_interval_ms = interval_ms; }
 
-void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
-  recv_frame = {{can_id, {}, (uint8_t) data.size()}};
-  memcpy(recv_frame.value().Data, &data[0], data.size());
-  CONodeProcess(&node);
-  if((can_id & ~0x7f) == 0x500 && data.size() > 4 && data[0] == this -> node_id) {
+void CanopenComponent::parse_od_writer_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
+  if((can_id & ~0x7f) == OD_WRITER_COB_ID_BASE && data.size() > 4 && data[0] == this -> node_id) {
     uint32_t key = ((uint32_t *)&data[0])[0] >> 8;
     uint32_t value = ((uint32_t *)&data[0])[1];
     uint32_t index = key >> 8;
@@ -83,6 +83,14 @@ void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> 
       ESP_LOGW(TAG, "Can't write %d bytes to %04x %02x", data.size() - 4, index, subindex);
     }
   }
+}
+
+void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
+  recv_frame = {{can_id, {}, (uint8_t) data.size()}};
+  memcpy(recv_frame.value().Data, &data[0], data.size());
+  CONodeProcess(&node);
+  if(pdo_od_writer_enabled)
+    parse_od_writer_frame(can_id, rtr, data);
 }
 
 void CanopenComponent::set_canbus(canbus::Canbus *canbus) {
@@ -720,7 +728,7 @@ bool CanopenComponent::remote_entity_write_od(uint8_t node_id, uint32_t index, u
   uint8_t buffer[8] = {node_id, subindex, (uint8_t)(index & 0xff), (uint8_t)((index >> 8) & 0xff)};
   memcpy(buffer + 4, data, size);
   std::vector<uint8_t> _data(buffer, buffer + 4 + size);
-  canbus->send_data(0x500 | node_id, false, _data);
+  canbus->send_data(OD_WRITER_COB_ID_BASE | node_id, false, _data);
   return true;
 }
 

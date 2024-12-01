@@ -1,0 +1,50 @@
+packages:
+  common: !include common.yaml
+
+esphome:
+  name: light
+
+canopen:
+  id: can_open
+  canbus_id: can_bus
+  node_id: 7
+  entities:
+    - index: 1
+      id: light1
+      tpdo: 0
+  
+    - index: 2
+      id: light2
+      tpdo: 0
+  
+output:
+  - platform: template
+    id: output1
+    type: float
+    write_action:
+      - logger.log:
+          format: "output1: %f"
+          args: ['state']
+          
+  - platform: template
+    id: output2
+    type: float
+    write_action:
+      - logger.log:
+          format: "output2: %f"
+          args: ['state']
+
+light:
+  - platform: monochromatic
+    id: light1
+    name: "Test Light 1"
+    output: output1
+    gamma_correct: 1
+    default_transition_length: 0s
+
+  - platform: monochromatic
+    id: light2
+    name: "Test Light 2"
+    output: output2
+    gamma_correct: 1
+    default_transition_length: 0s

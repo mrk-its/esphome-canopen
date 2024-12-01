@@ -1,0 +1,42 @@
+wifi:
+  power_save_mode: none
+  <<: !include {file: wifi.yaml}
+
+api:
+  password: ""
+  reboot_timeout: 900s
+
+ota:
+  - platform: esphome
+    password: ""
+
+external_components:
+  - source: github://mrk-its/esphome-canbus-udp-multicast
+  - source: ../components
+
+esphome:
+  platformio_options:
+    board_build.flash_mode: dio
+    board_build.mcu: esp32c3
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  framework:
+    type: esp-idf
+
+canbus:
+  - id: can_bus
+    can_id: 0
+    platform: canbus_udp_multicast
+
+  # - id: can_bus
+  #   can_id: 0
+  #   platform: esp32_can
+  #   bit_rate: 125kbps
+  #   rx_pin: GPIO22
+  #   tx_pin: GPIO23
+
+
+logger:
+  level: DEBUG

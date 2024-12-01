@@ -1,0 +1,83 @@
+packages:
+  common: !include common.yaml
+
+esphome:
+  name: light-switch
+
+canopen:
+  id: can_open
+  canbus_id: can_bus
+  node_id: 8
+  entities:
+    - index: 1
+      id: light1_state
+      rpdo:
+        - node_id: 7
+          tpdo: 0
+          offset: 0
+          cmd: 0
+
+    - index: 2
+      id: light1_brightness
+      size: 1
+      rpdo:
+        - node_id: 7
+          tpdo: 0
+          offset: 1
+          cmd: 0
+
+    - index: 3
+      id: light2_state
+      rpdo:
+        - node_id: 7
+          tpdo: 0
+          offset: 4
+          cmd: 0
+
+    - index: 4
+      id: light2_brightness
+      size: 1
+      rpdo:
+        - node_id: 7
+          tpdo: 0
+          offset: 5
+          cmd: 0
+
+binary_sensor:
+  - platform: template
+    id: light1_state
+    name: "Test Light 1 State"
+  - platform: template
+    id: light2_state
+    name: "Test Light 2 State"
+
+  - platform: template
+    id: light1_state_cmd
+
+  - platform: gpio
+    name: "Boot Button"
+    id: boot_button
+    pin:
+      number: GPIO9
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    on_press:
+      then:
+        - lambda: |-
+            bool state = id(light1_state).state || id(light2_state).state;
+            id(can_open).send_entity_cmd(
+              7,      // node_id
+              1,      // entity index (light1)
+              !state  // new state
+            );
+            id(can_open).send_entity_cmd(7, 2, !state);
+sensor:
+  - platform: template
+    id: light1_brightness
+    name: "Test Light 1 Brightness"
+
+  - platform: template
+    id: light2_brightness
+    name: "Test Light 2 Brightness"

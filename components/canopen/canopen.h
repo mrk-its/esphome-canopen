@@ -279,6 +279,9 @@ class CanopenComponent : public Component {
   uint16_t heartbeat_interval_ms = 0;
 
   ESPPreferenceObject comm_state;
+  bool pdo_od_writer_enabled = true;
+
+  void parse_od_writer_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
 
  public:
   HbConsumerEventTrigger *on_hb_cons_event = {};  // TODO: change visibility
@@ -324,12 +327,8 @@ class CanopenComponent : public Component {
   void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
   void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd);
 
-  // void add_entity(EntityBase *entity, uint32_t entity_id, TPDO tpdo, uint8_t size = 4, float min_val = 0,
-  //                 float max_val = 0);
+  void enable_pdo_od_writer(bool enable) {pdo_od_writer_enabled = enable;};
 
-  // void add_entity(EntityBase *sensor, uint32_t entity_id, int8_t tpdo);
-
-// void add_status(uint32_t entity_id, uint32_t update_interval);
 #ifdef USE_SENSOR
   void add_entity(sensor::Sensor *sensor, uint32_t entity_id, TPDO tpdo, uint8_t size = 4, float min_val = 0,
                   float max_val = 0) {
