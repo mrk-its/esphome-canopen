@@ -184,20 +184,25 @@ void CanopenComponent::od_set_state(uint32_t key, void *state, uint8_t size) {
   if (!size) {
     size = obj->Type->Size(obj, &node, 4);
   }
-  auto it = queued_states.begin();
-  while (it != queued_states.end() && it->obj != obj)
-    it++;
-  if (it != queued_states.end()) {
-    it->size = size;
-    memcpy(&it->state, state, size);
-    gettimeofday(&it->time, NULL);
+
+  if(!state_update_delay_us) {
+    auto ret = COObjWrValue(obj, &node, state, size);
   } else {
-    QueuedState qstate = {obj, {}, size, {}};
-    qstate.size = size;
-    memcpy(&qstate.state, state, size);
-    gettimeofday(&qstate.time, NULL);
-    queued_states.push_back(qstate);
-  };
+    auto it = queued_states.begin();
+    while (it != queued_states.end() && it->obj != obj)
+      it++;
+    if (it != queued_states.end()) {
+      it->size = size;
+      memcpy(&it->state, state, size);
+      gettimeofday(&it->time, NULL);
+    } else {
+      QueuedState qstate = {obj, {}, size, {}};
+      qstate.size = size;
+      memcpy(&qstate.state, state, size);
+      gettimeofday(&qstate.time, NULL);
+      queued_states.push_back(qstate);
+    };
+  }
 }
 
 uint32_t CanopenComponent::od_add_cmd(uint32_t entity_id, std::function<void(void *, uint32_t)> cb,

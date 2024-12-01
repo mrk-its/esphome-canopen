@@ -120,7 +120,7 @@ CONFIG_SCHEMA = cv.Schema({
         cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(HbConsumerEventTrigger),
     }),
     cv.Optional("pdo_od_writer", default=True): cv.boolean,
-    cv.Optional("state_update_delay", "100ms"): cv.positive_time_period_microseconds,
+    cv.Optional("state_update_delay", "0ms"): cv.positive_time_period_microseconds,
     cv.Optional("heartbeat_interval", "5000ms"): cv.positive_time_period_milliseconds,
     cv.Optional("heartbeat_clients"): cv.ensure_list(HB_CLIENT_SCHEMA),
     cv.Optional("sw_version"): cv.string,

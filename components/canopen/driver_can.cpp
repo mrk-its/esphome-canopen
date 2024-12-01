@@ -80,7 +80,7 @@ static uint8_t DrvTimerUpdate(void) {
   gettimeofday(&tv_now, NULL);
 
   int32_t dt = (timer.tv_sec - tv_now.tv_sec) * 1000000 + (timer.tv_usec - tv_now.tv_usec);
-  ESP_LOGV(TAG_TM, "DrvTimerUpdate %d", dt);
+  ESP_LOGVV(TAG_TM, "DrvTimerUpdate %d", dt);
   return dt > 0 ? 0 : 1;
 }
 
