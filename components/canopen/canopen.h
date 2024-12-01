@@ -56,11 +56,6 @@ class Cover;
 }
 #endif
 
-#ifdef USE_ALARM_CONTROL_PANEL
-namespace template_ {
-class TemplateAlarmControlPanel;
-}
-#endif
 }  // namespace esphome
 
 const int8_t ENTITY_TYPE_DISABLED = 0;
@@ -217,8 +212,8 @@ class CoverEntity : public BaseCanopenEntity {
 #ifdef USE_ALARM_CONTROL_PANEL
 class AlarmEntity : public BaseCanopenEntity {
  public:
-  esphome::template_::TemplateAlarmControlPanel *alarm;
-  AlarmEntity(esphome::template_::TemplateAlarmControlPanel *alarm, uint32_t entity_id, TPDO tpdo)
+  esphome::alarm_control_panel::AlarmControlPanel *alarm;
+  AlarmEntity(esphome::alarm_control_panel::AlarmControlPanel *alarm, uint32_t entity_id, TPDO tpdo)
       : BaseCanopenEntity(entity_id, tpdo) {
     this->alarm = alarm;
   }
@@ -369,7 +364,7 @@ class CanopenComponent : public Component {
 #endif
 
 #ifdef USE_ALARM_CONTROL_PANEL
-  void add_entity(esphome::template_::TemplateAlarmControlPanel *alarm, uint32_t entity_id, TPDO tpdo) {
+  void add_entity(esphome::alarm_control_panel::AlarmControlPanel *alarm, uint32_t entity_id, TPDO tpdo) {
     entities.push_back(new AlarmEntity(alarm, entity_id, tpdo));
   }
 #endif
