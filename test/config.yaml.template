@@ -49,3 +49,10 @@ light:
     output: output1
     gamma_correct: 1
     default_transition_length: 0s
+
+sensor:
+binary_sensor:
+cover:
+number:
+switch:
+alarm_control_panel:
