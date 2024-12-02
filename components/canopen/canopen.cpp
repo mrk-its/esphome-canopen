@@ -41,6 +41,13 @@ CO_OBJ_STR *od_string(const std::string &str) {
   return od_str;
 }
 
+void BaseCanopenEntity::od_set_state(CanopenComponent *canopen, uint32_t key, void *state, uint8_t size) {
+  canopen->od_set_state(key, state, size);
+  if(!tpdo.is_async) {
+    canopen->dirty_tpdo_mask |= (1 << tpdo.number);
+  }
+}
+
 CanopenComponent::CanopenComponent(uint32_t node_id) {
   ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03x", node_id);
   memset(rpdo_buf, 0, sizeof(rpdo_buf));
@@ -56,7 +63,6 @@ CanopenComponent::CanopenComponent(uint32_t node_id) {
   CO_OBJ_STR *esphome_ver_str = od_string(ESPHOME_VERSION " " + App.get_compilation_time());
   ODAddUpdate(NodeSpec.Dict, CO_KEY(0x100a, 0, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) esphome_ver_str);
 }
-void CanopenComponent::set_state_update_delay(uint32_t delay_us) { state_update_delay_us = delay_us; }
 void CanopenComponent::set_heartbeat_interval(uint16_t interval_ms) { heartbeat_interval_ms = interval_ms; }
 
 void CanopenComponent::parse_od_writer_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
@@ -184,25 +190,6 @@ void CanopenComponent::od_set_state(uint32_t key, void *state, uint8_t size) {
   if (!size) {
     size = obj->Type->Size(obj, &node, 4);
   }
-
-  if(!state_update_delay_us) {
-    auto ret = COObjWrValue(obj, &node, state, size);
-  } else {
-    auto it = queued_states.begin();
-    while (it != queued_states.end() && it->obj != obj)
-      it++;
-    if (it != queued_states.end()) {
-      it->size = size;
-      memcpy(&it->state, state, size);
-      gettimeofday(&it->time, NULL);
-    } else {
-      QueuedState qstate = {obj, {}, size, {}};
-      qstate.size = size;
-      memcpy(&qstate.state, state, size);
-      gettimeofday(&qstate.time, NULL);
-      queued_states.push_back(qstate);
-    };
-  }
 }
 
 uint32_t CanopenComponent::od_add_cmd(uint32_t entity_id, std::function<void(void *, uint32_t)> cb,
@@ -327,7 +314,7 @@ void SensorEntity::setup(CanopenComponent *canopen) {
 
   sensor->add_on_state_callback([=](float value) {
     auto casted_state = to_wire(value);
-    canopen->od_set_state(state_key, &casted_state, size);
+    od_set_state(canopen, state_key, &casted_state, size);
   });
   canopen->od_add_cmd(
       entity_id, [=](void *buffer, uint32_t size) { sensor->publish_state(from_wire(buffer)); }, cmd_type);
@@ -377,7 +364,7 @@ void NumberEntity::setup(CanopenComponent *canopen) {
   state_key = canopen->od_add_state(entity_id, type, &casted_state, size, tpdo);
   number->add_on_state_callback([=](float value) {
     auto casted_state = to_wire(value);
-    canopen->od_set_state(state_key, &casted_state, size);
+    od_set_state(canopen, state_key, &casted_state, size);
   });
   canopen->od_add_cmd(
       entity_id, [=](void *buffer, uint32_t size) { number->publish_state(from_wire(buffer)); }, cmd_type);
@@ -390,7 +377,7 @@ void BinarySensorEntity::setup(CanopenComponent *canopen) {
   canopen->od_add_metadata(entity_id, ENTITY_TYPE_BINARY_SENSOR, sensor->get_name(), sensor->get_device_class(), "",
                            "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &sensor->state, 1, tpdo);
-  sensor->add_on_state_callback([=](bool x) { canopen->od_set_state(state_key, &x, 1); });
+  sensor->add_on_state_callback([=](bool x) { od_set_state(canopen, state_key, &x, 1); });
   canopen->od_add_cmd(
       entity_id, [=](void *buffer, uint32_t size) { sensor->publish_state(*(uint8_t *)buffer); }, CO_TCMD8);
 
@@ -403,7 +390,7 @@ void SwitchEntity::setup(CanopenComponent *canopen) {
   auto state = switch_->get_initial_state_with_restore_mode().value_or(false);
   canopen->od_add_metadata(entity_id, ENTITY_TYPE_SWITCH, switch_->get_name(), switch_->get_device_class(), "", "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
-  switch_->add_on_state_callback([=](bool value) { canopen->od_set_state(state_key, &value, 1); });
+  switch_->add_on_state_callback([=](bool value) { od_set_state(canopen, state_key, &value, 1); });
   canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
     if (((uint8_t *) buffer)[0]) {
       switch_->turn_on();
@@ -427,9 +414,9 @@ void LightStateEntity::setup(CanopenComponent *canopen) {
     bool value = bool(light->remote_values.get_state());
     uint8_t brightness = (uint8_t) (light->remote_values.get_brightness() * 255);
     uint16_t colortemp = (uint16_t) (light->remote_values.get_color_temperature());
-    canopen->od_set_state(state_key, &value, 1);
-    canopen->od_set_state(brightness_key, &brightness, 1);
-    canopen->od_set_state(colortemp_key, &colortemp, 2);
+    od_set_state(canopen, state_key, &value, 1);
+    od_set_state(canopen, brightness_key, &brightness, 1);
+    od_set_state(canopen, colortemp_key, &colortemp, 2);
   });
   canopen->od_add_cmd(
       entity_id, [=](void *buffer, uint32_t size) { light->make_call().set_state(((uint8_t *) buffer)[0]).perform(); });
@@ -499,8 +486,8 @@ void CoverEntity::setup(CanopenComponent *canopen) {
              cover->position);
     uint8_t position = uint8_t(cover->position * 255);
     uint8_t state = get_cover_state(cover);
-    canopen->od_set_state(state_key, &state, 1);
-    canopen->od_set_state(pos_key, &position, 1);
+    od_set_state(canopen, state_key, &state, 1);
+    od_set_state(canopen, pos_key, &position, 1);
   });
   canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
     uint8_t cmd = *(uint8_t *) buffer;
@@ -535,7 +522,7 @@ void AlarmEntity::setup(CanopenComponent *canopen) {
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
   alarm->add_on_state_callback([=]() {
     auto state = alarm->get_state();
-    canopen->od_set_state(state_key, &state, 1);
+    od_set_state(canopen, state_key, &state, 1);
   });
 
   canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
@@ -827,16 +814,6 @@ void CanopenComponent::loop() {
   struct timeval tv_now;
   gettimeofday(&tv_now, NULL);
 
-  for (auto it = queued_states.begin(); it != queued_states.end();) {
-    uint32_t diff = (tv_now.tv_sec - it->time.tv_sec) * 1000000 + (tv_now.tv_usec - it->time.tv_usec);
-    if (diff >= state_update_delay_us) {
-      COObjWrValue(it->obj, &node, &it->state, it->size);
-      it = queued_states.erase(it);
-    } else {
-      ++it;
-    }
-  }
-
   if (abs(tv_now.tv_sec - status_time.tv_sec) >= status_update_interval) {
     if (get_can_status(status)) {
       if (status.tx_err > last_status.tx_err || status.rx_err > last_status.rx_err ||
@@ -849,6 +826,14 @@ void CanopenComponent::loop() {
     }
     status_time = tv_now;
   }
+
+  for(int8_t tpdo_nr=0; tpdo_nr<8; tpdo_nr++) {
+    if(dirty_tpdo_mask & (1<<tpdo_nr)) {
+      ESP_LOGD(TAG, "sending dirty tpdo #%d", tpdo_nr);
+      trig_tpdo(tpdo_nr);
+    }
+  }
+  dirty_tpdo_mask = 0;
 
 #ifdef USE_ESP32
 

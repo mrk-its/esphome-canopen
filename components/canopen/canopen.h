@@ -122,6 +122,7 @@ class BaseCanopenEntity {
     this->tpdo = tpdo;
   }
   virtual void setup(CanopenComponent *canopen) = 0;
+  void od_set_state(CanopenComponent *canopen, uint32_t key, void *state, uint8_t size);
 };
 
 #ifdef USE_SENSOR
@@ -231,12 +232,6 @@ struct CanStatus {
   uint32_t bus_err;
 };
 
-struct QueuedState {
-  CO_OBJ_T *obj;
-  uint32_t state;
-  uint8_t size;
-  struct timeval time;
-};
 
 const uint32_t status_update_interval = 1;
 
@@ -253,6 +248,7 @@ class CmdTriggerInt16 : public Trigger<int16_t> {};
 class CmdTriggerInt32 : public Trigger<int32_t> {};
 
 class CanopenComponent : public Component {
+ friend class BaseCanopenEntity;
  protected:
   CO_NODE node;
   uint32_t node_id;
@@ -267,11 +263,11 @@ class CanopenComponent : public Component {
   OperationalTrigger *on_operational = {};
   PreOperationalTrigger *on_pre_operational = {};
 
-  std::vector<QueuedState> queued_states;
   std::vector<BaseCanopenEntity *> entities;
 
-  uint32_t state_update_delay_us = 0;
   uint16_t heartbeat_interval_ms = 0;
+
+  uint8_t dirty_tpdo_mask = 0;
 
   ESPPreferenceObject comm_state;
   bool pdo_od_writer_enabled = true;
@@ -385,7 +381,6 @@ class CanopenComponent : public Component {
   void add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<int32_t> *trigger);
 
   void od_set_string(uint32_t index, uint32_t sub, const char *value);
-  void set_state_update_delay(uint32_t delay_ms);
   void set_heartbeat_interval(uint16_t interval_ms);
   void setup_heartbeat_client(uint8_t subidx, uint8_t node_id, uint16_t timeout_ms);
   int16_t get_heartbeat_events(uint8_t node_id);

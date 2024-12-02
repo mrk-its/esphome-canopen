@@ -120,7 +120,6 @@ CONFIG_SCHEMA = cv.Schema({
         cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(HbConsumerEventTrigger),
     }),
     cv.Optional("pdo_od_writer", default=True): cv.boolean,
-    cv.Optional("state_update_delay", "0ms"): cv.positive_time_period_microseconds,
     cv.Optional("heartbeat_interval", "5000ms"): cv.positive_time_period_milliseconds,
     cv.Optional("heartbeat_clients"): cv.ensure_list(HB_CLIENT_SCHEMA),
     cv.Optional("sw_version"): cv.string,
@@ -157,7 +156,6 @@ def to_code(config):
     canbus = yield cg.get_variable(config["canbus_id"])
     cg.add(canopen.set_canbus(canbus))
 
-    cg.add(canopen.set_state_update_delay(config["state_update_delay"]))
     cg.add(canopen.set_heartbeat_interval(config["heartbeat_interval"]))
     cg.add(canopen.enable_pdo_od_writer(config["pdo_od_writer"]))
     hw_version = config.get("hw_version")
@@ -182,7 +180,7 @@ def to_code(config):
         entity = yield cg.get_variable(entity_config["id"])
         tpdo = entity_config.get("tpdo", -1)
         if not isinstance(tpdo, dict):
-            tpdo = {"number": tpdo, "is_async": True}
+            tpdo = {"number": tpdo, "is_async": False}
 
         tpdo_struct = cg.StructInitializer(TPDO, ("number", tpdo["number"]), ("is_async", tpdo["is_async"]))
 
