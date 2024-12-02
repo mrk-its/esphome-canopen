@@ -190,6 +190,7 @@ void CanopenComponent::od_set_state(uint32_t key, void *state, uint8_t size) {
   if (!size) {
     size = obj->Type->Size(obj, &node, 4);
   }
+  COObjWrValue(obj, &node, state, size);
 }
 
 uint32_t CanopenComponent::od_add_cmd(uint32_t entity_id, std::function<void(void *, uint32_t)> cb,
