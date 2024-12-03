@@ -18,7 +18,7 @@ canopen:
 
 output:
   - platform: template
-    id: output1
+    id: cw_output1
     type: float
     write_action:
       - logger.log:
@@ -26,7 +26,23 @@ output:
           args: ['state']
 
   - platform: template
-    id: output2
+    id: ww_output1
+    type: float
+    write_action:
+      - logger.log:
+          format: "output2: %f"
+          args: ['state']
+
+  - platform: template
+    id: cw_output2
+    type: float
+    write_action:
+      - logger.log:
+          format: "output1: %f"
+          args: ['state']
+
+  - platform: template
+    id: ww_output2
     type: float
     write_action:
       - logger.log:
@@ -34,16 +50,22 @@ output:
           args: ['state']
 
 light:
-  - platform: monochromatic
+  - platform: cwww
     id: light1
-    name: "Test Light 1"
-    output: output1
-    gamma_correct: 1
+    name: "1"
+    cold_white: cw_output1
+    warm_white: ww_output1
+    cold_white_color_temperature: 6536 K
+    warm_white_color_temperature: 2000 K
+    constant_brightness: false
     default_transition_length: 0s
 
-  - platform: monochromatic
+  - platform: cwww
     id: light2
-    name: "Test Light 2"
-    output: output2
-    gamma_correct: 1
+    name: "2"
+    cold_white: cw_output2
+    warm_white: ww_output2
+    cold_white_color_temperature: 6536 K
+    warm_white_color_temperature: 2000 K
+    constant_brightness: false
     default_transition_length: 0s

@@ -19,6 +19,8 @@ canopen:
     - index: 2
       id: light1_brightness
       size: 1
+      min_value: 0.0
+      max_value: 1.0
       rpdo:
         - node_id: 7
           tpdo: 0
@@ -30,16 +32,18 @@ canopen:
       rpdo:
         - node_id: 7
           tpdo: 0
-          offset: 4
+          offset: 3
           cmd: 0
 
     - index: 4
       id: light2_brightness
       size: 1
+      min_value: 0.0
+      max_value: 1.0
       rpdo:
         - node_id: 7
           tpdo: 0
-          offset: 5
+          offset: 4
           cmd: 0
 
 binary_sensor:

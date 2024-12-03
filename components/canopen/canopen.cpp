@@ -224,7 +224,7 @@ void CanopenComponent::od_add_metadata(uint32_t entity_id, uint8_t type, const s
     od.add_update(CO_KEY(index, ENTITY_INDEX_STATE_CLASS, CO_OBJ_D___R_), CO_TSTRING, (CO_DATA) od_string(state_class));
 }
 
-void CanopenComponent::od_add_sensor_metadata(uint32_t entity_id, float min_value, float max_value) {
+void CanopenComponent::od_add_min_max_metadata(uint32_t entity_id, float min_value, float max_value) {
   uint32_t index = ENTITY_INDEX(entity_id);
   // temporary pointers to get rid of aliasing warning
   uint32_t *min_value_ptr = (uint32_t *) &min_value;
@@ -368,8 +368,6 @@ void CanopenComponent::add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<u
 void CanopenComponent::add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<int32_t> *trigger) {
   od_add_cmd(entity_id, [=](void *buffer, uint32_t size) { trigger->trigger(*((int32_t *) buffer)); }, CO_TCMD32);
 }
-
-CO_OBJ_STR ManufacturerDeviceNameObj = {0, (uint8_t *) "ESPHome"};
 
 #ifdef USE_CANOPEN_OTA
 Firmware FirmwareObj;
