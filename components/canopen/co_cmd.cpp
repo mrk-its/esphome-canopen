@@ -2,6 +2,9 @@
 #include "canopen.h"
 #include "co_cmd.h"
 
+namespace esphome {
+namespace canopen {
+
 uint32_t Cmd8Size(CO_OBJ *obj, CO_NODE *node, uint32_t width) {
   const CO_OBJ_TYPE *uint8 = CO_TUNSIGNED8;
   return uint8->Size(obj, node, width);
@@ -97,3 +100,6 @@ CO_ERR Cmd32Write(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
 CO_OBJ_TYPE Cmd32 = {
     Cmd32Size, Cmd32Init, Cmd32Read, Cmd32Write, 0,
 };
+
+}
+}

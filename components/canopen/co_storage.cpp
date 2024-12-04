@@ -2,6 +2,9 @@
 #include "canopen.h"
 #include "co_storage.h"
 
+namespace esphome {
+namespace canopen {
+
 uint32_t StoreCommParamsSize(CO_OBJ *obj, CO_NODE *node, uint32_t width) {
   const CO_OBJ_TYPE *uint32 = CO_TUNSIGNED32;
   return uint32->Size(obj, node, width);
@@ -44,3 +47,5 @@ CO_ERR ResetCommParamsWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t s
 
 CO_OBJ_TYPE ResetCommParams = {ResetCommParamsSize, ResetCommParamsInit, ResetCommParamsRead, ResetCommParamsWrite,
                                NULL};
+}
+}

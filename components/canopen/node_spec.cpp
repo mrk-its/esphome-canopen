@@ -309,6 +309,6 @@ struct CO_NODE_SPEC_T NodeSpec = {
     TmrMem,                       /* pointer to timer memory blocks */
     APP_TMR_N,                    /* number of timer memory blocks  */
     APP_TICKS_PER_SEC,            /* timer clock frequency in Hz    */
-    &ESPHome_CanOpenStack_Driver, /* select drivers for application */
+    &CanOpenStack_Driver, /* select drivers for application */
     SdoSrvMem                     /* SDO Transfer Buffer Memory     */
 };

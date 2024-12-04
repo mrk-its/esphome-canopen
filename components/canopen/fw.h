@@ -1,5 +1,4 @@
-#ifndef FW_H
-#define FW_H
+#pragma once
 
 #include "esphome.h"
 #include "canopen.h"
@@ -7,11 +6,6 @@
 #ifdef USE_CANOPEN_OTA
 
 #include "esphome/components/ota/ota_backend.h"
-
-#ifdef __cplusplus /* for compatibility with C++ environments  */
-
-extern "C" {
-#endif
 
 /******************************************************************************
  * INCLUDES
@@ -43,11 +37,5 @@ CO_ERR FwImageReset(CO_OBJ *obj, CO_NODE *node, uint32_t para);
 const CO_OBJ_TYPE FwImage = {FwImageSize, FwImageInit, 0, FwImageWrite, FwImageReset};
 
 #define FW_IMAGE ((CO_OBJ_TYPE *) &FwImage)
-
-#ifdef __cplusplus /* for compatibility with C++ environments  */
-}
-#endif
-
-#endif
 
 #endif

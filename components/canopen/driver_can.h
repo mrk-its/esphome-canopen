@@ -1,9 +1,13 @@
-#ifndef DRV_CAN_CAN1_H_
-#define DRV_CAN_CAN1_H_
+#pragma once
 
-#ifdef __cplusplus /* for compatibility with C++ environments  */
-extern "C" {
-#endif
+namespace esphome {
+namespace canopen {
+    void DrvCanInit(void);
+    void DrvCanEnable(uint32_t baudrate);
+    int16_t DrvCanSend(CO_IF_FRM *frm);
+    int16_t DrvCanRead(CO_IF_FRM *frm);
+}
+}
 
 /******************************************************************************
  * INCLUDES
@@ -15,11 +19,5 @@ extern "C" {
  * PUBLIC SYMBOLS
  ******************************************************************************/
 
-extern const CO_IF_CAN_DRV ESPHome_CanDriver;
-extern struct CO_IF_DRV_T ESPHome_CanOpenStack_Driver;
-
-#ifdef __cplusplus /* for compatibility with C++ environments  */
-}
-#endif
-
-#endif
+extern const CO_IF_CAN_DRV CanDriver;
+extern struct CO_IF_DRV_T CanOpenStack_Driver;

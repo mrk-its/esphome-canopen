@@ -7,17 +7,17 @@
  * PRIVATE FUNCTIONS
  ******************************************************************************/
 namespace esphome {
-
-extern canopen::CanopenComponent *global_canopen;
+namespace canopen {
+// extern CanopenComponent *global_canopen;
 
 const char *TAG = "can_driver";
 const char *TAG_TM = "timer_driver";
 
 struct timeval timer = {0, 0};
 
-static void DrvCanInit(void) { ESP_LOGI(TAG, "DrvCanInit"); }
+void DrvCanInit(void) { ESP_LOGI(TAG, "DrvCanInit"); }
 
-static void DrvCanEnable(uint32_t baudrate) { ESP_LOGI(TAG, "DrvCanEnable baudrate: %d", baudrate); }
+void DrvCanEnable(uint32_t baudrate) { ESP_LOGI(TAG, "DrvCanEnable baudrate: %d", baudrate); }
 
 char *can_data_str(uint8_t *data, uint8_t len) {
   static char buf[3 * 8 + 1] = "";
@@ -27,7 +27,7 @@ char *can_data_str(uint8_t *data, uint8_t len) {
   return buf;
 }
 
-static int16_t DrvCanSend(CO_IF_FRM *frm) {
+int16_t DrvCanSend(CO_IF_FRM *frm) {
   if (global_canopen) {
     auto len = frm->DLC;
     std::vector<uint8_t> data(frm->Data, frm->Data + len);
@@ -42,7 +42,7 @@ static int16_t DrvCanSend(CO_IF_FRM *frm) {
   }
 }
 
-static int16_t DrvCanRead(CO_IF_FRM *frm) {
+int16_t DrvCanRead(CO_IF_FRM *frm) {
   if (global_canopen->recv_frame.has_value()) {
     *frm = global_canopen->recv_frame.value();
     global_canopen->recv_frame.reset();
@@ -55,9 +55,9 @@ static int16_t DrvCanRead(CO_IF_FRM *frm) {
   return 0;
 }
 
-static void DrvCanReset(void) { ESP_LOGI(TAG, "DrvCanReset"); }
+void DrvCanReset(void) { ESP_LOGI(TAG, "DrvCanReset"); }
 
-static void DrvCanClose(void) { ESP_LOGI(TAG, "DrvCanClose"); }
+void DrvCanClose(void) { ESP_LOGI(TAG, "DrvCanClose"); }
 
 /******************************************************************************
  * PRIVATE FUNCTIONS
@@ -125,14 +125,18 @@ static uint32_t DrvNvmWrite(uint32_t start, uint8_t *buffer, uint32_t size) {
  * PUBLIC VARIABLE
  ******************************************************************************/
 
-const CO_IF_CAN_DRV ESPHome_CanDriver = {DrvCanInit, DrvCanEnable, DrvCanRead, DrvCanSend, DrvCanReset, DrvCanClose};
+const CO_IF_CAN_DRV CanDriver = {DrvCanInit, DrvCanEnable, DrvCanRead, DrvCanSend, DrvCanReset, DrvCanClose};
 
-const CO_IF_TIMER_DRV ESPHome_TimerDriver = {DrvTimerInit, DrvTimerReload, DrvTimerDelay,
+const CO_IF_TIMER_DRV TimerDriver = {DrvTimerInit, DrvTimerReload, DrvTimerDelay,
                                              DrvTimerStop, DrvTimerStart,  DrvTimerUpdate};
 
-const CO_IF_NVM_DRV ESPHome_NvmDriver = {DrvNvmInit, DrvNvmRead, DrvNvmWrite};
+const CO_IF_NVM_DRV NvmDriver = {DrvNvmInit, DrvNvmRead, DrvNvmWrite};
 
+}  // namespace canopen
 }  // namespace esphome
 
-struct CO_IF_DRV_T ESPHome_CanOpenStack_Driver = {&esphome::ESPHome_CanDriver, &esphome::ESPHome_TimerDriver,
-                                                  &esphome::ESPHome_NvmDriver};
+struct CO_IF_DRV_T CanOpenStack_Driver = {
+  &esphome::canopen::CanDriver,
+  &esphome::canopen::TimerDriver,
+  &esphome::canopen::NvmDriver
+};

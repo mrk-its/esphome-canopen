@@ -11,12 +11,7 @@
    limitations under the License.
 ******************************************************************************/
 
-#ifndef CLOCK_SPEC_H_
-#define CLOCK_SPEC_H_
-
-#ifdef __cplusplus /* for compatibility with C++ environments  */
-extern "C" {
-#endif
+#pragma once
 
 /******************************************************************************
  * INCLUDES
@@ -42,9 +37,3 @@ extern struct CO_NODE_SPEC_T NodeSpec;
 extern uint8_t rpdo_buf[CO_RPDO_N][41];
 CO_OBJ *ODFind(CO_OBJ *od, uint32_t key);
 CO_OBJ *ODAddUpdate(CO_OBJ *od, uint32_t key, const CO_OBJ_TYPE *type, CO_DATA data);
-
-#ifdef __cplusplus /* for compatibility with C++ environments  */
-}
-#endif
-
-#endif /* CLOCK_SPEC_H_ */
