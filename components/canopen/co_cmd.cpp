@@ -101,5 +101,5 @@ CO_OBJ_TYPE Cmd32 = {
     Cmd32Size, Cmd32Init, Cmd32Read, Cmd32Write, 0,
 };
 
-}
-}
+}  // namespace canopen
+}  // namespace esphome

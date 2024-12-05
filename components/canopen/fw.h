@@ -13,6 +13,10 @@
 
 #include "co_core.h"
 
+
+namespace esphome {
+namespace canopen {
+
 #pragma pack(push, 1)
 struct Firmware {
   CO_OBJ_DOM domain;
@@ -37,5 +41,6 @@ CO_ERR FwImageReset(CO_OBJ *obj, CO_NODE *node, uint32_t para);
 const CO_OBJ_TYPE FwImage = {FwImageSize, FwImageInit, 0, FwImageWrite, FwImageReset};
 
 #define FW_IMAGE ((CO_OBJ_TYPE *) &FwImage)
-
+}  // namespace canopen
+}  // namespace esphome
 #endif

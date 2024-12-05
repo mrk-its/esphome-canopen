@@ -276,6 +276,5 @@ void AlarmEntity::setup(CanopenComponent *canopen) {
 }
 #endif
 
-}
-
-}
+}  // namespace canopen
+}  // namespace esphome

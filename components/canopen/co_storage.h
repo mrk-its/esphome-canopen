@@ -10,5 +10,5 @@ extern CO_OBJ_TYPE StoreCommParams;
 extern CO_OBJ_TYPE ResetCommParams;
 #define CO_TRESET ((CO_OBJ_TYPE *) &esphome::canopen::ResetCommParams)
 
-}
-}
+}  // namespace canopen
+}  // namespace esphome

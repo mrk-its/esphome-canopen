@@ -177,5 +177,5 @@ class AlarmEntity : public BaseCanopenEntity {
 };
 #endif
 
-}
-}
+}  // namespace canopen
+}  // namespace esphome

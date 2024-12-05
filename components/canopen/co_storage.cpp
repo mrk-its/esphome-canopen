@@ -47,5 +47,5 @@ CO_ERR ResetCommParamsWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t s
 
 CO_OBJ_TYPE ResetCommParams = {ResetCommParamsSize, ResetCommParamsInit, ResetCommParamsRead, ResetCommParamsWrite,
                                NULL};
-}
-}
+}  // namespace canopen
+}  // namespace esphome

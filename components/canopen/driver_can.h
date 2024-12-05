@@ -6,8 +6,8 @@ namespace canopen {
     void DrvCanEnable(uint32_t baudrate);
     int16_t DrvCanSend(CO_IF_FRM *frm);
     int16_t DrvCanRead(CO_IF_FRM *frm);
-}
-}
+}  // namespace canopen
+}  // namespace esphome
 
 /******************************************************************************
  * INCLUDES

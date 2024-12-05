@@ -5,6 +5,9 @@
 
 #define TAG "fw"
 
+namespace esphome {
+namespace canopen {
+
 uint32_t FwCtrlSize(CO_OBJ *obj, CO_NODE *node, uint32_t width) {
   const CO_OBJ_TYPE *uint32 = CO_TUNSIGNED32;
   return uint32->Size(obj, node, width);
@@ -55,11 +58,11 @@ CO_ERR FwImageWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
   CO_ERR result = CO_ERR_TYPE_WR;
   uint32_t address = (uint32_t) domain->Start + domain->Offset;
 
-  if (!esphome::canopen::global_canopen->ota) {
+  if (!global_canopen->ota) {
     ESP_LOGW(TAG, "FwImageWrite, ota not enabled");
     return CO_ERR_NONE;
   }
-  auto ret = esphome::canopen::global_canopen->ota->write((uint8_t *) buffer, size);
+  auto ret = global_canopen->ota->write((uint8_t *) buffer, size);
   if (ret) {
     ESP_LOGE(TAG, "FwImageWrite, ret: %x", ret);
     return CO_ERR_OBJ_WRITE;
@@ -79,7 +82,7 @@ CO_ERR FwImageWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
     }
     ESP_LOGI(TAG, "FwImageWrite: upload complete, md5: %s", buf);
 
-    auto ret = esphome::canopen::global_canopen->ota->end(buf);
+    auto ret = global_canopen->ota->end(buf);
     if (ret) {
       ESP_LOGE(TAG, "FwImageWrite, can't end update, ret: %x", ret);
       return CO_ERR_OBJ_WRITE;
@@ -96,11 +99,11 @@ CO_ERR FwImageReset(CO_OBJ *obj, CO_NODE *node, uint32_t para) {
   if (!firmware->size) {
     return CO_ERR_OBJ_WRITE;
   }
-  if (!esphome::canopen::global_canopen->ota) {
+  if (!global_canopen->ota) {
     ESP_LOGW(TAG, "FwImageReset, ota not enabled");
     return CO_ERR_NONE;
   }
-  auto ret = esphome::canopen::global_canopen->ota->begin(firmware->size);
+  auto ret = global_canopen->ota->begin(firmware->size);
   if (ret) {
     ESP_LOGE(TAG, "FwImageReset, can't start OTA, ret: %x", ret);
     return CO_ERR_OBJ_WRITE;
@@ -109,5 +112,6 @@ CO_ERR FwImageReset(CO_OBJ *obj, CO_NODE *node, uint32_t para) {
 
   return CO_ERR_NONE;
 }
-
+}  // namespace canopen
+}  // namespace esphome
 #endif

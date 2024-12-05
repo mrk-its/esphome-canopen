@@ -4,6 +4,9 @@ packages:
 esphome:
   name: light
 
+ota:
+  - platform: canopen
+
 canopen:
   id: can_open
   canbus_id: can_bus
