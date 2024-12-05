@@ -75,7 +75,7 @@ uint8_t rpdo_buf[CO_RPDO_N][41];
   }
 
 /* define the static object dictionary */
-static struct CO_OBJ_T ClockOD[APP_OBJ_N] = {
+static struct CO_OBJ_T ObjectDictionary[APP_OBJ_N] = {
     {CO_KEY(0x1000, 0, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA) (&Obj1000_00_20)},
     {CO_KEY(0x1001, 0, CO_OBJ_____R_), CO_TUNSIGNED8, (CO_DATA) (&Obj1001_00_08)},
     {CO_KEY(0x100a, 0, CO_OBJ_D___R_), CO_TSTRING, (CO_DATA) 0},
@@ -303,7 +303,7 @@ static CO_EMCY_TBL AppEmcyTbl[APP_ERR_ID_NUM] = {
 struct CO_NODE_SPEC_T NodeSpec = {
     APP_NODE_ID,                  /* default Node-Id                */
     APP_BAUDRATE,                 /* default Baudrate               */
-    ClockOD,                      /* pointer to object dictionary   */
+    ObjectDictionary,             /* pointer to object dictionary   */
     APP_OBJ_N,                    /* object dictionary max length   */
     AppEmcyTbl,                   /* EMCY code & register bit table */
     TmrMem,                       /* pointer to timer memory blocks */
