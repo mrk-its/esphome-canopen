@@ -77,9 +77,39 @@ class CmdTriggerInt8 : public Trigger<int8_t> {};
 class CmdTriggerInt16 : public Trigger<int16_t> {};
 class CmdTriggerInt32 : public Trigger<int32_t> {};
 
+#define APP_BAUDRATE 125000u       /* CAN baudrate                */
+#define APP_TMR_N 16u              /* Number of software timers   */
+#define APP_TICKS_PER_SEC 1000000u /* Timer clock frequency in Hz */
+
+#ifndef APP_OBJ_N
+#define APP_OBJ_N 512u             /* Object dictionary max size  */
+#endif
 
 class CanopenComponent : public Component {
  protected:
+  /* Each software timer needs some memory for managing
+  * the lists and states of the timed action events.
+  */
+  CO_TMR_MEM TmrMem[APP_TMR_N];
+
+  /* Each SDO server needs memory for the segmented or
+  * block transfer requests.
+  */
+  uint8_t SdoSrvMem[CO_SSDO_N * CO_SDO_BUF_BYTE];
+
+  /* Specify the EMCY error codes with the corresponding
+  * error register bit. There is a collection of defines
+  * for the predefined emergency codes CO_EMCY_CODE...
+  * and for the error register bits CO_EMCY_REG... for
+  * readability. You can use plain numbers, too.
+  */
+  CO_EMCY_TBL AppEmcyTbl[APP_ERR_ID_NUM] = {
+      {CO_EMCY_REG_GENERAL, CO_EMCY_CODE_HW_ERR} /* APP_ERR_ID_EEPROM */
+  };
+
+
+  CO_NODE_SPEC_T NodeSpec;
+
   optional<CO_IF_FRM> recv_frame;
   friend class BaseCanopenEntity;
 

@@ -18,6 +18,8 @@ void CONmtHbConsEvent(CO_NMT *nmt, uint8_t nodeId) {
   };
 }
 
+extern struct CO_OBJ_T ObjectDictionary[APP_OBJ_N];
+
 namespace esphome {
 namespace canopen {
 
@@ -40,11 +42,45 @@ void BaseCanopenEntity::od_set_state(CanopenComponent *canopen, uint32_t key, vo
   }
 }
 
+/* Each software timer needs some memory for managing
+ * the lists and states of the timed action events.
+ */
+static CO_TMR_MEM TmrMem[APP_TMR_N];
+
+/* Each SDO server needs memory for the segmented or
+ * block transfer requests.
+ */
+static uint8_t SdoSrvMem[CO_SSDO_N * CO_SDO_BUF_BYTE];
+
+/* Specify the EMCY error codes with the corresponding
+ * error register bit. There is a collection of defines
+ * for the predefined emergency codes CO_EMCY_CODE...
+ * and for the error register bits CO_EMCY_REG... for
+ * readability. You can use plain numbers, too.
+ */
+static CO_EMCY_TBL AppEmcyTbl[APP_ERR_ID_NUM] = {
+    {CO_EMCY_REG_GENERAL, CO_EMCY_CODE_HW_ERR} /* APP_ERR_ID_EEPROM */
+};
+
+
 CanopenComponent::CanopenComponent(uint32_t node_id) {
   ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03x", node_id);
   memset(rpdo_buf, 0, sizeof(rpdo_buf));
   this->node_id = node_id;
-  NodeSpec.NodeId = node_id;
+
+  NodeSpec = {
+    (uint8_t)node_id,                      /* default Node-Id                */
+    APP_BAUDRATE,                 /* default Baudrate               */
+    ObjectDictionary,             /* pointer to object dictionary   */
+    APP_OBJ_N,                    /* object dictionary max length   */
+    AppEmcyTbl,                   /* EMCY code & register bit table */
+    TmrMem,                       /* pointer to timer memory blocks */
+    APP_TMR_N,                    /* number of timer memory blocks  */
+    APP_TICKS_PER_SEC,            /* timer clock frequency in Hz    */
+    &CanOpenStack_Driver, /* select drivers for application */
+    SdoSrvMem                     /* SDO Transfer Buffer Memory     */
+  };
+
   CODictInit(&node.Dict, &node, NodeSpec.Dict, NodeSpec.DictLen);
 
   global_canopen = this;
