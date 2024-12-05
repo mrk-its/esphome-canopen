@@ -18,7 +18,7 @@ void CONmtHbConsEvent(CO_NMT *nmt, uint8_t nodeId) {
   };
 }
 
-extern struct CO_OBJ_T ObjectDictionary[APP_OBJ_N];
+extern struct CO_OBJ_T object_dictionary[APP_OBJ_N];
 
 namespace esphome {
 namespace canopen {
@@ -61,27 +61,81 @@ static uint8_t SdoSrvMem[CO_SSDO_N * CO_SDO_BUF_BYTE];
 static CO_EMCY_TBL AppEmcyTbl[APP_ERR_ID_NUM] = {
     {CO_EMCY_REG_GENERAL, CO_EMCY_CODE_HW_ERR} /* APP_ERR_ID_EEPROM */
 };
+/* allocate variables for dynamic runtime value in RAM */
+static uint8_t Obj1001_00_08 = 0;
+
+/* allocate variables for constant values in FLASH */
+const uint32_t Obj1000_00_20 = 0x00000000L;
+
+const uint32_t Obj1014_00_20 = 0x00000080L;
+
+const uint32_t VENDOR_ID = 0xa59a08f5;
+const uint32_t PRODUCT_CODE = 0x6bdfa1d9;
+const uint32_t REVISION_NUMBER = 0x00000000;
+const uint32_t SERIAL_NUMBER = 0x00000000;
+
+const uint32_t Obj1200_01_20 = CO_COBID_SDO_REQUEST();
+const uint32_t Obj1200_02_20 = CO_COBID_SDO_RESPONSE();
+
+const struct CO_OBJ_T od_header[] = {
+    {CO_KEY(0x1000, 0, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA) (&Obj1000_00_20)},
+    {CO_KEY(0x1001, 0, CO_OBJ_____R_), CO_TUNSIGNED8, (CO_DATA) (&Obj1001_00_08)},
+    {CO_KEY(0x100a, 0, CO_OBJ_D___R_), CO_TSTRING, (CO_DATA) 0},
+    {CO_KEY(0x1010, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 2},
+    {CO_KEY(0x1010, 1, CO_OBJ_D___RW), CO_TSTORE, (CO_DATA) 0},
+    {CO_KEY(0x1010, 2, CO_OBJ_D___RW), CO_TSTORE, (CO_DATA) 0},
+    {CO_KEY(0x1011, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 2},
+    {CO_KEY(0x1011, 1, CO_OBJ_D___RW), CO_TRESET, (CO_DATA) 0},
+    {CO_KEY(0x1011, 2, CO_OBJ_D___RW), CO_TRESET, (CO_DATA) 0},
+
+    {CO_KEY(0x1014, 0, CO_OBJ__N__R_), CO_TEMCY_ID, (CO_DATA) (&Obj1014_00_20)},
+    {CO_KEY(0x1016, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 0x00000000},
+
+    {CO_KEY(0x1018, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) (4)},
+    {CO_KEY(0x1018, 1, CO_OBJ_D___R_), CO_TUNSIGNED32, (CO_DATA) (VENDOR_ID)},
+    {CO_KEY(0x1018, 2, CO_OBJ_D___R_), CO_TUNSIGNED32, (CO_DATA) (PRODUCT_CODE)},
+    {CO_KEY(0x1018, 3, CO_OBJ_D___R_), CO_TUNSIGNED32, (CO_DATA) (REVISION_NUMBER)},
+    {CO_KEY(0x1018, 4, CO_OBJ_D___R_), CO_TUNSIGNED32, (CO_DATA) (SERIAL_NUMBER)},
+
+    {CO_KEY(0x1200, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) (2)},
+    {CO_KEY(0x1200, 1, CO_OBJ__N__R_), CO_TUNSIGNED32, (CO_DATA) (&Obj1200_01_20)},
+    {CO_KEY(0x1200, 2, CO_OBJ__N__R_), CO_TUNSIGNED32, (CO_DATA) (&Obj1200_02_20)},
+};
 
 
-CanopenComponent::CanopenComponent(uint32_t node_id) {
+
+CanopenComponent::CanopenComponent(uint32_t node_id): od(APP_OBJ_N) {
   ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03x", node_id);
   memset(rpdo_buf, 0, sizeof(rpdo_buf));
   this->node_id = node_id;
 
-  NodeSpec = {
-    (uint8_t)node_id,                      /* default Node-Id                */
-    APP_BAUDRATE,                 /* default Baudrate               */
-    ObjectDictionary,             /* pointer to object dictionary   */
-    APP_OBJ_N,                    /* object dictionary max length   */
-    AppEmcyTbl,                   /* EMCY code & register bit table */
-    TmrMem,                       /* pointer to timer memory blocks */
-    APP_TMR_N,                    /* number of timer memory blocks  */
-    APP_TICKS_PER_SEC,            /* timer clock frequency in Hz    */
-    &CanOpenStack_Driver, /* select drivers for application */
-    SdoSrvMem                     /* SDO Transfer Buffer Memory     */
+  for(auto ptr=od_header; ptr<od_header+sizeof(od_header) / sizeof(od_header[0]); ptr++) {
+    od.append(ptr->Key, ptr->Type, ptr->Data);
+  }
+
+  for(int n=0; n<CO_RPDO_N; n++) {
+    od.append(CO_KEY(0x1400 + n, 0, CO_OBJ_____RW), CO_TUNSIGNED8, (CO_DATA) rpdo_buf[n] + 0);
+    od.append(CO_KEY(0x1400 + n, 1, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) rpdo_buf[n] + 1);
+    od.append(CO_KEY(0x1400 + n, 2, CO_OBJ_____RW), CO_TUNSIGNED8, (CO_DATA) rpdo_buf[n] + 5);
+    od.append(CO_KEY(0x1400 + n, 3, CO_OBJ_____RW), CO_TUNSIGNED16, (CO_DATA) rpdo_buf[n] + 6);
   };
 
-  CODictInit(&node.Dict, &node, NodeSpec.Dict, NodeSpec.DictLen);
+  for(int n=0; n<CO_RPDO_N; n++) {
+    od.append(CO_KEY(0x1600 + n, 0, CO_OBJ_____RW), CO_TUNSIGNED8, (CO_DATA) rpdo_buf[n] + 8);
+    od.append(CO_KEY(0x1600 + n, 1, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) rpdo_buf[n] + 9);
+    od.append(CO_KEY(0x1600 + n, 2, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) rpdo_buf[n] + 13);
+    od.append(CO_KEY(0x1600 + n, 3, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) rpdo_buf[n] + 17);
+    od.append(CO_KEY(0x1600 + n, 4, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) rpdo_buf[n] + 21);
+    od.append(CO_KEY(0x1600 + n, 5, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) rpdo_buf[n] + 25);
+    od.append(CO_KEY(0x1600 + n, 6, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) rpdo_buf[n] + 29);
+    od.append(CO_KEY(0x1600 + n, 7, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) rpdo_buf[n] + 33);
+    od.append(CO_KEY(0x1600 + n, 8, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) rpdo_buf[n] + 37);
+  };
+
+  for(int i=0; i<8; i++)
+    od.append(CO_KEY(0x1800 + i, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, 0);
+  for(int i=0; i<8; i++)
+    od.append(CO_KEY(0x1A00 + i, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, 0);
 
   global_canopen = this;
 
@@ -89,7 +143,7 @@ CanopenComponent::CanopenComponent(uint32_t node_id) {
   memset(&last_status, 0, sizeof(last_status));
 
   CO_OBJ_STR *esphome_ver_str = od_string(ESPHOME_VERSION " " + App.get_compilation_time());
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x100a, 0, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) esphome_ver_str);
+  od.add_update(CO_KEY(0x100a, 0, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) esphome_ver_str);
 }
 void CanopenComponent::set_heartbeat_interval(uint16_t interval_ms) { heartbeat_interval_ms = interval_ms; }
 
@@ -149,16 +203,16 @@ void CanopenComponent::od_add_metadata(uint32_t entity_id, uint8_t type, const s
                                        const std::string &device_class, const std::string &unit,
                                        const std::string &state_class) {
   uint32_t index = ENTITY_INDEX(entity_id);
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x2000, entity_id, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) type);
+  od.add_update(CO_KEY(0x2000, entity_id, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) type);
   if (name.size())
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_NAME, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) od_string(name));
+    od.add_update(CO_KEY(index, ENTITY_INDEX_NAME, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) od_string(name));
   if (device_class.size())
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_DEVICE_CLASS, CO_OBJ_____R_), CO_TSTRING,
+    od.add_update(CO_KEY(index, ENTITY_INDEX_DEVICE_CLASS, CO_OBJ_____R_), CO_TSTRING,
                 (CO_DATA) od_string(device_class));
   if (unit.size())
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_UNIT, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) od_string(unit));
+    od.add_update(CO_KEY(index, ENTITY_INDEX_UNIT, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) od_string(unit));
   if (state_class.size())
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_STATE_CLASS, CO_OBJ_D___R_), CO_TSTRING,
+    od.add_update(CO_KEY(index, ENTITY_INDEX_STATE_CLASS, CO_OBJ_D___R_), CO_TSTRING,
                 (CO_DATA) od_string(state_class));
 }
 
@@ -167,9 +221,9 @@ void CanopenComponent::od_add_sensor_metadata(uint32_t entity_id, float min_valu
   // temporary pointers to get rid of aliasing warning
   uint32_t *min_value_ptr = (uint32_t *) &min_value;
   uint32_t *max_value_ptr = (uint32_t *) &max_value;
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_SENSOR_MIN_VALUE, CO_OBJ_D___R_), CO_TUNSIGNED32,
+  od.add_update(CO_KEY(index, ENTITY_INDEX_SENSOR_MIN_VALUE, CO_OBJ_D___R_), CO_TUNSIGNED32,
               (CO_DATA) *min_value_ptr);
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(index, ENTITY_INDEX_SENSOR_MAX_VALUE, CO_OBJ_D___R_), CO_TUNSIGNED32,
+  od.add_update(CO_KEY(index, ENTITY_INDEX_SENSOR_MAX_VALUE, CO_OBJ_D___R_), CO_TUNSIGNED32,
               (CO_DATA) *max_value_ptr);
 }
 
@@ -180,7 +234,7 @@ uint32_t CanopenComponent::od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *t
   uint32_t entity_index = ENTITY_INDEX(entity_id);
 
   uint8_t state_sub_index = 0;
-  auto obj = ODFind(NodeSpec.Dict, CO_DEV(entity_index + 1, 0));
+  auto obj = od.find(CO_DEV(entity_index + 1, 0));
   if (obj)
     state_sub_index = obj->Data;
   state_sub_index += 1;
@@ -188,7 +242,7 @@ uint32_t CanopenComponent::od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *t
   uint32_t value = 0;
   if (state && size)
     memcpy(&value, state, size);
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(entity_index + 1, state_sub_index, pdo_mask | CO_OBJ_D___R_), type, value);
+  od.add_update(CO_KEY(entity_index + 1, state_sub_index, pdo_mask | CO_OBJ_D___R_), type, value);
 
   if (tpdo.number >= 0) {
     od_setup_tpdo(entity_index + 1, state_sub_index, size, tpdo);
@@ -197,17 +251,17 @@ uint32_t CanopenComponent::od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *t
 }
 
 void CanopenComponent::od_setup_tpdo(uint32_t index, uint8_t sub_index, uint8_t size, TPDO &tpdo) {
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo.number, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32,
+  od.add_update(CO_KEY(0x1800 + tpdo.number, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32,
               tpdo.number < 4 ? CO_COBID_TPDO_DEFAULT(tpdo.number) : CO_COBID_TPDO_DEFAULT(tpdo.number - 4) + 0x80);
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + tpdo.number, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 254);
+  od.add_update(CO_KEY(0x1800 + tpdo.number, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 254);
 
   uint8_t tpdo_sub_index = 0;
-  auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1a00 + tpdo.number, 0));
+  auto obj = od.find(CO_DEV(0x1a00 + tpdo.number, 0));
   if (obj)
     tpdo_sub_index = obj->Data;
   tpdo_sub_index += 1;
   uint32_t bits = size * 8;
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1a00 + tpdo.number, tpdo_sub_index, CO_OBJ_D___R_), CO_TUNSIGNED32,
+  od.add_update(CO_KEY(0x1a00 + tpdo.number, tpdo_sub_index, CO_OBJ_D___R_), CO_TUNSIGNED32,
               CO_LINK(index, sub_index, bits));
 }
 
@@ -226,19 +280,19 @@ uint32_t CanopenComponent::od_add_cmd(uint32_t entity_id, std::function<void(voi
   uint32_t index = ENTITY_INDEX(entity_id);
 
   uint8_t max_index = 0;
-  auto obj = ODFind(NodeSpec.Dict, CO_DEV(index + 2, 0));
+  auto obj = od.find(CO_DEV(index + 2, 0));
   if (obj)
     max_index = obj->Data;
   max_index += 1;
 
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(index + 2, max_index, CO_OBJ_D___RW), type, (CO_DATA) 0);
+  od.add_update(CO_KEY(index + 2, max_index, CO_OBJ_D___RW), type, (CO_DATA) 0);
   auto key = CO_KEY(index + 2, max_index, 0);
   can_cmd_handlers[key] = cb;
   return key;
 }
 
 void CanopenComponent::rpdo_map_append(uint8_t idx, uint32_t index, uint8_t sub, uint8_t bit_size) {
-  auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1600 + idx, 0));
+  auto obj = od.find(CO_DEV(0x1600 + idx, 0));
   if (!obj) {
     ESP_LOGE(TAG, "RPDO map %d not found", idx);
     return;
@@ -270,7 +324,7 @@ void CanopenComponent::add_rpdo_dummy(uint8_t idx, uint8_t size) {
   }
 }
 void CanopenComponent::add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo) {
-  auto obj = ODFind(NodeSpec.Dict, CO_DEV(0x1400 + idx, 0));
+  auto obj = od.find(CO_DEV(0x1400 + idx, 0));
   if (!obj) {
     ESP_LOGE(TAG, "RPDO param %d not found", idx);
     return;
@@ -330,14 +384,14 @@ CO_OBJ_DOM FirmwareMD5 = {
 #endif
 
 void CanopenComponent::setup_csdo(uint8_t num, uint8_t node_id, uint32_t tx_id, uint32_t rx_id) {
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1280 + num, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, 0);
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1280 + num, 1, CO_OBJ_D___R_), CO_TUNSIGNED32, tx_id);
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1280 + num, 2, CO_OBJ_D___R_), CO_TUNSIGNED32, rx_id);
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1280 + num, 3, CO_OBJ_D___R_), CO_TUNSIGNED8, node_id);
+  od.add_update(CO_KEY(0x1280 + num, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, 0);
+  od.add_update(CO_KEY(0x1280 + num, 1, CO_OBJ_D___R_), CO_TUNSIGNED32, tx_id);
+  od.add_update(CO_KEY(0x1280 + num, 2, CO_OBJ_D___R_), CO_TUNSIGNED32, rx_id);
+  od.add_update(CO_KEY(0x1280 + num, 3, CO_OBJ_D___R_), CO_TUNSIGNED8, node_id);
 }
 
 void CanopenComponent::od_set_string(uint32_t index, uint32_t sub, const char *value) {
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(index, sub, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) od_string(value));
+  od.add_update(CO_KEY(index, sub, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) od_string(value));
 }
 
 float CanopenComponent::get_setup_priority() const { return setup_priority::PROCESSOR; }
@@ -360,30 +414,43 @@ void CanopenComponent::setup() {
   }
 
   if (heartbeat_interval_ms) {
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1017, 0, CO_OBJ_D___RW), CO_THB_PROD, (CO_DATA) (heartbeat_interval_ms));
+    od.add_update(CO_KEY(0x1017, 0, CO_OBJ_D___RW), CO_THB_PROD, (CO_DATA) (heartbeat_interval_ms));
   }
 
   // manufacturer device name
   od_set_string(0x1008, 0, App.get_name().c_str());
 
   for (uint8_t i = 0; i < 8; i++) {
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + i, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32,
+    od.add_update(CO_KEY(0x1800 + i, 1, CO_OBJ_DN__R_), CO_TUNSIGNED32,
                 i < 4 ? CO_COBID_TPDO_DEFAULT(i) : CO_COBID_TPDO_DEFAULT(i - 4) + 0x80);
-    ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1800 + i, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 254);
+    od.add_update(CO_KEY(0x1800 + i, 2, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 254);
   }
 
 #ifdef USE_CANOPEN_OTA
   FirmwareObj.domain.Size = 1024 * 1024;
 
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 1, CO_OBJ_D____W), FW_CTRL, (CO_DATA) 0);
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 2, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) (&FirmwareObj.size));
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 3, CO_OBJ______W), CO_TDOMAIN, (CO_DATA) (&FirmwareMD5));
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x3000, 4, CO_OBJ______W), FW_IMAGE, (CO_DATA) (&FirmwareObj));
+  od.add_update(CO_KEY(0x3000, 1, CO_OBJ_D____W), FW_CTRL, (CO_DATA) 0);
+  od.add_update(CO_KEY(0x3000, 2, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) (&FirmwareObj.size));
+  od.add_update(CO_KEY(0x3000, 3, CO_OBJ______W), CO_TDOMAIN, (CO_DATA) (&FirmwareMD5));
+  od.add_update(CO_KEY(0x3000, 4, CO_OBJ______W), FW_IMAGE, (CO_DATA) (&FirmwareObj));
 #endif
 
   for (auto it = entities.begin(); it != entities.end(); it++) {
     (*it)->setup(this);
   }
+
+  CO_NODE_SPEC_T NodeSpec = {
+    (uint8_t)node_id,                      /* default Node-Id                */
+    APP_BAUDRATE,                 /* default Baudrate               */
+    &*od.od.begin(),             /* pointer to object dictionary   */
+    APP_OBJ_N,                    /* object dictionary max length   */
+    AppEmcyTbl,                   /* EMCY code & register bit table */
+    TmrMem,                       /* pointer to timer memory blocks */
+    APP_TMR_N,                    /* number of timer memory blocks  */
+    APP_TICKS_PER_SEC,            /* timer clock frequency in Hz    */
+    &CanOpenStack_Driver, /* select drivers for application */
+    SdoSrvMem                     /* SDO Transfer Buffer Memory     */
+  };
 
   CONodeInit(&node, &NodeSpec);
   auto err = CONodeGetErr(&node);
@@ -408,12 +475,12 @@ void CanopenComponent::set_pre_operational_mode() {
 void CanopenComponent::set_operational_mode() {
   // update dictionary size
   // as new entries may have been added on pre_operational phase
-  CODictInit(&node.Dict, &node, NodeSpec.Dict, NodeSpec.DictLen);
+  node.Dict.Num = od.od.size();
   CONmtSetMode(&node.Nmt, CO_OPERATIONAL);
 
   ESP_LOGD(TAG, "############# Object Dictionary #############");
   uint16_t index = 0;
-  for (auto od = node.Dict.Root; index < NodeSpec.DictLen && (od->Key != 0);) {
+  for (auto od = node.Dict.Root; index < node.Dict.Num;) {
     uint32_t value = od->Key & CO_OBJ_D_____ ? od->Data : (*(uint32_t *) od->Data);
     if (od->Type && od->Type->Size) {
       auto size = od->Type->Size(od, &node, 4);
@@ -545,7 +612,7 @@ void CanopenComponent::setup_heartbeat_client(uint8_t subidx, uint8_t node_id, u
   memset(thb_cons, 0, sizeof(CO_HBCONS));
   thb_cons->Time = timeout_ms;
   thb_cons->NodeId = node_id;
-  ODAddUpdate(NodeSpec.Dict, CO_KEY(0x1016, subidx, CO_OBJ_____RW), CO_THB_CONS, (CO_DATA) thb_cons);
+  od.add_update(CO_KEY(0x1016, subidx, CO_OBJ_____RW), CO_THB_CONS, (CO_DATA) thb_cons);
 }
 
 void CanopenComponent::loop() {

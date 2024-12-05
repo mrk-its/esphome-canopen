@@ -10,7 +10,6 @@ using namespace esphome;
 #include <driver/twai.h>
 #include <sstream>
 
-#include "node_spec.h"
 #include "co_if.h"
 #include "co_cmd.h"
 

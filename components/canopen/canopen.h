@@ -2,6 +2,7 @@
 
 #include "entities.h"
 #include "driver_can.h"
+#include "od.h"
 
 const int8_t ENTITY_TYPE_DISABLED = 0;
 const int8_t ENTITY_TYPE_SENSOR = 1;
@@ -85,6 +86,11 @@ class CmdTriggerInt32 : public Trigger<int32_t> {};
 #define APP_OBJ_N 512u             /* Object dictionary max size  */
 #endif
 
+enum EMCY_CODES {
+  APP_ERR_ID_EEPROM = 0,
+  APP_ERR_ID_NUM /* number of EMCY error codes in application */
+};
+
 class CanopenComponent : public Component {
  protected:
   /* Each software timer needs some memory for managing
@@ -107,8 +113,9 @@ class CanopenComponent : public Component {
       {CO_EMCY_REG_GENERAL, CO_EMCY_CODE_HW_ERR} /* APP_ERR_ID_EEPROM */
   };
 
+  uint8_t rpdo_buf[CO_RPDO_N][41];
 
-  CO_NODE_SPEC_T NodeSpec;
+  ObjectDictionary od;
 
   optional<CO_IF_FRM> recv_frame;
   friend class BaseCanopenEntity;
