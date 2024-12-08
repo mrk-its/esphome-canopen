@@ -18,7 +18,7 @@ CO_ERR StoreCommParamsRead(struct CO_OBJ_T *obj, struct CO_NODE_T *node, void *b
 
 CO_ERR StoreCommParamsWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
   if (size == 4 && *(uint32_t *) buffer == 0x65766173) {
-    global_canopen->store_comm_params();
+    ((CanopenNode *)node)->canopen->store_comm_params();
     return CO_ERR_NONE;
   }
   return CO_ERR_OBJ_WRITE;
@@ -39,7 +39,7 @@ CO_ERR ResetCommParamsRead(struct CO_OBJ_T *obj, struct CO_NODE_T *node, void *b
 
 CO_ERR ResetCommParamsWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
   if (size == 4 && *(uint32_t *) buffer == 0x64616F6C) {
-    global_canopen->reset_comm_params();
+    ((CanopenNode *)node)->canopen->reset_comm_params();
     return CO_ERR_NONE;
   }
   return CO_ERR_OBJ_WRITE;

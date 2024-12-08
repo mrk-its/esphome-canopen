@@ -6,20 +6,25 @@ esphome:
 
 ota:
   - platform: canopen
+    canopen_id: can_open
 
 canopen:
-  id: can_open
-  canbus_id: can_bus
-  node_id: 7
-  entities:
-    - index: 1
-      id: light1
-      tpdo: 0
-  
-    - index: 2
-      id: light2
-      tpdo: 0
-  
+  - id: can_open
+    canbus_id: can_bus
+    node_id: 7
+    entities:
+      - index: 1
+        id: light1
+        tpdo: 0
+
+  - id: can_open2
+    canbus_id: can_bus
+    node_id: 77
+    entities:
+      - index: 1
+        id: light2
+        tpdo: 0
+
 output:
   - platform: template
     id: output1
@@ -28,7 +33,7 @@ output:
       - logger.log:
           format: "output1: %f"
           args: ['state']
-          
+
   - platform: template
     id: output2
     type: float
@@ -51,3 +56,19 @@ light:
     output: output2
     gamma_correct: 1
     default_transition_length: 0s
+
+binary_sensor:
+  - platform: gpio
+    name: "Boot Button"
+    id: boot_button
+    pin:
+      number: GPIO9
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    on_press:
+      then:
+        - lambda: |-
+            id(can_open).send_entity_cmd(7, 1, true);
+            id(can_open).send_entity_cmd(77, 1, true);

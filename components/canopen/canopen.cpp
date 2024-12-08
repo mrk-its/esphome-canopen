@@ -13,8 +13,9 @@ void esp_log(const char *tag, const char *fmt, ...) {
 }
 
 void CONmtHbConsEvent(CO_NMT *nmt, uint8_t nodeId) {
-  if (esphome::canopen::global_canopen && esphome::canopen::global_canopen->on_hb_cons_event) {
-    esphome::canopen::global_canopen->on_hb_cons_event->trigger(nodeId);
+  auto trigger = ((esphome::canopen::CanopenNode *)nmt->Node)->canopen->on_hb_cons_event;
+  if (trigger) {
+    trigger->trigger(nodeId);
   };
 }
 
@@ -23,7 +24,8 @@ extern struct CO_OBJ_T object_dictionary[APP_OBJ_N];
 namespace esphome {
 namespace canopen {
 
-CanopenComponent *global_canopen = 0;
+std::vector<CanopenComponent *> all_instances;
+CanopenComponent *current_canopen = 0;
 
 // use last RPDO for od_writer
 const uint32_t OD_WRITER_COB_ID_BASE = CO_COBID_RPDO_DEFAULT(3);
@@ -106,6 +108,11 @@ const struct CO_OBJ_T od_header[] = {
 
 CanopenComponent::CanopenComponent(uint32_t node_id): od(APP_OBJ_N) {
   ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03x", node_id);
+  canopen_node.canopen = this;
+  node = &canopen_node.node;
+
+  recv_frames.reserve(3);
+
   memset(rpdo_buf, 0, sizeof(rpdo_buf));
   this->node_id = node_id;
 
@@ -137,8 +144,6 @@ CanopenComponent::CanopenComponent(uint32_t node_id): od(APP_OBJ_N) {
   for(int i=0; i<8; i++)
     od.append(CO_KEY(0x1A00 + i, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, 0);
 
-  global_canopen = this;
-
   memset(&status, 0, sizeof(status));
   memset(&last_status, 0, sizeof(last_status));
 
@@ -147,38 +152,44 @@ CanopenComponent::CanopenComponent(uint32_t node_id): od(APP_OBJ_N) {
 }
 void CanopenComponent::set_heartbeat_interval(uint16_t interval_ms) { heartbeat_interval_ms = interval_ms; }
 
-void CanopenComponent::parse_od_writer_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
-  if((can_id & ~0x7f) == OD_WRITER_COB_ID_BASE && data.size() > 4 && data[0] == this -> node_id) {
-    uint32_t key = ((uint32_t *)&data[0])[0] >> 8;
-    uint32_t value = ((uint32_t *)&data[0])[1];
+void CanopenComponent::parse_od_writer_frame(CO_IF_FRM *frm) {
+  if((frm->Identifier & ~0x7f) == OD_WRITER_COB_ID_BASE && frm->DLC > 4 && frm->Data[0] == this -> node_id) {
+    uint32_t key = ((uint32_t *)frm->Data)[0] >> 8;
+    uint32_t value = ((uint32_t *)frm->Data)[1];
     uint32_t index = key >> 8;
     uint8_t subindex = (uint8_t)(key & 0xff);
 
-    if(data.size() == 5) {
+    if(frm->DLC == 5) {
       value = value & 0xff;
-    } else if(data.size() == 6) {
+    } else if(frm->DLC == 6) {
       value = value & 0xffff;
-    } else if(data.size() == 7) {
+    } else if(frm->DLC == 7) {
       value = value & 0xffffff;
     }
-    ESP_LOGI(TAG, "cmd from: %02x key: %06x value: %08x", can_id & 0x7f, key, value);
-    auto obj = CODictFind(&node.Dict, (key << 8));
+    ESP_LOGI(TAG, "cmd from: %02x key: %06x value: %08x", frm->Identifier & 0x7f, key, value);
+    auto obj = CODictFind(&node->Dict, (key << 8));
     if (!obj) {
       ESP_LOGW(TAG, "Can't find object at %04x %02x", index, subindex);
       return;
     }
-    if(COObjWrValue(obj, &node, &data[4], data.size() - 4) != CO_ERR_NONE) {
-      ESP_LOGW(TAG, "Can't write %d bytes to %04x %02x", data.size() - 4, index, subindex);
+    if(COObjWrValue(obj, node, frm->Data + 4, frm->DLC - 4) != CO_ERR_NONE) {
+      ESP_LOGW(TAG, "Can't write %d bytes to %04x %02x", frm->DLC - 4, index, subindex);
     }
   }
 }
 
 void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
-  recv_frame = {{can_id, {}, (uint8_t) data.size()}};
-  memcpy(recv_frame.value().Data, &data[0], data.size());
-  CONodeProcess(&node);
+  CO_IF_FRM frame = {can_id, {}, (uint8_t) data.size()};
+  memcpy(frame.Data, &data[0], data.size());
+  recv_frames.push_back(frame);
+  // this assumes single-threded ESPHome callbacks
+  current_canopen = this;
+
+  CONodeProcess(node);
   if(pdo_od_writer_enabled)
-    parse_od_writer_frame(can_id, rtr, data);
+    parse_od_writer_frame(&frame);
+
+  current_canopen = 0;
 }
 
 void CanopenComponent::set_canbus(canbus::Canbus *canbus) {
@@ -266,13 +277,13 @@ void CanopenComponent::od_setup_tpdo(uint32_t index, uint8_t sub_index, uint8_t 
 }
 
 void CanopenComponent::od_set_state(uint32_t key, void *state, uint8_t size) {
-  auto obj = CODictFind(&node.Dict, key);
+  auto obj = CODictFind(&node->Dict, key);
   if (!obj)
     return;
   if (!size) {
-    size = obj->Type->Size(obj, &node, 4);
+    size = obj->Type->Size(obj, node, 4);
   }
-  COObjWrValue(obj, &node, state, size);
+  COObjWrValue(obj, node, state, size);
 }
 
 uint32_t CanopenComponent::od_add_cmd(uint32_t entity_id, std::function<void(void *, uint32_t)> cb,
@@ -397,6 +408,8 @@ void CanopenComponent::od_set_string(uint32_t index, uint32_t sub, const char *v
 float CanopenComponent::get_setup_priority() const { return setup_priority::PROCESSOR; }
 
 void CanopenComponent::setup() {
+  all_instances.push_back(this);
+  current_canopen=this;
   ESP_LOGCONFIG(TAG, "Setting up CANopen...");
   ESP_LOGD(TAG, "CO_TPDO_N: %d", CO_TPDO_N);
   ESP_LOGD(TAG, "CO_RPDO_N: %d", CO_RPDO_N);
@@ -452,18 +465,21 @@ void CanopenComponent::setup() {
     SdoSrvMem                     /* SDO Transfer Buffer Memory     */
   };
 
-  CONodeInit(&node, &NodeSpec);
-  auto err = CONodeGetErr(&node);
+  CONodeInit(node, &NodeSpec);
+  auto err = CONodeGetErr(node);
   if (err != CO_ERR_NONE) {
     ESP_LOGE(TAG, "canopen init error: %d", err);
   }
 
-  CONodeStart(&node);
+  CONodeStart(node);
   set_pre_operational_mode();
 }
 
 void CanopenComponent::set_pre_operational_mode() {
-  CONmtSetMode(&node.Nmt, CO_PREOP);
+  current_canopen=this;
+  CONmtSetMode(&node->Nmt, CO_PREOP);
+  current_canopen=0;
+
   ESP_LOGI(TAG, "node is pre_operational");
   if (on_pre_operational) {
     on_pre_operational->trigger();
@@ -473,17 +489,19 @@ void CanopenComponent::set_pre_operational_mode() {
 }
 
 void CanopenComponent::set_operational_mode() {
+  current_canopen=this;
   // update dictionary size
   // as new entries may have been added on pre_operational phase
-  node.Dict.Num = od.od.size();
-  CONmtSetMode(&node.Nmt, CO_OPERATIONAL);
+  node->Dict.Num = od.od.size();
+  CONmtSetMode(&node->Nmt, CO_OPERATIONAL);
+  current_canopen=0;
 
   ESP_LOGD(TAG, "############# Object Dictionary #############");
   uint16_t index = 0;
-  for (auto od = node.Dict.Root; index < node.Dict.Num;) {
+  for (auto od = node->Dict.Root; index < node->Dict.Num;) {
     uint32_t value = od->Key & CO_OBJ_D_____ ? od->Data : (*(uint32_t *) od->Data);
     if (od->Type && od->Type->Size) {
-      auto size = od->Type->Size(od, &node, 4);
+      auto size = od->Type->Size(od, node, 4);
       if (size == 1)
         value &= 0xff;
       else if (size == 2)
@@ -502,11 +520,13 @@ void CanopenComponent::set_operational_mode() {
 }
 
 void CanopenComponent::trig_tpdo(int8_t num) {
+  current_canopen = this;
   for (auto tpdo = 0; tpdo < CO_TPDO_N; tpdo++) {
-    if (node.TPdo[tpdo].ObjNum > 0 && (num < 0 || tpdo == num)) {
-      COTPdoTrigPdo(node.TPdo, tpdo);
+    if (node->TPdo[tpdo].ObjNum > 0 && (num < 0 || tpdo == num)) {
+      COTPdoTrigPdo(node->TPdo, tpdo);
     }
   }
+  current_canopen = 0;
 }
 
 bool CanopenComponent::remote_entity_write_od(uint8_t node_id, uint32_t index, uint8_t subindex, void *data, uint8_t size) {
@@ -515,31 +535,43 @@ bool CanopenComponent::remote_entity_write_od(uint8_t node_id, uint32_t index, u
   }
   if(node_id == this->node_id) {
     uint32_t key = CO_KEY(index, subindex, 0);
-    auto obj = CODictFind(&node.Dict, (key << 8));
+    auto obj = CODictFind(&node->Dict, key);
     if (!obj) {
       ESP_LOGW(TAG, "Can't find object at %04x %02x", index, subindex);
       return false;
     }
-    auto result = COObjWrValue(obj, &node, data, size);
+    auto result = COObjWrValue(obj, node, data, size);
     if(result != CO_ERR_NONE) {
       ESP_LOGW(TAG, "Can't write %d bytes to %04x %02x", size, index, subindex);
     }
   }
-  uint8_t buffer[8] = {node_id, subindex, (uint8_t)(index & 0xff), (uint8_t)((index >> 8) & 0xff)};
-  memcpy(buffer + 4, data, size);
-  std::vector<uint8_t> _data(buffer, buffer + 4 + size);
-  canbus->send_data(OD_WRITER_COB_ID_BASE | node_id, false, _data);
+
+  CO_IF_FRM frame = {OD_WRITER_COB_ID_BASE | node_id, {}, (uint8_t)(size + 4)};
+  frame.Data[0] = node_id;
+  frame.Data[1] = subindex;
+  frame.Data[2] = (uint8_t)(index & 0xff);
+  frame.Data[3] = (uint8_t)((index >> 8) & 0xff);
+  memcpy(frame.Data + 4, data, size);
+
+  current_canopen = this;
+  node->If.Drv->Can->Send(&frame);
+  current_canopen = 0;
+
+  // uint8_t buffer[8] = {node_id, subindex, (uint8_t)(index & 0xff), (uint8_t)((index >> 8) & 0xff)};
+  // memcpy(buffer + 4, data, size);
+  // std::vector<uint8_t> _data(buffer, buffer + 4 + size);
+  // canbus->send_data(OD_WRITER_COB_ID_BASE | node_id, false, _data);
   return true;
 }
 
 void CanopenComponent::csdo_recv(uint8_t num, uint32_t key, std::function<void(uint32_t, uint32_t)> cb) {
-  static auto csdo0 = COCSdoFind(&node, 0);
+  static auto csdo0 = COCSdoFind(node, 0);
   if (!csdo0) {
     return cb(0, -1);
   }
   static uint32_t buffers[CO_CSDO_N];
   static std::function<void(uint32_t, uint32_t)> callbacks[CO_CSDO_N];
-  auto csdo = COCSdoFind(&node, num);
+  auto csdo = COCSdoFind(node, num);
   if (csdo) {
     buffers[num] = 0;
     callbacks[num] = cb;
@@ -557,7 +589,7 @@ void CanopenComponent::csdo_recv(uint8_t num, uint32_t key, std::function<void(u
 }
 
 void CanopenComponent::csdo_send_data(uint8_t num, uint32_t key, uint8_t *data, uint8_t len) {
-  auto csdo = COCSdoFind(&node, num);
+  auto csdo = COCSdoFind(node, num);
   if (csdo) {
     auto ret = COCSdoRequestDownload(
         csdo, key, data, len,
@@ -605,7 +637,7 @@ void CanopenComponent::reset_comm_params() {
   ESP_LOGI(TAG, "Reseted communication params in NVM");
 }
 
-int16_t CanopenComponent::get_heartbeat_events(uint8_t node_id) { return CONmtGetHbEvents(&node.Nmt, node_id); }
+int16_t CanopenComponent::get_heartbeat_events(uint8_t node_id) { return CONmtGetHbEvents(&node->Nmt, node_id); }
 
 void CanopenComponent::setup_heartbeat_client(uint8_t subidx, uint8_t node_id, uint16_t timeout_ms) {
   CO_HBCONS *thb_cons = new CO_HBCONS;
@@ -616,8 +648,26 @@ void CanopenComponent::setup_heartbeat_client(uint8_t subidx, uint8_t node_id, u
 }
 
 void CanopenComponent::loop() {
-  COTmrService(&node.Tmr);
-  COTmrProcess(&node.Tmr);
+  ESP_LOGVV(TAG, "loop start, node_id: %d", node_id);
+  current_canopen = this;
+  COTmrService(&node->Tmr);
+  COTmrProcess(&node->Tmr);
+
+  while(recv_frames.size() > 0) {
+    if(pdo_od_writer_enabled)
+      parse_od_writer_frame(&recv_frames[0]);
+    CONodeProcess(node);
+  }
+
+  current_canopen = 0;
+
+  for(int8_t tpdo_nr=0; tpdo_nr<8; tpdo_nr++) {
+    if(dirty_tpdo_mask & (1<<tpdo_nr)) {
+      ESP_LOGD(TAG, "sending dirty tpdo #%d", tpdo_nr);
+      trig_tpdo(tpdo_nr);
+    }
+  }
+  dirty_tpdo_mask = 0;
 
   struct timeval tv_now;
   gettimeofday(&tv_now, NULL);
@@ -634,14 +684,6 @@ void CanopenComponent::loop() {
     }
     status_time = tv_now;
   }
-
-  for(int8_t tpdo_nr=0; tpdo_nr<8; tpdo_nr++) {
-    if(dirty_tpdo_mask & (1<<tpdo_nr)) {
-      ESP_LOGD(TAG, "sending dirty tpdo #%d", tpdo_nr);
-      trig_tpdo(tpdo_nr);
-    }
-  }
-  dirty_tpdo_mask = 0;
 
 #ifdef USE_ESP32
 
@@ -682,6 +724,7 @@ void CanopenComponent::loop() {
     }
   }
 #endif
+  ESP_LOGVV(TAG, "loop end, node_id: %d", node_id);
 }
 }  // namespace canopen
 }  // namespace esphome

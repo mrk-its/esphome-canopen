@@ -8,12 +8,9 @@
  ******************************************************************************/
 namespace esphome {
 namespace canopen {
-// extern CanopenComponent *global_canopen;
 
 const char *TAG = "can_driver";
 const char *TAG_TM = "timer_driver";
-
-struct timeval timer = {0, 0};
 
 void DrvCanInit(void) { ESP_LOGI(TAG, "DrvCanInit"); }
 
@@ -28,24 +25,35 @@ char *can_data_str(uint8_t *data, uint8_t len) {
 }
 
 int16_t DrvCanSend(CO_IF_FRM *frm) {
-  if (global_canopen) {
-    auto len = frm->DLC;
-    std::vector<uint8_t> data(frm->Data, frm->Data + len);
-    ESP_LOGV(TAG, "DrvCanSend id: %03x, len: %d, data:%s", frm->Identifier, len, can_data_str(frm->Data, len));
-
-    if (global_canopen->canbus) {
-      global_canopen->canbus->send_data(frm->Identifier, false, data);
-    }
-    return 0;
-  } else {
+  if(!current_canopen) {
+    ESP_LOGW(TAG, "no current canopen instance set");
     return -1;
   }
+  ESP_LOGV(TAG, "DrvCanSend id: %03x, len: %d, data:%s", frm->Identifier, frm->DLC, can_data_str(frm->Data, frm->DLC));
+
+  for(auto it=all_instances.begin(); it < all_instances.end(); it++)
+    if(*it != current_canopen) {
+      // loopback to peer node
+      (*it)->recv_frames.push_back(*frm);
+    }
+
+  std::vector<uint8_t> data(frm->Data, frm->Data + frm->DLC);
+
+  if (current_canopen->canbus) {
+    current_canopen->canbus->send_data(frm->Identifier, false, data);
+  }
+  return 0;
 }
 
 int16_t DrvCanRead(CO_IF_FRM *frm) {
-  if (global_canopen->recv_frame.has_value()) {
-    *frm = global_canopen->recv_frame.value();
-    global_canopen->recv_frame.reset();
+  if(!current_canopen) {
+    ESP_LOGW(TAG, "no current canopen instance set");
+    return 0;
+  }
+  if (current_canopen->recv_frames.size()>0) {
+    auto it = current_canopen->recv_frames.begin();
+    *frm = *it;
+    current_canopen->recv_frames.erase(it);
     ESP_LOGV(TAG, "DrvCanRead id: %03x, len: %d, data:%s", frm->Identifier, frm->DLC,
              can_data_str(frm->Data, frm->DLC));
     return sizeof(CO_IF_FRM);
@@ -63,15 +71,27 @@ void DrvCanClose(void) { ESP_LOGI(TAG, "DrvCanClose"); }
  * PRIVATE FUNCTIONS
  ******************************************************************************/
 
-static void DrvTimerInit(uint32_t freq) { ESP_LOGV(TAG_TM, "DrvTimerInit, freq: %d", freq); }
+void DrvTimerInit(uint32_t freq) {
+  if(!current_canopen) {
+    ESP_LOGW(TAG_TM, "no current canopen instance set");
+    return;
+  }
+  current_canopen->timer.tv_sec = current_canopen->timer.tv_usec = 0;
+  ESP_LOGV(TAG_TM, "DrvTimerInit, freq: %d", freq);
+}
 
-static void DrvTimerStart(void) {
-  ESP_LOGV(TAG_TM, "DrvTimerStart");
+void DrvTimerStart(void) {
+  ESP_LOGV(TAG_TM, "DrvTimerStart, node_id: %d", current_canopen->node_id);
   /* start the hardware timer counting */
 }
 
-static uint8_t DrvTimerUpdate(void) {
-  if (!timer.tv_sec && !timer.tv_usec) {
+uint8_t DrvTimerUpdate(void) {
+  if(!current_canopen) {
+    ESP_LOGW(TAG_TM, "no current canopen instance set");
+    return 0;
+  }
+
+  if (!current_canopen->timer.tv_sec && !current_canopen->timer.tv_usec) {
     // timer is stopped
     return 0;
   }
@@ -79,33 +99,47 @@ static uint8_t DrvTimerUpdate(void) {
   struct timeval tv_now;
   gettimeofday(&tv_now, NULL);
 
-  int32_t dt = (timer.tv_sec - tv_now.tv_sec) * 1000000 + (timer.tv_usec - tv_now.tv_usec);
-  ESP_LOGVV(TAG_TM, "DrvTimerUpdate %d", dt);
+  int32_t dt = (current_canopen->timer.tv_sec - tv_now.tv_sec) * 1000000 + (current_canopen->timer.tv_usec - tv_now.tv_usec);
+  ESP_LOGVV(TAG_TM, "DrvTimerUpdate node_id: %d, %d", current_canopen->node_id, dt);
   return dt > 0 ? 0 : 1;
 }
 
-static uint32_t DrvTimerDelay(void) {
+uint32_t DrvTimerDelay(void) {
+  if(!current_canopen) {
+    ESP_LOGW(TAG_TM, "no current canopen instance set");
+    return 0;
+  }
+
   struct timeval tv_now;
   gettimeofday(&tv_now, NULL);
 
-  int32_t dt = (timer.tv_sec - tv_now.tv_sec) * 1000000 + (timer.tv_usec - tv_now.tv_usec);
-  ESP_LOGV(TAG_TM, "DrvTimerDelay: %d", dt);
+  int32_t dt = (current_canopen->timer.tv_sec - tv_now.tv_sec) * 1000000 + (current_canopen->timer.tv_usec - tv_now.tv_usec);
+  ESP_LOGV(TAG_TM, "DrvTimerDelay node_id: %d delay: %d", current_canopen->node_id, dt);
 
   /* return remaining ticks until interrupt occurs */
   return (uint32_t) (dt > 0 ? dt : 0);
 }
 
-static void DrvTimerReload(uint32_t reload) {
-  /* configure the next hardware timer interrupt */
-  ESP_LOGV(TAG_TM, "DrvTimerReload %d", reload);
+void DrvTimerReload(uint32_t reload) {
+  if(!current_canopen) {
+    ESP_LOGW(TAG_TM, "no current canopen instance set");
+    return;
+  }
 
-  gettimeofday(&timer, NULL);
-  timer.tv_usec += reload;
+  /* configure the next hardware timer interrupt */
+  ESP_LOGV(TAG_TM, "DrvTimerReload node_id: %d, %d", current_canopen->node_id, reload);
+
+  gettimeofday(&current_canopen->timer, NULL);
+  current_canopen->timer.tv_usec += reload;
 }
 
-static void DrvTimerStop(void) {
-  ESP_LOGV(TAG_TM, "DrvTimerStop");
-  timer.tv_sec = timer.tv_usec = 0;
+void DrvTimerStop(void) {
+  if(!current_canopen) {
+    ESP_LOGW(TAG_TM, "no current canopen instance set");
+    return;
+  }
+  ESP_LOGV(TAG_TM, "DrvTimerStop, node_id: %d", current_canopen->node_id);
+  current_canopen->timer.tv_sec = current_canopen->timer.tv_usec = 0;
   /* stop the hardware timer counting */
 }
 

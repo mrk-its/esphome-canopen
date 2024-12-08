@@ -91,8 +91,19 @@ enum EMCY_CODES {
   APP_ERR_ID_NUM /* number of EMCY error codes in application */
 };
 
+class CanopenComponent;
+
+struct CanopenNode {
+  CO_NODE node;
+  CanopenComponent *canopen;
+};
+
 class CanopenComponent : public Component {
  protected:
+
+  // for timer driver
+  struct timeval timer;
+
   /* Each software timer needs some memory for managing
   * the lists and states of the timed action events.
   */
@@ -117,13 +128,23 @@ class CanopenComponent : public Component {
 
   ObjectDictionary od;
 
-  optional<CO_IF_FRM> recv_frame;
+  std::vector<CO_IF_FRM> recv_frames;
   friend class BaseCanopenEntity;
 
   friend int16_t esphome::canopen::DrvCanSend(CO_IF_FRM *frm);
   friend int16_t esphome::canopen::DrvCanRead(CO_IF_FRM *frm);
 
-  CO_NODE node;
+  friend void DrvTimerInit(uint32_t freq);
+  friend void DrvTimerStart(void);
+  friend uint8_t DrvTimerUpdate(void);
+  friend uint32_t DrvTimerDelay(void);
+  friend void DrvTimerReload(uint32_t reload);
+  friend void DrvTimerStop(void);
+
+
+  CanopenNode canopen_node;
+  CO_NODE *node;
+
   uint32_t node_id;
 
   CanStatus last_status = {};
@@ -145,7 +166,7 @@ class CanopenComponent : public Component {
   ESPPreferenceObject comm_state;
   bool pdo_od_writer_enabled = true;
 
-  void parse_od_writer_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
+  void parse_od_writer_frame(CO_IF_FRM *frm);
 
  public:
 
@@ -186,7 +207,7 @@ class CanopenComponent : public Component {
   float get_setup_priority() const override;
   void setup() override;
 
-  bool is_initialized() { return node.Nmt.Mode == CO_PREOP || node.Nmt.Mode == CO_OPERATIONAL; }
+  bool is_initialized() { return node->Nmt.Mode == CO_PREOP || node->Nmt.Mode == CO_OPERATIONAL; }
   void add_rpdo_dummy(uint8_t idx, uint8_t size);
   void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
   void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd);
@@ -291,6 +312,8 @@ class CanopenComponent : public Component {
   void loop() override;
   bool get_can_status(CanStatus &status_info);
 };
-extern CanopenComponent *global_canopen;
+extern CanopenComponent *current_canopen;
+extern std::vector<CanopenComponent *> all_instances;
+
 }  // namespace canopen
 }  // namespace esphome

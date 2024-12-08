@@ -100,7 +100,7 @@ HB_CLIENT_SCHEMA = cv.Schema({
     cv.Required("timeout"): cv.positive_time_period_milliseconds,
 })
 
-CONFIG_SCHEMA = cv.Schema({
+CONFIG_SCHEMA = cv.ensure_list(cv.Schema({
     cv.GenerateID(): cv.declare_id(CanopenComponent),
     cv.Required("canbus_id"): cv.use_id(CanbusComponent),
     # cv.GenerateID("ota_id"): cv.use_id(CanopenOTAComponent),
@@ -124,7 +124,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("heartbeat_clients"): cv.ensure_list(HB_CLIENT_SCHEMA),
     cv.Optional("sw_version"): cv.string,
     cv.Optional("hw_version"): cv.string
-}).extend(cv.COMPONENT_SCHEMA)
+}).extend(cv.COMPONENT_SCHEMA))
 
 TYPE_TO_CANOPEN_TYPE = {
     "uint8": (cg.RawExpression("CO_TUNSIGNED8"), 1),
@@ -135,7 +135,8 @@ TYPE_TO_CANOPEN_TYPE = {
     "int32": (cg.RawExpression("CO_TSIGNED32"), 4),
 }
 
-def to_code(config):
+def to_code(config_list):
+  for config in config_list:
     cg.add_platformio_option("build_flags", [
         "-DCO_SDO_BUF_SEG={}".format(config["sdo_block_transfer_size"]),
         "-DCO_SSDO_N=1",
@@ -163,9 +164,9 @@ def to_code(config):
 
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d.%H%M%S")
 
-    cg.add(cg.RawStatement(f"""const char * version_str = "node_id: {node_id:02x}, ver: " ESPHOME_VERSION ".{ts}";"""))
+    cg.add(cg.RawStatement(f"""const char * version_str_{node_id} = "node_id: {node_id:02x}, ver: " ESPHOME_VERSION ".{ts}";"""))
 
-    sw_version = 'version_str + 18'
+    sw_version = f'version_str_{node_id} + 18'
 
     if hw_version:
         cg.add(canopen.od_set_string(0x1009, 0, hw_version))
