@@ -133,8 +133,7 @@ class BinarySensorEntity : public BaseCanopenEntity {
 class SwitchEntity : public BaseCanopenEntity {
  public:
   esphome::switch_::Switch *switch_;
-  SwitchEntity(esphome::switch_::Switch *switch_, uint32_t entity_id, TPDO tpdo)
-      : BaseCanopenEntity(entity_id, tpdo) {
+  SwitchEntity(esphome::switch_::Switch *switch_, uint32_t entity_id, TPDO tpdo) : BaseCanopenEntity(entity_id, tpdo) {
     this->switch_ = switch_;
   }
   void setup(CanopenComponent *canopen) override;

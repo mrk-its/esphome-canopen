@@ -7,7 +7,6 @@ namespace esphome {
 
 namespace canopen {
 
-
 float scale_to_wire(float value, float min_val, float max_val, float n_levels) {
   if (std::isnan(value))
     return n_levels;
@@ -130,8 +129,7 @@ void BinarySensorEntity::setup(CanopenComponent *canopen) {
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &sensor->state, 1, tpdo);
   sensor->add_on_state_callback([=](bool x) { od_set_state(canopen, state_key, &x, 1); });
   canopen->od_add_cmd(
-      entity_id, [=](void *buffer, uint32_t size) { sensor->publish_state(*(uint8_t *)buffer); }, CO_TCMD8);
-
+      entity_id, [=](void *buffer, uint32_t size) { sensor->publish_state(*(uint8_t *) buffer); }, CO_TCMD8);
 }
 
 #endif
@@ -151,7 +149,6 @@ void SwitchEntity::setup(CanopenComponent *canopen) {
   });
 }
 #endif
-
 
 #ifdef USE_LIGHT
 void LightStateEntity::setup(CanopenComponent *canopen) {

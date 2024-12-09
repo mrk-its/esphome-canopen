@@ -25,7 +25,7 @@ CO_ERR Cmd8Write(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
   CO_ERR result = uint8->Write(obj, node, buffer, size);
   uint32_t index = obj->Key & 0xffffff00;
 
-  auto cmd_handlers = ((CanopenNode *)node)->canopen->can_cmd_handlers;
+  auto cmd_handlers = ((CanopenNode *) node)->canopen->can_cmd_handlers;
   auto it = cmd_handlers.find(index);
   if (it != cmd_handlers.end()) {
     it->second(buffer, size);
@@ -57,7 +57,7 @@ CO_ERR Cmd16Write(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
   CO_ERR result = uint32->Write(obj, node, buffer, size);
   uint32_t index = obj->Key & 0xffffff00;
 
-  auto cmd_handlers = ((CanopenNode *)node)->canopen->can_cmd_handlers;
+  auto cmd_handlers = ((CanopenNode *) node)->canopen->can_cmd_handlers;
   auto it = cmd_handlers.find(index);
   if (it != cmd_handlers.end()) {
     it->second(buffer, size);
@@ -89,7 +89,7 @@ CO_ERR Cmd32Write(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
   CO_ERR result = uint32->Write(obj, node, buffer, size);
   uint32_t index = obj->Key & 0xffffff00;
 
-  auto cmd_handlers = ((CanopenNode *)node)->canopen->can_cmd_handlers;
+  auto cmd_handlers = ((CanopenNode *) node)->canopen->can_cmd_handlers;
   auto it = cmd_handlers.find(index);
   if (it != cmd_handlers.end()) {
     it->second(buffer, size);

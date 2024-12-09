@@ -13,7 +13,6 @@
 
 #include "co_core.h"
 
-
 namespace esphome {
 namespace canopen {
 

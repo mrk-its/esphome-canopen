@@ -19,7 +19,7 @@ CODEOWNERS = ["mrk@sed.pl"]
 AUTO_LOAD = ["md5"]
 DEPENDENCIES = ["canopen"]
 
-ns = cg.esphome_ns.namespace('canopen')
+ns = cg.esphome_ns.namespace("canopen")
 
 CanopenOTAComponent = ns.class_("CanopenOTAComponent", OTAComponent)
 

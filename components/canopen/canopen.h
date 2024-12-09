@@ -63,7 +63,6 @@ struct CanStatus {
   uint32_t bus_err;
 };
 
-
 const uint32_t status_update_interval = 1;
 
 class OperationalTrigger : public Trigger<> {};
@@ -83,7 +82,7 @@ class CmdTriggerInt32 : public Trigger<int32_t> {};
 #define APP_TICKS_PER_SEC 1000000u /* Timer clock frequency in Hz */
 
 #ifndef APP_OBJ_N
-#define APP_OBJ_N 512u             /* Object dictionary max size  */
+#define APP_OBJ_N 512u /* Object dictionary max size  */
 #endif
 
 enum EMCY_CODES {
@@ -100,26 +99,25 @@ struct CanopenNode {
 
 class CanopenComponent : public Component {
  protected:
-
   // for timer driver
   struct timeval timer;
 
   /* Each software timer needs some memory for managing
-  * the lists and states of the timed action events.
-  */
+   * the lists and states of the timed action events.
+   */
   CO_TMR_MEM TmrMem[APP_TMR_N];
 
   /* Each SDO server needs memory for the segmented or
-  * block transfer requests.
-  */
+   * block transfer requests.
+   */
   uint8_t SdoSrvMem[CO_SSDO_N * CO_SDO_BUF_BYTE];
 
   /* Specify the EMCY error codes with the corresponding
-  * error register bit. There is a collection of defines
-  * for the predefined emergency codes CO_EMCY_CODE...
-  * and for the error register bits CO_EMCY_REG... for
-  * readability. You can use plain numbers, too.
-  */
+   * error register bit. There is a collection of defines
+   * for the predefined emergency codes CO_EMCY_CODE...
+   * and for the error register bits CO_EMCY_REG... for
+   * readability. You can use plain numbers, too.
+   */
   CO_EMCY_TBL AppEmcyTbl[APP_ERR_ID_NUM] = {
       {CO_EMCY_REG_GENERAL, CO_EMCY_CODE_HW_ERR} /* APP_ERR_ID_EEPROM */
   };
@@ -140,7 +138,6 @@ class CanopenComponent : public Component {
   friend uint32_t DrvTimerDelay(void);
   friend void DrvTimerReload(uint32_t reload);
   friend void DrvTimerStop(void);
-
 
   CanopenNode canopen_node;
   CO_NODE *node;
@@ -169,11 +166,9 @@ class CanopenComponent : public Component {
   void parse_od_writer_frame(CO_IF_FRM *frm);
 
  public:
-
   HbConsumerEventTrigger *on_hb_cons_event = {};  // TODO: change visibility
   CanStatus status;
   std::map<uint32_t, std::function<void(void *, uint32_t)>> can_cmd_handlers;
-
 
 #ifdef USE_CANOPEN_OTA
   CanopenOTAComponent *ota;
@@ -212,7 +207,7 @@ class CanopenComponent : public Component {
   void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
   void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd);
 
-  void enable_pdo_od_writer(bool enable) {pdo_od_writer_enabled = enable;};
+  void enable_pdo_od_writer(bool enable) { pdo_od_writer_enabled = enable; };
 
 #ifdef USE_SENSOR
   void add_entity(sensor::Sensor *sensor, uint32_t entity_id, TPDO tpdo, uint8_t size = 4, float min_val = 0,
@@ -284,24 +279,24 @@ class CanopenComponent : public Component {
     od_set_state(ENTITY_STATE_KEY(entity_id, state), data, size);
   }
 
-  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint8_t value, uint8_t cmd=0) {
-    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd+1, &value, 1);
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint8_t value, uint8_t cmd = 0) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd + 1, &value, 1);
   }
 
-  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, bool value, uint8_t cmd=0) {
-    return send_entity_cmd(node_id, entity_index, (uint8_t)(value ? 1 : 0), cmd);
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, bool value, uint8_t cmd = 0) {
+    return send_entity_cmd(node_id, entity_index, (uint8_t) (value ? 1 : 0), cmd);
   }
 
-  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint16_t value, uint8_t cmd=0) {
-    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd+1, &value, 2);
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint16_t value, uint8_t cmd = 0) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd + 1, &value, 2);
   }
 
-  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint32_t value, uint8_t cmd=0) {
-    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd+1, &value, 4);
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, uint32_t value, uint8_t cmd = 0) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd + 1, &value, 4);
   }
 
-  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, float value, uint8_t cmd=0) {
-    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd+1, &value, 4);
+  bool send_entity_cmd(uint8_t node_id, uint32_t entity_index, float value, uint8_t cmd = 0) {
+    return remote_entity_write_od(node_id, ENTITY_INDEX(entity_index) + 2, cmd + 1, &value, 4);
   }
 
   bool remote_entity_write_od(uint8_t node_id, uint32_t index, uint8_t subindex, void *data, uint8_t size);
