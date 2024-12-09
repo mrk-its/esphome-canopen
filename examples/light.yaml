@@ -6,7 +6,6 @@ esphome:
 
 canopen:
   id: can_open
-  canbus_id: can_bus
   node_id: 7
   entities:
     - index: 1

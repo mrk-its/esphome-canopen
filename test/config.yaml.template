@@ -28,7 +28,6 @@ canbus:
   tx_pin: GPIO4
 
 canopen:
-  canbus_id: can_bus
   node_id: 1
   entities:
     - index: 1

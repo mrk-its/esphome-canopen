@@ -131,7 +131,7 @@ CONFIG_SCHEMA = cv.ensure_list(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(CanopenComponent),
-            cv.Required("canbus_id"): cv.use_id(CanbusComponent),
+            cv.GenerateID("canbus_id"): cv.use_id(CanbusComponent),
             # cv.GenerateID("ota_id"): cv.use_id(CanopenOTAComponent),
             cv.Required("node_id"): cv.All(cv.int_, cv.Range(min=0, max=127)),
             # cv.Optional("status"): STATUS_ENTITY_SCHEMA,
