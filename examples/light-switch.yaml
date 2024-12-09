@@ -4,9 +4,6 @@ packages:
 esphome:
   name: light-switch
 
-ota:
-  - platform: canopen
-
 canopen:
   id: can_open
   canbus_id: can_bus
@@ -32,18 +29,18 @@ canopen:
     - index: 3
       id: light2_state
       rpdo:
-        - node_id: 77
+        - node_id: 7
           tpdo: 0
-          offset: 0
+          offset: 4
           cmd: 0
 
     - index: 4
       id: light2_brightness
       size: 1
       rpdo:
-        - node_id: 77
+        - node_id: 7
           tpdo: 0
-          offset: 1
+          offset: 5
           cmd: 0
 
 binary_sensor:
@@ -74,8 +71,8 @@ binary_sensor:
             // send command to entity #1 (light) on node #7
             id(can_open).send_entity_cmd(7, 1, !state);
 
-            // send command to entity #1 (light2) on node #77
-            id(can_open).send_entity_cmd(77, 1, !state);
+            // send command to entity #2 (light2) on node #7
+            id(can_open).send_entity_cmd(7, 2, !state);
 
 sensor:
   - platform: template
