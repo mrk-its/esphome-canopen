@@ -7,7 +7,7 @@ extern "C" {
 void esp_log(const char *tag, const char *fmt, ...) {
   va_list arglist;
   va_start(arglist, fmt);
-  esp_log_vprintf_(0, tag, __LINE__, fmt, arglist);
+  esphome::esp_log_vprintf_(0, tag, __LINE__, fmt, arglist);
   va_end(arglist);
 }
 }
