@@ -2,7 +2,7 @@
 .esphome/
 __pycache__/
 *.py[cod]
-
+venv/
 config/can-node-*
 config/common.yaml
 config/wifi.yaml
