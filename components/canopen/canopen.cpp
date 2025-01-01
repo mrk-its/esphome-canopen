@@ -73,7 +73,7 @@ const uint32_t Obj1014_00_20 = 0x00000080L;
 
 const uint32_t VENDOR_ID = 0xa59a08f5;
 const uint32_t PRODUCT_CODE = 0x6bdfa1d9;
-const uint32_t REVISION_NUMBER = 0x00000000;
+const uint32_t REVISION_NUMBER = 0x00000001;
 const uint32_t SERIAL_NUMBER = 0x00000000;
 
 const uint32_t Obj1200_01_20 = CO_COBID_SDO_REQUEST();
@@ -142,6 +142,8 @@ CanopenComponent::CanopenComponent(uint32_t node_id) : od(APP_OBJ_N) {
   for (int i = 0; i < 8; i++)
     od.append(CO_KEY(0x1A00 + i, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, 0);
 
+  od.append(CO_KEY(0x2000, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, 0);
+
   memset(&status, 0, sizeof(status));
   memset(&last_status, 0, sizeof(last_status));
 
@@ -208,11 +210,11 @@ void CanopenComponent::set_canbus(canbus::Canbus *canbus) {
   automation->add_actions({lambdaaction});
 }
 
-void CanopenComponent::od_add_metadata(uint32_t entity_id, uint8_t type, const std::string &name,
+void CanopenComponent::od_add_metadata(uint32_t entity_id, uint32_t type, const std::string &name,
                                        const std::string &device_class, const std::string &unit,
                                        const std::string &state_class) {
   uint32_t index = ENTITY_INDEX(entity_id);
-  od.add_update(CO_KEY(0x2000, entity_id, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) type);
+  od.add_update(CO_KEY(0x2001, entity_id, CO_OBJ_D___R_), CO_TUNSIGNED32, (CO_DATA) type);
   if (name.size())
     od.add_update(CO_KEY(index, ENTITY_INDEX_NAME, CO_OBJ_____R_), CO_TSTRING, (CO_DATA) od_string(name));
   if (device_class.size())

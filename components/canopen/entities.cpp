@@ -172,33 +172,68 @@ void LightStateEntity::setup(CanopenComponent *canopen) {
   bool state = bool(light->remote_values.get_state());
   uint8_t brightness = percentage_to_wire(light->remote_values.get_brightness());
   uint8_t colortemp = color_temp_to_wire(light->remote_values.get_color_temperature());
-  canopen->od_add_metadata(entity_id, ENTITY_TYPE_LIGHT, light->get_name(), "", "", "");
-  auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
-  auto brightness_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &brightness, 1, tpdo);
-  auto colortemp_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &colortemp, 1, tpdo);
+
+  uint32_t state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
+  canopen->od_add_cmd(
+      entity_id, [this](void *buffer, uint32_t size) { light->make_call().set_state(*(uint8_t *)buffer).perform(); });
+
+  uint32_t brightness_key = 0;
+  uint32_t colortemp_key = 0;
+
+  uint32_t version = 1;
+  uint32_t caps = 0;
 
   auto traits = light->get_traits();
-  auto color_modes = traits.get_supported_color_modes();
-  float min_mireds = traits.get_min_mireds();
-  float max_mireds = traits.get_max_mireds();
 
-  ESP_LOGD(TAG, "min_mireds: %f, max_mireds: %f", min_mireds, max_mireds);
-  canopen->od_add_min_max_metadata(entity_id, min_mireds, max_mireds);
+  if (traits.supports_color_mode(light::ColorMode::ON_OFF)) {
+    caps |= 1;
+    ESP_LOGI(TAG, "SUPPORTS ON OFF");
+  }
 
-  light->add_new_remote_values_callback([=]() {
+  if (traits.supports_color_mode(light::ColorMode::BRIGHTNESS)) {
+    caps |= 2;
+  }
+  if (
+    traits.supports_color_mode(light::ColorMode::COLOR_TEMPERATURE) ||
+    traits.supports_color_mode(light::ColorMode::COLD_WARM_WHITE)
+  ) {
+    caps |= 4;
+  }
+
+  canopen->od_add_metadata(entity_id, ENTITY_TYPE_LIGHT | (version << 8) | (caps << 16), light->get_name(), "", "", "");
+
+  if(caps & (2 | 4)) {
+    brightness_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &brightness, 1, tpdo);
+    canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t size) {
+        light->make_call().set_brightness_if_supported(percentage_from_wire(*(uint8_t *)buffer)).perform(); });
+    ESP_LOGI(TAG, "SUPPORTS BRIGHTNESS");
+  }
+
+  if (caps & 4) {
+    ESP_LOGI(TAG, "SUPPORTS COLOR_TEMPERATURE");
+    colortemp_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &colortemp, 1, tpdo);
+    canopen->od_add_cmd(entity_id, [=, this](void *buffer, uint32_t size) {
+        light->make_call().set_color_temperature_if_supported(color_temp_from_wire(*(uint8_t *)buffer)).perform(); });
+
+    float min_mireds = traits.get_min_mireds();
+    float max_mireds = traits.get_max_mireds();
+
+    ESP_LOGD(TAG, "min_mireds: %f, max_mireds: %f", min_mireds, max_mireds);
+    canopen->od_add_min_max_metadata(entity_id, min_mireds, max_mireds);
+  }
+
+  light->add_new_remote_values_callback([=, this]() {
     bool state = bool(light->remote_values.get_state());
-    uint8_t brightness =  percentage_to_wire(light->remote_values.get_brightness());
-    uint8_t colortemp = color_temp_to_wire(light->remote_values.get_color_temperature());
     od_set_state(canopen, state_key, &state, 1);
-    od_set_state(canopen, brightness_key, &brightness, 1);
-    od_set_state(canopen, colortemp_key, &colortemp, 1);
+    if(brightness_key) {
+      uint8_t brightness =  percentage_to_wire(light->remote_values.get_brightness());
+      od_set_state(canopen, brightness_key, &brightness, 1);
+    }
+    if(colortemp_key) {
+      uint8_t colortemp = color_temp_to_wire(light->remote_values.get_color_temperature());
+      od_set_state(canopen, colortemp_key, &colortemp, 1);
+    }
   });
-  canopen->od_add_cmd(
-      entity_id, [=](void *buffer, uint32_t size) { light->make_call().set_state(*(uint8_t *)buffer).perform(); });
-  canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
-      light->make_call().set_brightness_if_supported(percentage_from_wire(*(uint8_t *)buffer)).perform(); });
-  canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
-      light->make_call().set_color_temperature_if_supported(color_temp_from_wire(*(uint8_t *)buffer)).perform(); });
 }
 #endif
 
@@ -218,19 +253,26 @@ uint8_t get_cover_state(esphome::cover::Cover *cover) {
 
 void CoverEntity::setup(CanopenComponent *canopen) {
   uint8_t state = get_cover_state(cover);
-  uint8_t position = percentage_to_wire(cover->position);
-  canopen->od_add_metadata(entity_id, ENTITY_TYPE_COVER, cover->get_name(), cover->get_device_class(), "", "");
+
+  auto traits = cover->get_traits();
+
+  uint32_t version = 1;
+  uint32_t caps = 0;
+  uint32_t pos_key = 0;
+  uint32_t tilt_key = 0;
+
+  if(traits.get_supports_position()) {
+    caps |= 1;
+  }
+
+  if(traits.get_supports_tilt() || 1) {
+    caps |= 2;
+  }
+
+  canopen->od_add_metadata(entity_id, ENTITY_TYPE_COVER | (version << 8) | (caps << 16), cover->get_name(), cover->get_device_class(), "", "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
-  auto pos_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &position, 1, tpdo);
-  cover->add_on_state_callback([=]() {
-    ESP_LOGD(TAG, "on_state callback, op: %s, pos: %f", cover_operation_to_str(cover->current_operation),
-             cover->position);
-    uint8_t position = percentage_to_wire(cover->position);
-    uint8_t state = get_cover_state(cover);
-    od_set_state(canopen, state_key, &state, 1);
-    od_set_state(canopen, pos_key, &position, 1);
-  });
-  canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+
+  canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t size) {
     uint8_t cmd = *(uint8_t *) buffer;
     auto call = cover->make_call();
     if (cmd == 0) {
@@ -244,11 +286,42 @@ void CoverEntity::setup(CanopenComponent *canopen) {
       call.perform();
     }
   });
-  canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
-    float position = percentage_from_wire(*(uint8_t *)buffer);
-    auto call = cover->make_call();
-    call.set_position(position);
-    call.perform();
+
+  if(caps & 1) {
+    uint8_t position = percentage_to_wire(cover->position);
+    pos_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &position, 1, tpdo);
+    canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t size) {
+      float position = percentage_from_wire(*(uint8_t *)buffer);
+      auto call = cover->make_call();
+      call.set_position(position);
+      call.perform();
+    });
+  }
+
+  if(caps & 2) {
+    uint8_t tilt = percentage_to_wire(cover->tilt);
+    tilt_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &tilt, 1, tpdo);
+    canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t size) {
+      float tilt = percentage_from_wire(*(uint8_t *)buffer);
+      auto call = cover->make_call();
+      call.set_tilt(tilt);
+      call.perform();
+    });
+  }
+
+  cover->add_on_state_callback([=,this]() {
+    ESP_LOGD(TAG, "on_state callback, op: %s, pos: %f", cover_operation_to_str(cover->current_operation),
+             cover->position);
+    uint8_t state = get_cover_state(cover);
+    od_set_state(canopen, state_key, &state, 1);
+    if(pos_key) {
+      uint8_t position = percentage_to_wire(cover->position);
+      od_set_state(canopen, pos_key, &position, 1);
+    }
+    if(tilt_key) {
+      uint8_t tilt = percentage_to_wire(cover->tilt);
+      od_set_state(canopen, tilt_key, &tilt, 1);
+    }
   });
 }
 #endif

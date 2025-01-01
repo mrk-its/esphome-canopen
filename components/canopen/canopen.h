@@ -254,7 +254,7 @@ class CanopenComponent : public Component {
   }
 #endif
 
-  void od_add_metadata(uint32_t entity_id, uint8_t type, const std::string &name, const std::string &device_class,
+  void od_add_metadata(uint32_t entity_id, uint32_t type, const std::string &name, const std::string &device_class,
                        const std::string &unit, const std::string &state_class);
   void od_add_min_max_metadata(uint32_t entity_id, float min_value, float max_value);
 

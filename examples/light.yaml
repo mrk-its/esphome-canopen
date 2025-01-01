@@ -16,6 +16,10 @@ canopen:
       id: light2
       tpdo: 0
 
+    - index: 3
+      id: light3
+      tpdo: 0
+
 output:
   - platform: template
     id: cw_output1
@@ -34,7 +38,7 @@ output:
           args: ['state']
 
   - platform: template
-    id: cw_output2
+    id: output2
     type: float
     write_action:
       - logger.log:
@@ -42,11 +46,11 @@ output:
           args: ['state']
 
   - platform: template
-    id: ww_output2
+    id: output3
     type: float
     write_action:
       - logger.log:
-          format: "output2: %f"
+          format: "output1: %f"
           args: ['state']
 
 light:
@@ -60,12 +64,13 @@ light:
     constant_brightness: false
     default_transition_length: 0s
 
-  - platform: cwww
+  - platform: monochromatic
     id: light2
     name: "2"
-    cold_white: cw_output2
-    warm_white: ww_output2
-    cold_white_color_temperature: 6536 K
-    warm_white_color_temperature: 2000 K
-    constant_brightness: false
+    output: output2
     default_transition_length: 0s
+
+  - platform: binary
+    id: light3
+    name: "3"
+    output: output3
