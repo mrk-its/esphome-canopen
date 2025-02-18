@@ -25,7 +25,7 @@ jobs:
       - name: Configure
         run: ${{matrix.framework_opts}} board=${{matrix.board}} envsubst < test/config.yaml.template > test/config.yaml
       - name: Compile
-        uses: esphome/build-action@v4.0.4
+        uses: esphome/build-action@v6
         id: esphome-build
         with:
           yaml-file: test/config.yaml
