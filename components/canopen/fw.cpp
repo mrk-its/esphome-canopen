@@ -75,7 +75,11 @@ CO_ERR FwImageWrite(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
     ESP_LOGI(TAG, "FwImageWrite, %d kB (%d%%)", (domain->Offset >> 10), progress);
   }
 
-  if (domain->Offset == firmware->ota_size) {
+  if (domain->Offset >= firmware->ota_size) {
+    if (domain->Offset > firmware->ota_size) {
+      ESP_LOGW(TAG, "FwImageWrite: too many bytes received: %d, expected: %d", domain->Offset, firmware->ota_size);
+    }
+
     char buf[33] = "";
     for (int i = 0; i < 16; i++) {
       sprintf(buf + i * 2, "%02x", firmware->md5[i]);
