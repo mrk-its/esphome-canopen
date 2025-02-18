@@ -32,6 +32,7 @@ void CanopenOTAComponent::setup() {
     App.safe_reboot();
   });
   automation_id->add_actions({delayaction_id, lambdaaction_id});
+  this->stream = z_stream{};
 }
 
 void CanopenOTAComponent::loop() {}
@@ -39,14 +40,19 @@ void CanopenOTAComponent::loop() {}
 float CanopenOTAComponent::get_setup_priority() const { return setup_priority::LATE; }
 
 esphome::ota::OTAResponseTypes CanopenOTAComponent::begin(uint32_t size) {
-  this->stream = z_stream{};
+  if(this->stream.state) {
+    mz_deflateEnd(&this->stream);
+  }
+
   this->stream.next_out = this->s_outbuf;
   this->stream.avail_out = BUF_SIZE;
   this->stream.avail_in = 0;
   this->written = 0;
 
-  if (mz_inflateInit(&this->stream)) {
-    ESP_LOGW(TAG, "cannot initialize decompressor");
+  int err = mz_inflateInit(&this->stream);
+  if (err) {
+    ESP_LOGW(TAG, "cannot initialize decompressor: %d", err);
+    return esphome::ota::OTAResponseTypes::OTA_RESPONSE_ERROR_UNKNOWN;
   }
   return !dry_run ? backend->begin(size) : esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK;
 }
