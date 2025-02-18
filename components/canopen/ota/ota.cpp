@@ -104,7 +104,9 @@ esphome::ota::OTAResponseTypes CanopenOTAComponent::end(const char *expected_md5
       }
       if (!ret) {
         ESP_LOGI(TAG, "decompression finished successfully");
-        ota_finished_trigger->trigger();
+        if(!dry_run) {
+          ota_finished_trigger->trigger();
+        }
       }
       break;
     } else if (status != Z_OK) {
