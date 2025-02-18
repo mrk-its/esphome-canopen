@@ -62,11 +62,13 @@ int CanopenOTAComponent::decompress() {
   if ((status == Z_STREAM_END) || (status == Z_OK && !this->stream.avail_out)) {
     uint32_t n = BUF_SIZE - this->stream.avail_out;
     this->written += n;
-    ESP_LOGI(TAG, "writing %d bytes to flash, total: %d", n, this->written);
-    auto ret = !dry_run ? backend->write(this->s_outbuf, n) : esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK;
-    if (ret != esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK) {
-      ESP_LOGW("ota", "write flash error: %d", ret);
-      return -10;
+    if(n > 0) {
+      ESP_LOGI(TAG, "writing %d bytes to flash, total: %d", n, this->written);
+      auto ret = !dry_run ? backend->write(this->s_outbuf, n) : esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK;
+      if (ret != esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK) {
+        ESP_LOGW("ota", "write flash error: %d", ret);
+        return -10;
+      }
     }
     this->stream.next_out = this->s_outbuf;
     this->stream.avail_out = BUF_SIZE;
