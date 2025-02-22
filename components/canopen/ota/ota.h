@@ -33,6 +33,7 @@ class CanopenOTAComponent : public ota::OTAComponent {
   int decompress();
 
  public:
+  bool disable_ota_reboot = false;
   std::unique_ptr<esphome::ota::OTABackend> backend;
   void setup() override;
   //   void dump_config() override;
