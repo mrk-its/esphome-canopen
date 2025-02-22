@@ -48,6 +48,7 @@ esphome::ota::OTAResponseTypes CanopenOTAComponent::begin(uint32_t size) {
   this->stream.avail_out = BUF_SIZE;
   this->stream.avail_in = 0;
   this->written = 0;
+  this->received = 0;
 
   int err = mz_inflateInit(&this->stream);
   if (err) {
@@ -77,8 +78,16 @@ int CanopenOTAComponent::decompress() {
 }
 
 esphome::ota::OTAResponseTypes CanopenOTAComponent::write(uint8_t *data, size_t len) {
+  ESP_LOGV(
+    TAG,
+    "offset: %d, len: %d, data: %02x %02x %02x %02x %02x %02x %02x",
+    this->received, len,
+    data[0], data[1], data[2], data[3],
+    data[3], data[4], data[6]
+  );
   this->stream.next_in = data;
   this->stream.avail_in = len;
+  this->received += len;
 
   while (stream.avail_in) {
     int status = this->decompress();
