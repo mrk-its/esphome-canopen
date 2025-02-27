@@ -4,8 +4,8 @@ external_components:
 esp32:
   framework:
     type: ${type}
-    # version: ${version}
-    # platform_version: ${platform_version}
+    version: ${version}
+    platform_version: ${platform_version}
   board: ${board}
 
 ota:
