@@ -166,14 +166,14 @@ void CanopenComponent::parse_od_writer_frame(CO_IF_FRM *frm) {
     } else if (frm->DLC == 7) {
       value = value & 0xffffff;
     }
-    ESP_LOGI(TAG, "cmd from: %02x key: %06x value: %08x", frm->Identifier & 0x7f, key, value);
+    ESP_LOGI(TAG, "cmd from: %02x key: %06x value: %08lx", frm->Identifier & 0x7f, key, value);
     auto obj = CODictFind(&node->Dict, (key << 8));
     if (!obj) {
-      ESP_LOGW(TAG, "Can't find object at %04x %02x", index, subindex);
+      ESP_LOGW(TAG, "Can't find object at %04lx %02x", index, subindex);
       return;
     }
     if (COObjWrValue(obj, node, frm->Data + 4, frm->DLC - 4) != CO_ERR_NONE) {
-      ESP_LOGW(TAG, "Can't write %d bytes to %04x %02x", frm->DLC - 4, index, subindex);
+      ESP_LOGW(TAG, "Can't write %d bytes to %04lx %02x", frm->DLC - 4, index, subindex);
     }
   }
 }
@@ -495,7 +495,7 @@ void CanopenComponent::set_operational_mode() {
       else if (size == 2)
         value &= 0xffff;
     }
-    ESP_LOGD(TAG, "OD Index: %02x Key: %08x Data: %08x Type: %p", index, od->Key, value, od->Type);
+    ESP_LOGD(TAG, "OD Index: %02x Key: %08lx Data: %08lx Type: %p", index, od->Key, value, od->Type);
     index++;
     od++;
   }
@@ -526,12 +526,12 @@ bool CanopenComponent::remote_entity_write_od(uint8_t node_id, uint32_t index, u
     uint32_t key = CO_KEY(index, subindex, 0);
     auto obj = CODictFind(&node->Dict, key);
     if (!obj) {
-      ESP_LOGW(TAG, "Can't find object at %04x %02x", index, subindex);
+      ESP_LOGW(TAG, "Can't find object at %04lx %02x", index, subindex);
       return false;
     }
     auto result = COObjWrValue(obj, node, data, size);
     if (result != CO_ERR_NONE) {
-      ESP_LOGW(TAG, "Can't write %d bytes to %04x %02x", size, index, subindex);
+      ESP_LOGW(TAG, "Can't write %d bytes to %04lx %02x", size, index, subindex);
     }
   }
 
@@ -568,7 +568,7 @@ void CanopenComponent::csdo_recv(uint8_t num, uint32_t key, std::function<void(u
         csdo, key, (uint8_t *) &buffers[num], 4,
         [](CO_CSDO_T *csdo, uint16_t index, uint8_t sub, uint32_t code) {
           auto num = csdo - csdo0;
-          ESP_LOGV(TAG, "COCSdoRequestUpload cb: %04x %02x %08x", index, sub, code);
+          ESP_LOGV(TAG, "COCSdoRequestUpload cb: %04x %02x %08lx", index, sub, code);
           callbacks[num](buffers[num], code);
         },
         1000);
@@ -583,7 +583,7 @@ void CanopenComponent::csdo_send_data(uint8_t num, uint32_t key, uint8_t *data, 
     auto ret = COCSdoRequestDownload(
         csdo, key, data, len,
         [](CO_CSDO_T *csdo, uint16_t index, uint8_t sub, uint32_t code) {
-          ESP_LOGV(TAG, "COCSdoRequestDownload cb: %04x %02x %08x", index, sub, code);
+          ESP_LOGV(TAG, "COCSdoRequestDownload cb: %04x %02x %08lx", index, sub, code);
         },
         1000);
 
@@ -666,7 +666,7 @@ void CanopenComponent::loop() {
       if (status.tx_err > last_status.tx_err || status.rx_err > last_status.rx_err ||
           status.tx_failed > last_status.tx_failed || status.rx_miss > last_status.rx_miss ||
           status.arb_lost > last_status.arb_lost || status.bus_err > last_status.bus_err) {
-        ESP_LOGW(TAG, "tx_err: %d rx_err: %d tx_failed: %d rx_miss: %d arb_lost: %d bus_err: %d", status.tx_err,
+        ESP_LOGW(TAG, "tx_err: %ld rx_err: %ld tx_failed: %ld rx_miss: %ld arb_lost: %ld bus_err: %ld", status.tx_err,
                  status.rx_err, status.tx_failed, status.rx_miss, status.arb_lost, status.bus_err);
       }
       last_status = status;
