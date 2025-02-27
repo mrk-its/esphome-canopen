@@ -13,13 +13,13 @@ uint32_t Cmd8Size(CO_OBJ *obj, CO_NODE *node, uint32_t width) {
 CO_ERR Cmd8Init(CO_OBJ *obj, CO_NODE *node) { return CO_ERR_NONE; }
 
 CO_ERR Cmd8Read(struct CO_OBJ_T *obj, struct CO_NODE_T *node, void *buffer, uint32_t size) {
-  ESP_LOGV(TAG, "Cmd8Read: key: %x", obj->Key);
+  ESP_LOGV(TAG, "Cmd8Read: key: %lx", obj->Key);
   const CO_OBJ_TYPE *uint8 = CO_TUNSIGNED8;
   return uint8->Read(obj, node, buffer, size);
 }
 
 CO_ERR Cmd8Write(CO_OBJ *obj, CO_NODE *node, void *buffer, uint32_t size) {
-  ESP_LOGV(TAG, "Cmd8Write: key: %08x, val: %02x, size: %x", obj->Key, *((uint8_t *) buffer), size);
+  ESP_LOGV(TAG, "Cmd8Write: key: %08lx, val: %02x, size: %lx", obj->Key, *((uint8_t *) buffer), size);
 
   const CO_OBJ_TYPE *uint8 = CO_TUNSIGNED8;
   CO_ERR result = uint8->Write(obj, node, buffer, size);
