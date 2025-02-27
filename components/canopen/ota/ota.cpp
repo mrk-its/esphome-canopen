@@ -64,7 +64,7 @@ int CanopenOTAComponent::decompress() {
     uint32_t n = BUF_SIZE - this->stream.avail_out;
     this->written += n;
     if(n > 0) {
-      ESP_LOGI(TAG, "writing %d bytes to flash, total: %d", n, this->written);
+      ESP_LOGI(TAG, "writing %ld bytes to flash, total: %ld", n, this->written);
       auto ret = !dry_run ? backend->write(this->s_outbuf, n) : esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK;
       if (ret != esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK) {
         ESP_LOGW("ota", "write flash error: %d", ret);
@@ -80,7 +80,7 @@ int CanopenOTAComponent::decompress() {
 esphome::ota::OTAResponseTypes CanopenOTAComponent::write(uint8_t *data, size_t len) {
   ESP_LOGV(
     TAG,
-    "offset: %d, len: %d, data: %02x %02x %02x %02x %02x %02x %02x",
+    "offset: %ld, len: %d, data: %02x %02x %02x %02x %02x %02x %02x",
     this->received, len,
     data[0], data[1], data[2], data[3],
     data[3], data[4], data[6]

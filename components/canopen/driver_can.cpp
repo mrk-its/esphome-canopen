@@ -14,7 +14,7 @@ const char *TAG_TM = "timer_driver";
 
 void DrvCanInit(void) { ESP_LOGI(TAG, "DrvCanInit"); }
 
-void DrvCanEnable(uint32_t baudrate) { ESP_LOGI(TAG, "DrvCanEnable baudrate: %d", baudrate); }
+void DrvCanEnable(uint32_t baudrate) { ESP_LOGI(TAG, "DrvCanEnable baudrate: %ld", baudrate); }
 
 char *can_data_str(uint8_t *data, uint8_t len) {
   static char buf[3 * 8 + 1] = "";
@@ -29,7 +29,7 @@ int16_t DrvCanSend(CO_IF_FRM *frm) {
     ESP_LOGW(TAG, "no current canopen instance set");
     return -1;
   }
-  ESP_LOGV(TAG, "DrvCanSend id: %03x, len: %d, data:%s", frm->Identifier, frm->DLC, can_data_str(frm->Data, frm->DLC));
+  ESP_LOGV(TAG, "DrvCanSend id: %03lx, len: %d, data:%s", frm->Identifier, frm->DLC, can_data_str(frm->Data, frm->DLC));
 
   for (auto it = all_instances.begin(); it < all_instances.end(); it++)
     if (*it != current_canopen) {
@@ -54,7 +54,7 @@ int16_t DrvCanRead(CO_IF_FRM *frm) {
     auto it = current_canopen->recv_frames.begin();
     *frm = *it;
     current_canopen->recv_frames.erase(it);
-    ESP_LOGV(TAG, "DrvCanRead id: %03x, len: %d, data:%s", frm->Identifier, frm->DLC,
+    ESP_LOGV(TAG, "DrvCanRead id: %03lx, len: %d, data:%s", frm->Identifier, frm->DLC,
              can_data_str(frm->Data, frm->DLC));
     return sizeof(CO_IF_FRM);
   } else {
@@ -77,11 +77,11 @@ void DrvTimerInit(uint32_t freq) {
     return;
   }
   current_canopen->timer.tv_sec = current_canopen->timer.tv_usec = 0;
-  ESP_LOGV(TAG_TM, "DrvTimerInit, freq: %d", freq);
+  ESP_LOGV(TAG_TM, "DrvTimerInit, freq: %ld", freq);
 }
 
 void DrvTimerStart(void) {
-  ESP_LOGV(TAG_TM, "DrvTimerStart, node_id: %d", current_canopen->node_id);
+  ESP_LOGV(TAG_TM, "DrvTimerStart, node_id: %ld", current_canopen->node_id);
   /* start the hardware timer counting */
 }
 
@@ -116,7 +116,7 @@ uint32_t DrvTimerDelay(void) {
 
   int32_t dt =
       (current_canopen->timer.tv_sec - tv_now.tv_sec) * 1000000 + (current_canopen->timer.tv_usec - tv_now.tv_usec);
-  ESP_LOGV(TAG_TM, "DrvTimerDelay node_id: %d delay: %d", current_canopen->node_id, dt);
+  ESP_LOGV(TAG_TM, "DrvTimerDelay node_id: %ld delay: %ld", current_canopen->node_id, dt);
 
   /* return remaining ticks until interrupt occurs */
   return (uint32_t) (dt > 0 ? dt : 0);
@@ -129,7 +129,7 @@ void DrvTimerReload(uint32_t reload) {
   }
 
   /* configure the next hardware timer interrupt */
-  ESP_LOGV(TAG_TM, "DrvTimerReload node_id: %d, %d", current_canopen->node_id, reload);
+  ESP_LOGV(TAG_TM, "DrvTimerReload node_id: %ld, %ld", current_canopen->node_id, reload);
 
   gettimeofday(&current_canopen->timer, NULL);
   current_canopen->timer.tv_usec += reload;
@@ -140,7 +140,7 @@ void DrvTimerStop(void) {
     ESP_LOGW(TAG_TM, "no current canopen instance set");
     return;
   }
-  ESP_LOGV(TAG_TM, "DrvTimerStop, node_id: %d", current_canopen->node_id);
+  ESP_LOGV(TAG_TM, "DrvTimerStop, node_id: %ld", current_canopen->node_id);
   current_canopen->timer.tv_sec = current_canopen->timer.tv_usec = 0;
   /* stop the hardware timer counting */
 }
@@ -148,12 +148,12 @@ void DrvTimerStop(void) {
 static void DrvNvmInit(void) { ESP_LOGI(TAG, "DrvNvmInit"); }
 
 static uint32_t DrvNvmRead(uint32_t start, uint8_t *buffer, uint32_t size) {
-  ESP_LOGI(TAG, "DrvNvmRead, start: %08x, buf: %p, size: %08x", start, buffer, size);
+  ESP_LOGI(TAG, "DrvNvmRead, start: %08lx, buf: %p, size: %08lx", start, buffer, size);
   return 0;
 }
 
 static uint32_t DrvNvmWrite(uint32_t start, uint8_t *buffer, uint32_t size) {
-  ESP_LOGI(TAG, "DrvNvmWrite, start: %08x, buf: %p, size: %08x", start, buffer, size);
+  ESP_LOGI(TAG, "DrvNvmWrite, start: %08lx, buf: %p, size: %08lx", start, buffer, size);
   return 0;
 }
 

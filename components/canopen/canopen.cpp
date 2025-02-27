@@ -105,7 +105,7 @@ const struct CO_OBJ_T od_header[] = {
 };
 
 CanopenComponent::CanopenComponent(uint32_t node_id) : od(APP_OBJ_N) {
-  ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03x", node_id);
+  ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03lx", node_id);
   canopen_node.canopen = this;
   node = &canopen_node.node;
 
@@ -166,7 +166,7 @@ void CanopenComponent::parse_od_writer_frame(CO_IF_FRM *frm) {
     } else if (frm->DLC == 7) {
       value = value & 0xffffff;
     }
-    ESP_LOGI(TAG, "cmd from: %02x key: %06x value: %08lx", frm->Identifier & 0x7f, key, value);
+    ESP_LOGI(TAG, "cmd from: %02lx key: %06lx value: %08lx", frm->Identifier & 0x7f, key, value);
     auto obj = CODictFind(&node->Dict, (key << 8));
     if (!obj) {
       ESP_LOGW(TAG, "Can't find object at %04lx %02x", index, subindex);
