@@ -265,7 +265,7 @@ void CoverEntity::setup(CanopenComponent *canopen) {
     caps |= 1;
   }
 
-  if(traits.get_supports_tilt() || 1) {
+  if(traits.get_supports_tilt()) {
     caps |= 2;
   }
 
