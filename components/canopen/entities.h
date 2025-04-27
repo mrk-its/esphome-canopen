@@ -5,7 +5,6 @@
 #include "esphome/core/defines.h"
 #include <vector>
 #include <map>
-#include <driver/twai.h>
 #include <sstream>
 
 #include "co_if.h"

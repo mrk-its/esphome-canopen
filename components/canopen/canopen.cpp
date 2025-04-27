@@ -1,4 +1,7 @@
 #include <map>
+#ifdef USE_ESP32
+#include <driver/twai.h>
+#endif
 #include "esphome.h"
 #include "esphome/core/helpers.h"
 #include "canopen.h"
