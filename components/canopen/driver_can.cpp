@@ -112,7 +112,7 @@ uint8_t DrvTimerUpdate(void) {
   uint64_t micros = get_micros_u64();
   int64_t dt = current_canopen->next_timer_us - micros;
 
-  ESP_LOGVV(TAG_TM, "DrvTimerUpdate node_id: %d, %ld %ld", micros, dt);
+  ESP_LOGVV(TAG_TM, "DrvTimerUpdate node_id: %d, %lld", current_canopen->node_id, dt);
   return dt > 0 ? 0 : 1;
 }
 
@@ -123,7 +123,7 @@ uint32_t DrvTimerDelay(void) {
   }
   uint64_t micros = get_micros_u64();
   int64_t dt = current_canopen->next_timer_us - micros;
-  ESP_LOGV(TAG_TM, "DrvTimerDelay node_id: %ld delay: %ld", current_canopen->node_id, dt);
+  ESP_LOGV(TAG_TM, "DrvTimerDelay node_id: %ld delay: %lld", current_canopen->node_id, dt);
 
   // /* return remaining ticks until interrupt occurs */
   return (uint32_t) (dt > 0 ? dt : 0);
