@@ -1,5 +1,6 @@
 #include <map>
 #include "esphome.h"
+#include "esphome/core/helpers.h"
 #include "canopen.h"
 #include "fw.h"
 
@@ -11,6 +12,23 @@ void esp_log(const char *tag, const char *fmt, ...) {
   va_end(arglist);
 }
 }
+
+#ifdef USE_STM32
+extern "C" caddr_t _sbrk(int incr);
+extern "C" char _end; // Symbol defined in the linker script, marking the end of the data segment
+
+uint32_t get_free_heap_size() {
+    caddr_t current_break = _sbrk(0); // Get current program break
+    caddr_t stack_ptr;
+    stack_ptr = (caddr_t)&stack_ptr;
+
+    if (stack_ptr > current_break) {
+        return (size_t)(stack_ptr - current_break);
+    } else {
+        return 0; // Stack has likely overflowed into the heap
+    }
+}
+#endif
 
 void CONmtHbConsEvent(CO_NMT *nmt, uint8_t nodeId) {
   auto trigger = ((esphome::canopen::CanopenNode *) nmt->Node)->canopen->on_hb_cons_event;
@@ -463,6 +481,10 @@ void CanopenComponent::setup() {
 
   CONodeStart(node);
   set_pre_operational_mode();
+
+  #ifdef USE_STM32
+  ESP_LOGI(TAG, "free heap size: %d", ::get_free_heap_size());
+  #endif
 }
 
 void CanopenComponent::set_pre_operational_mode() {
