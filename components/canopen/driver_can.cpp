@@ -12,6 +12,20 @@ namespace canopen {
 const char *TAG = "can_driver";
 const char *TAG_TM = "timer_driver";
 
+
+static uint32_t prev_us = 0;
+static uint64_t total_us = 0;
+
+uint64_t get_micros_u64() {
+    uint32_t us = esphome::micros();
+    if(prev_us > us) {
+      // overflow
+      total_us += 0x100000000;
+    }
+    prev_us = us;
+    return total_us | us;
+}
+
 void DrvCanInit(void) { ESP_LOGI(TAG, "DrvCanInit"); }
 
 void DrvCanEnable(uint32_t baudrate) { ESP_LOGI(TAG, "DrvCanEnable baudrate: %ld", baudrate); }
@@ -76,7 +90,7 @@ void DrvTimerInit(uint32_t freq) {
     ESP_LOGW(TAG_TM, "no current canopen instance set");
     return;
   }
-  current_canopen->timer.tv_sec = current_canopen->timer.tv_usec = 0;
+  current_canopen -> next_timer_us = 0;
   ESP_LOGV(TAG_TM, "DrvTimerInit, freq: %ld", freq);
 }
 
@@ -90,18 +104,15 @@ uint8_t DrvTimerUpdate(void) {
     ESP_LOGW(TAG_TM, "no current canopen instance set");
     return 0;
   }
-
-  if (!current_canopen->timer.tv_sec && !current_canopen->timer.tv_usec) {
+  if (!current_canopen->next_timer_us) {
     // timer is stopped
     return 0;
   }
 
-  struct timeval tv_now;
-  gettimeofday(&tv_now, NULL);
+  uint64_t micros = get_micros_u64();
+  int64_t dt = current_canopen->next_timer_us - micros;
 
-  int32_t dt =
-      (current_canopen->timer.tv_sec - tv_now.tv_sec) * 1000000 + (current_canopen->timer.tv_usec - tv_now.tv_usec);
-  ESP_LOGVV(TAG_TM, "DrvTimerUpdate node_id: %d, %d", current_canopen->node_id, dt);
+  ESP_LOGVV(TAG_TM, "DrvTimerUpdate node_id: %d, %ld %ld", micros, dt);
   return dt > 0 ? 0 : 1;
 }
 
@@ -110,15 +121,11 @@ uint32_t DrvTimerDelay(void) {
     ESP_LOGW(TAG_TM, "no current canopen instance set");
     return 0;
   }
-
-  struct timeval tv_now;
-  gettimeofday(&tv_now, NULL);
-
-  int32_t dt =
-      (current_canopen->timer.tv_sec - tv_now.tv_sec) * 1000000 + (current_canopen->timer.tv_usec - tv_now.tv_usec);
+  uint64_t micros = get_micros_u64();
+  int64_t dt = current_canopen->next_timer_us - micros;
   ESP_LOGV(TAG_TM, "DrvTimerDelay node_id: %ld delay: %ld", current_canopen->node_id, dt);
 
-  /* return remaining ticks until interrupt occurs */
+  // /* return remaining ticks until interrupt occurs */
   return (uint32_t) (dt > 0 ? dt : 0);
 }
 
@@ -131,8 +138,7 @@ void DrvTimerReload(uint32_t reload) {
   /* configure the next hardware timer interrupt */
   ESP_LOGV(TAG_TM, "DrvTimerReload node_id: %ld, %ld", current_canopen->node_id, reload);
 
-  gettimeofday(&current_canopen->timer, NULL);
-  current_canopen->timer.tv_usec += reload;
+  current_canopen->next_timer_us = get_micros_u64() + reload;
 }
 
 void DrvTimerStop(void) {
@@ -141,7 +147,7 @@ void DrvTimerStop(void) {
     return;
   }
   ESP_LOGV(TAG_TM, "DrvTimerStop, node_id: %ld", current_canopen->node_id);
-  current_canopen->timer.tv_sec = current_canopen->timer.tv_usec = 0;
+  current_canopen->next_timer_us = 0;
   /* stop the hardware timer counting */
 }
 

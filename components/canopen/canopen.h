@@ -100,7 +100,7 @@ struct CanopenNode {
 class CanopenComponent : public Component {
  protected:
   // for timer driver
-  struct timeval timer;
+  uint64_t next_timer_us;
 
   /* Each software timer needs some memory for managing
    * the lists and states of the timed action events.
