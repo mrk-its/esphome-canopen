@@ -63,7 +63,7 @@ struct CanStatus {
   uint32_t bus_err;
 };
 
-const uint32_t status_update_interval = 1;
+const uint32_t status_update_interval_ms = 5000;
 
 class OperationalTrigger : public Trigger<> {};
 class PreOperationalTrigger : public Trigger<> {};
@@ -145,8 +145,8 @@ class CanopenComponent : public Component {
   uint32_t node_id;
 
   CanStatus last_status = {};
-  struct timeval status_time = {};
-  struct timeval bus_off_time = {};
+  uint32_t status_time_ms = 0;
+  uint32_t bus_off_time_ms = 0;
 
   bool waiting_for_bus_recovery = false;
   int recovery_delay_seconds = 60;

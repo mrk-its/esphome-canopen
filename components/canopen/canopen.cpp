@@ -610,7 +610,11 @@ bool CanopenComponent::get_can_status(CanStatus &status_info) {
   return false;
 }
 
-void CanopenComponent::initiate_recovery() { twai_initiate_recovery(); }
+void CanopenComponent::initiate_recovery() {
+#ifdef USE_ESP32
+  twai_initiate_recovery();
+#endif
+}
 
 void CanopenComponent::store_comm_params() {
   if (comm_state.save(&rpdo_buf)) {
@@ -658,10 +662,9 @@ void CanopenComponent::loop() {
   }
   dirty_tpdo_mask = 0;
 
-  struct timeval tv_now;
-  gettimeofday(&tv_now, NULL);
+  uint32_t now_ms = esphome::millis();
 
-  if (abs(tv_now.tv_sec - status_time.tv_sec) >= status_update_interval) {
+  if ((now_ms - status_time_ms) >= status_update_interval_ms) {
     if (get_can_status(status)) {
       if (status.tx_err > last_status.tx_err || status.rx_err > last_status.rx_err ||
           status.tx_failed > last_status.tx_failed || status.rx_miss > last_status.rx_miss ||
@@ -671,7 +674,7 @@ void CanopenComponent::loop() {
       }
       last_status = status;
     }
-    status_time = tv_now;
+    status_time_ms = now_ms;
   }
 
 #ifdef USE_ESP32
@@ -689,7 +692,7 @@ void CanopenComponent::loop() {
       // Prepare to initiate bus recovery, reconfigure alerts to detect bus recovery completion
       twai_reconfigure_alerts(TWAI_ALERT_BUS_RECOVERED, NULL);
       waiting_for_bus_recovery = true;
-      gettimeofday(&bus_off_time, NULL);
+      bus_off_time_ms = esphome::millis();
       ESP_LOGI(TAG, "Initiate bus recovery in %d seconds", recovery_delay_seconds);
     }
     if (alerts & TWAI_ALERT_BUS_RECOVERED) {
@@ -703,16 +706,17 @@ void CanopenComponent::loop() {
       }
     }
   }
+#endif
 
   if (waiting_for_bus_recovery) {
-    auto t = abs(tv_now.tv_sec - bus_off_time.tv_sec);
+    auto t = now_ms - bus_off_time_ms;
     if (t >= recovery_delay_seconds) {
-      twai_initiate_recovery();  // Needs 128 occurrences of bus free signal
+      initiate_recovery();  // Needs 128 occurrences of bus free signal
       ESP_LOGI(TAG, "Initiate bus recovery");
       waiting_for_bus_recovery = false;
     }
   }
-#endif
+
   ESP_LOGVV(TAG, "loop end, node_id: %d", node_id);
 }
 }  // namespace canopen
