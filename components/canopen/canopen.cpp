@@ -406,6 +406,7 @@ void CanopenComponent::setup() {
   twai_reconfigure_alerts(TWAI_ALERT_ABOVE_ERR_WARN | TWAI_ALERT_ERR_PASS | TWAI_ALERT_BUS_OFF, NULL);
 #endif
 
+#ifdef USE_ESP32
   uint32_t hash = fnv1_hash("canopen_comm_state_v2");
   this->comm_state = global_preferences->make_preference<uint8_t[CO_RPDO_N * 41]>(hash, true);
   if (this->comm_state.load(&rpdo_buf)) {
@@ -413,6 +414,7 @@ void CanopenComponent::setup() {
   } else {
     ESP_LOGI(TAG, "can't load RPDO config from preferences, using defaults");
   }
+#endif
 
   if (heartbeat_interval_ms) {
     od.add_update(CO_KEY(0x1017, 0, CO_OBJ_D___RW), CO_THB_PROD, (CO_DATA) (heartbeat_interval_ms));
@@ -617,17 +619,21 @@ void CanopenComponent::initiate_recovery() {
 }
 
 void CanopenComponent::store_comm_params() {
+#ifdef USE_ESP32
   if (comm_state.save(&rpdo_buf)) {
     global_preferences->sync();
     ESP_LOGI(TAG, "Stored communication params in NVM");
   } else {
     ESP_LOGE(TAG, "Can't store communication params in NVM");
   }
+#endif
 }
 
 void CanopenComponent::reset_comm_params() {
+#ifdef USE_ESP32
   global_preferences->reset();
   ESP_LOGI(TAG, "Reseted communication params in NVM");
+#endif
 }
 
 int16_t CanopenComponent::get_heartbeat_events(uint8_t node_id) { return CONmtGetHbEvents(&node->Nmt, node_id); }
