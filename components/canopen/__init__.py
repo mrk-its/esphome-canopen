@@ -6,7 +6,7 @@ import esphome.codegen as cg
 from esphome import automation
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.components.canbus import CanbusComponent
-from esphome.core import coroutine_with_priority
+from esphome.core import CORE
 
 ns = cg.esphome_ns.namespace("canopen")
 
@@ -182,6 +182,11 @@ TYPE_TO_CANOPEN_TYPE = {
 
 
 def to_code(config_list):
+    if not CORE.is_stm32:
+        extra_build_flags = ("-DOTA_COMPRESSION=1", )
+    else:
+        extra_build_flags = ()
+
     for config in config_list:
         cg.add_platformio_option(
             "build_flags",
@@ -194,14 +199,12 @@ def to_code(config_list):
                 "-DUSE_LSS=0",
                 "-DUSE_CSDO=0",
                 "-DMINIZ_NO_STDIO=1",
+                *extra_build_flags,
             ],
         )
-
         cg.add_library(
             "canopenstack=https://github.com/mrk-its/canopen-stack#test", None
         )
-        cg.add_library("micro_miniz=https://github.com/rzeldent/micro-miniz#main", None)
-        # cg.add_library("canopenstack=file:///home/mrk/canopen-stack", "0.0.0")
         node_id = config["node_id"]
         canopen = cg.new_Pvariable(config[CONF_ID], node_id)
 

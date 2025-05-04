@@ -3,7 +3,6 @@
 #include <driver/twai.h>
 #endif
 #include "esphome.h"
-#include "esphome/core/helpers.h"
 #include "canopen.h"
 #include "fw.h"
 
@@ -125,7 +124,7 @@ const struct CO_OBJ_T od_header[] = {
     {CO_KEY(0x1200, 2, CO_OBJ__N__R_), CO_TUNSIGNED32, (CO_DATA) (&Obj1200_02_20)},
 };
 
-CanopenComponent::CanopenComponent(uint32_t node_id) : od(APP_OBJ_N) {
+CanopenComponent::CanopenComponent(uint32_t node_id) : od(APP_OBJ_N), hfq_requester() {
   ESP_LOGI(TAG, "initializing CANopen-stack, node_id: %03lx", node_id);
   canopen_node.canopen = this;
   node = &canopen_node.node;
@@ -419,9 +418,14 @@ float CanopenComponent::get_setup_priority() const { return setup_priority::PROC
 void CanopenComponent::setup() {
   all_instances.push_back(this);
   current_canopen = this;
+
+  hfq_requester.start();
+
   ESP_LOGCONFIG(TAG, "Setting up CANopen...");
+  ESP_LOGI(TAG, "high frequency loop: %d", hfq_requester.is_high_frequency());
   ESP_LOGD(TAG, "CO_TPDO_N: %d", CO_TPDO_N);
   ESP_LOGD(TAG, "CO_RPDO_N: %d", CO_RPDO_N);
+
 
 #ifdef USE_ESP32
   twai_reconfigure_alerts(TWAI_ALERT_ABOVE_ERR_WARN | TWAI_ALERT_ERR_PASS | TWAI_ALERT_BUS_OFF, NULL);
@@ -457,6 +461,11 @@ void CanopenComponent::setup() {
   od.add_update(CO_KEY(0x3000, 2, CO_OBJ_____RW), CO_TUNSIGNED32, (CO_DATA) (&FirmwareObj.size));
   od.add_update(CO_KEY(0x3000, 3, CO_OBJ______W), CO_TDOMAIN, (CO_DATA) (&FirmwareMD5));
   od.add_update(CO_KEY(0x3000, 4, CO_OBJ______W), FW_IMAGE, (CO_DATA) (&FirmwareObj));
+  uint32_t flags = 0;
+#ifdef OTA_COMPRESSION
+  flags |= 1;
+#endif
+  od.add_update(CO_KEY(0x3000, 5, CO_OBJ_D___R_), CO_TUNSIGNED32, flags);
 #endif
 
   for (auto it = entities.begin(); it != entities.end(); it++) {
@@ -705,6 +714,9 @@ void CanopenComponent::loop() {
       }
       last_status = status;
     }
+    #ifdef USE_STM32
+    ESP_LOGI(TAG, "free heap size: %d", ::get_free_heap_size());
+    #endif
     status_time_ms = now_ms;
   }
 

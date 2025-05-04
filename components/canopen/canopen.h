@@ -3,6 +3,7 @@
 #include "entities.h"
 #include "driver_can.h"
 #include "od.h"
+#include "esphome/core/helpers.h"
 
 const int8_t ENTITY_TYPE_DISABLED = 0;
 const int8_t ENTITY_TYPE_SENSOR = 1;
@@ -125,6 +126,7 @@ class CanopenComponent : public Component {
   uint8_t rpdo_buf[CO_RPDO_N][41];
 
   ObjectDictionary od;
+  HighFrequencyLoopRequester hfq_requester;
 
   std::vector<CO_IF_FRM> recv_frames;
   friend class BaseCanopenEntity;

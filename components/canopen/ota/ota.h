@@ -3,7 +3,9 @@
 
 // #ifdef USE_OTA
 
+#ifdef OTA_COMPRESSION
 #include "miniz.h"
+#endif
 
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
@@ -21,16 +23,18 @@ class OtaFinishedTrigger : public Trigger<> {};
 
 class CanopenOTAComponent : public ota::OTAComponent {
   const char *TAG = "canopen_ota";
-  const static uint32_t BUF_SIZE = 8 * 1024;
   OtaFinishedTrigger *ota_finished_trigger;
+
+#ifdef OTA_COMPRESSION
+  const static uint32_t BUF_SIZE = 8 * 1024;
   z_stream stream;
   uint8_t s_outbuf[BUF_SIZE];
-  uint32_t size;
   uint32_t written;
   uint32_t received;
-  bool dry_run = false;
-
   int decompress();
+#endif
+
+  bool dry_run = false;
 
  public:
   bool disable_ota_reboot = false;
