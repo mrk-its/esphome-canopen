@@ -182,7 +182,7 @@ TYPE_TO_CANOPEN_TYPE = {
 
 
 def to_code(config_list):
-    if not CORE.is_stm32:
+    if not getattr(CORE, "is_stm32", False):
         extra_build_flags = ("-DOTA_COMPRESSION=1", )
     else:
         extra_build_flags = ()
