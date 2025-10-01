@@ -26,11 +26,9 @@ void CanopenOTAComponent::setup() {
   auto delayaction_id = new DelayAction<>();
   auto delayaction2_id = new DelayAction<>();
 
-  delayaction_id->set_component_source("canopen.ota");
   App.register_component(delayaction_id);
   delayaction_id->set_delay(1000);
 
-  delayaction2_id->set_component_source("canopen.ota");
   App.register_component(delayaction2_id);
   delayaction2_id->set_delay(1000);
 
