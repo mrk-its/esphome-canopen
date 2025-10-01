@@ -21,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Configure
-        run: framework=${{matrix.framework}} board=${{matrix.board}} envsubst < test/config.yaml.template > test/config.yaml
+        run: framework="${{matrix.framework}}" board=${{matrix.board}} envsubst < test/config.yaml.template > test/config.yaml
       - name: Compile
         uses: esphome/build-action@v6
         id: esphome-build
