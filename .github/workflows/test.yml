@@ -11,8 +11,8 @@ jobs:
       max-parallel: 3
       matrix:
         framework:
-          - "{type: esp-idf, version: recommended}"
-          - "{type: arduino, version: recommended}"
+          - "{type: esp-idf}"
+          - "{type: arduino}"
         board:
           - esp32-c3-devkitm-1
           - wt32-eth01
