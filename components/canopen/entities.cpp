@@ -43,7 +43,7 @@ void SensorEntity::setup(CanopenComponent *canopen) {
                            : size == 2 ? ENTITY_TYPE_SENSOR_UINT16
                                        : ENTITY_TYPE_SENSOR,
                            sensor->get_name(), sensor->get_device_class(), sensor->get_unit_of_measurement(),
-                           esphome::sensor::state_class_to_string(sensor->get_state_class()));
+                           (char *)esphome::sensor::state_class_to_string(sensor->get_state_class()));
   canopen->od_add_min_max_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
 
