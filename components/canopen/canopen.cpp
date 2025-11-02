@@ -198,7 +198,7 @@ void CanopenComponent::parse_od_writer_frame(CO_IF_FRM *frm) {
   }
 }
 
-void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data) {
+void CanopenComponent::on_frame(uint32_t can_id, bool rtr, const std::vector<uint8_t> &data) {
   CO_IF_FRM frame = {can_id, {}, (uint8_t) data.size()};
   memcpy(frame.Data, &data[0], data.size());
   recv_frames.push_back(frame);
@@ -213,21 +213,10 @@ void CanopenComponent::on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> 
 }
 
 void CanopenComponent::set_canbus(canbus::Canbus *canbus) {
-  Automation<std::vector<uint8_t>, uint32_t, bool> *automation;
-  LambdaAction<std::vector<uint8_t>, uint32_t, bool> *lambdaaction;
-  canbus::CanbusTrigger *canbus_canbustrigger;
-
   this->canbus = canbus;
-
-  canbus_canbustrigger = new canbus::CanbusTrigger(canbus, 0, 0, false);
-  canbus_canbustrigger->set_component_source(LOG_STR("canbus"));
-  App.register_component(canbus_canbustrigger);
-  automation = new Automation<std::vector<uint8_t>, uint32_t, bool>(canbus_canbustrigger);
-  auto cb = [this](std::vector<uint8_t> x, uint32_t can_id, bool remote_transmission_request) -> void {
-    this->on_frame(can_id, remote_transmission_request, x);
-  };
-  lambdaaction = new LambdaAction<std::vector<uint8_t>, uint32_t, bool>(cb);
-  automation->add_actions({lambdaaction});
+  this->canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) -> void {
+    this->on_frame(can_id, rtr, data);
+  });
 }
 
 void CanopenComponent::od_add_metadata(uint32_t entity_id, uint32_t type, const std::string &name,

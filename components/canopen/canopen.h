@@ -303,7 +303,7 @@ class CanopenComponent : public Component {
 
   bool remote_entity_write_od(uint8_t node_id, uint32_t index, uint8_t subindex, void *data, uint8_t size);
 
-  void on_frame(uint32_t can_id, bool rtr, std::vector<uint8_t> &data);
+  void on_frame(uint32_t can_id, bool rtr, const std::vector<uint8_t> &data);
   void store_comm_params();
   void reset_comm_params();
   void loop() override;
