@@ -1,0 +1,50 @@
+packages:
+  common: !include common.yaml
+
+esphome:
+  name: light
+
+canopen:
+  id: can_open
+  canbus_id: can_bus
+  node_id: 7
+  entities:
+    - index: 1
+      id: light1
+      tpdo: 0
+
+output:
+  - platform: template
+    id: output_warm
+    type: float
+    write_action:
+      - logger.log:
+          format: "output warm: %f"
+          args: ['state']
+
+  - platform: template
+    id: output_cold
+    type: float
+    write_action:
+      - logger.log:
+          format: "output cold: %f"
+          args: ['state']
+
+light:
+  - platform: cwww
+    id: light1
+    name: "Test Light 1"
+    cold_white: output_cold
+    warm_white: output_warm
+    gamma_correct: 1
+    cold_white_color_temperature: 10000 K
+    warm_white_color_temperature: 1000 K
+    default_transition_length: 0s
+
+cover:
+sensor:
+number:
+
+logger:
+  logs:
+    canbus_udp_multicast: INFO

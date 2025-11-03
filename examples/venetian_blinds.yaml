@@ -1,0 +1,37 @@
+packages:
+  common: !include common.yaml
+
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/bruxy70/Venetian-Blinds-Control
+      ref: master
+    components: [venetian_blinds]
+
+esphome:
+  name: venetian_blinds
+
+canopen:
+  id: can_open
+  node_id: 9
+  entities:
+    - index: 1
+      id: cover1
+      tpdo: 0
+
+cover:
+  - platform: venetian_blinds
+    name: "Cover 1"
+    id: cover1
+    internal: true
+    device_class: shutter
+    open_action:
+      - logger.log: open_action
+    open_duration: 10s
+    close_action:
+      - logger.log: close_action
+    close_duration: 10s
+    stop_action:
+      - logger.log: stop_action
+    tilt_duration: 2000ms
