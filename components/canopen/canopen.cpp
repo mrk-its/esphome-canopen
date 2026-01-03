@@ -17,18 +17,18 @@
 
 #ifdef USE_STM32
 extern "C" caddr_t _sbrk(int incr);
-extern "C" char _end; // Symbol defined in the linker script, marking the end of the data segment
+extern "C" char _end;  // Symbol defined in the linker script, marking the end of the data segment
 
 uint32_t get_free_heap_size() {
-    caddr_t current_break = _sbrk(0); // Get current program break
-    caddr_t stack_ptr;
-    stack_ptr = (caddr_t)&stack_ptr;
+  caddr_t current_break = _sbrk(0);  // Get current program break
+  caddr_t stack_ptr;
+  stack_ptr = (caddr_t) &stack_ptr;
 
-    if (stack_ptr > current_break) {
-        return (size_t)(stack_ptr - current_break);
-    } else {
-        return 0; // Stack has likely overflowed into the heap
-    }
+  if (stack_ptr > current_break) {
+    return (size_t) (stack_ptr - current_break);
+  } else {
+    return 0;  // Stack has likely overflowed into the heap
+  }
 }
 #endif
 
@@ -214,9 +214,8 @@ void CanopenComponent::on_frame(uint32_t can_id, bool rtr, const std::vector<uin
 
 void CanopenComponent::set_canbus(canbus::Canbus *canbus) {
   this->canbus = canbus;
-  this->canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) -> void {
-    this->on_frame(can_id, rtr, data);
-  });
+  this->canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr,
+                                    const std::vector<uint8_t> &data) -> void { this->on_frame(can_id, rtr, data); });
 }
 
 void CanopenComponent::od_add_metadata(uint32_t entity_id, uint32_t type, const std::string &name,
@@ -411,6 +410,7 @@ void CanopenComponent::setup() {
   //  hfq_requester.start();
 
   ESP_LOGCONFIG(TAG, "Setting up CANopen...");
+  ESP_LOGI(TAG, "node name: %s, node_id: %02x", esphome::App.get_name().c_str(), this->node_id);
   ESP_LOGI(TAG, "high frequency loop: %d", hfq_requester.is_high_frequency());
   ESP_LOGD(TAG, "CO_TPDO_N: %d", CO_TPDO_N);
   ESP_LOGD(TAG, "CO_RPDO_N: %d", CO_RPDO_N);
@@ -483,9 +483,9 @@ void CanopenComponent::setup() {
   CONodeStart(node);
   set_pre_operational_mode();
 
-  #ifdef USE_STM32
-  ESP_LOGI(TAG, "free heap size: %d", ::get_free_heap_size());
-  #endif
+  // #ifdef USE_STM32
+  // ESP_LOGI(TAG, "free heap size: %d", ::get_free_heap_size());
+  // #endif
 }
 
 void CanopenComponent::set_pre_operational_mode() {
@@ -703,9 +703,9 @@ void CanopenComponent::loop() {
       }
       last_status = status;
     }
-    #ifdef USE_STM32
-    ESP_LOGI(TAG, "free heap size: %d", ::get_free_heap_size());
-    #endif
+    // #ifdef USE_STM32
+    //     ESP_LOGI(TAG, "free heap size: %d", ::get_free_heap_size());
+    // #endif
     status_time_ms = now_ms;
   }
 
