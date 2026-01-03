@@ -6,14 +6,14 @@
 #include "canopen.h"
 #include "fw.h"
 
-extern "C" {
-void esp_log(const char *tag, const char *fmt, ...) {
-  va_list arglist;
-  va_start(arglist, fmt);
-  esphome::esp_log_vprintf_(ESPHOME_LOG_LEVEL_INFO, tag, __LINE__, fmt, arglist);
-  va_end(arglist);
-}
-}
+// extern "C" {
+// void esp_log(const char *tag, const char *fmt, ...) {
+//   va_list arglist;
+//   va_start(arglist, fmt);
+//   esphome::esp_log_vprintf_(ESPHOME_LOG_LEVEL_INFO, tag, __LINE__, fmt, arglist);
+//   va_end(arglist);
+// }
+// }
 
 #ifdef USE_STM32
 extern "C" caddr_t _sbrk(int incr);
