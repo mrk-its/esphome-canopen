@@ -408,7 +408,7 @@ void CanopenComponent::setup() {
   all_instances.push_back(this);
   current_canopen = this;
 
-  hfq_requester.start();
+  //  hfq_requester.start();
 
   ESP_LOGCONFIG(TAG, "Setting up CANopen...");
   ESP_LOGI(TAG, "high frequency loop: %d", hfq_requester.is_high_frequency());
