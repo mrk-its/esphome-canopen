@@ -742,7 +742,7 @@ void CanopenComponent::loop() {
 
   if (waiting_for_bus_recovery) {
     auto t = now_ms - bus_off_time_ms;
-    if (t >= recovery_delay_seconds) {
+    if (t >= recovery_delay_seconds * 1000) {
       initiate_recovery();  // Needs 128 occurrences of bus free signal
       ESP_LOGI(TAG, "Initiate bus recovery");
       waiting_for_bus_recovery = false;

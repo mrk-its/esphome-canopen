@@ -151,7 +151,7 @@ class CanopenComponent : public Component {
   uint32_t bus_off_time_ms = 0;
 
   bool waiting_for_bus_recovery = false;
-  int recovery_delay_seconds = 60;
+  int recovery_delay_seconds = 15;
 
   OperationalTrigger *on_operational = {};
   PreOperationalTrigger *on_pre_operational = {};
