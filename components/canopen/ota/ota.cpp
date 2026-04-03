@@ -1,7 +1,7 @@
 #include "ota.h"
 // #ifdef USE_OTA
 #include "esphome/components/md5/md5.h"
-#include "esphome/components/ota/ota_backend.h"
+#include "esphome/components/ota/ota_backend_factory.h"
 #include "esphome/components/ota/ota_backend_esp_idf.h"
 #include "esphome/core/application.h"
 #include "esphome/core/hal.h"

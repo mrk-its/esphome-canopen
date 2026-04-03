@@ -14,7 +14,7 @@
 #include "esphome/core/preferences.h"
 #include "esphome/core/automation.h"
 
-#include "esphome/components/ota/ota_backend.h"
+#include "esphome/components/ota/ota_backend_factory.h"
 
 namespace esphome {
 namespace canopen {
@@ -38,7 +38,7 @@ class CanopenOTAComponent : public ota::OTAComponent {
 
  public:
   bool disable_ota_reboot = false;
-  std::unique_ptr<esphome::ota::OTABackend> backend;
+  ota::OTABackendPtr backend;
   void setup() override;
   //   void dump_config() override;
   float get_setup_priority() const override;

@@ -5,7 +5,7 @@
 
 #ifdef USE_CANOPEN_OTA
 
-#include "esphome/components/ota/ota_backend.h"
+#include "esphome/components/ota/ota_backend_factory.h"
 
 /******************************************************************************
  * INCLUDES
