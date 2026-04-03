@@ -23,37 +23,29 @@ void CanopenOTAComponent::setup() {
 
   ota_finished_trigger = new canopen::OtaFinishedTrigger();
   auto automation_id = new Automation<>(ota_finished_trigger);
-  auto delayaction_id = new DelayAction<>();
-  auto delayaction2_id = new DelayAction<>();
 
-  delayaction_id->set_component_source(LOG_STR("canopen.ota"));
-  App.register_component(delayaction_id);
-  delayaction_id->set_delay(1000);
+  auto ota_end_id = new LambdaAction<>([this]() -> void {
+    App.scheduler.set_timeout(this, "ota_timeout", 1000, [this]() {
+      esphome::ota::OTAResponseTypes ret = esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK;
+      if(!dry_run) {
+        ret = backend->end();
+      }
+      if(ret == esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK) {
+        ESP_LOGI(TAG, "ota finished successfully, rebooting");
+      } else {
+        ESP_LOGE(TAG, "ota error: %d", ret);
+      }
 
-  delayaction2_id->set_component_source(LOG_STR("canopen.ota"));
-  App.register_component(delayaction2_id);
-  delayaction2_id->set_delay(1000);
-
-  auto ota_end_id = new LambdaAction<>([=]() -> void {
-    esphome::ota::OTAResponseTypes ret = esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK;
-    if(!dry_run) {
-      ret = backend->end();
-    }
-    if(ret == esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK) {
-      ESP_LOGI(TAG, "ota finished successfully, rebooting");
-    } else {
-      ESP_LOGE(TAG, "ota error: %d", ret);
-    }
+      App.scheduler.set_timeout(this, "reboot_timeout", 1000, [this]() {
+        if(!disable_ota_reboot) {
+          ESP_LOGI(TAG, "ota finished, rebooting");
+          App.safe_reboot();
+        }
+      });
+    });
   });
 
-  auto reboot_action_id = new LambdaAction<>([=]() -> void {
-    if(!disable_ota_reboot) {
-      ESP_LOGI(TAG, "ota finished, rebooting");
-      App.safe_reboot();
-    }
-  });
-
-  automation_id->add_actions({delayaction_id, ota_end_id, delayaction2_id, reboot_action_id});
+  automation_id->add_actions({ota_end_id});
 #ifdef OTA_COMPRESSION
   this->stream = z_stream{};
 #endif
