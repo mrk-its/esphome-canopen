@@ -101,14 +101,14 @@ void NumberEntity::setup(CanopenComponent *canopen) {
 
   switch (size) {
     case 1:
-      to_wire = [=](float state) { return scale_to_wire(state, min_val, max_val, 255); };
-      from_wire = [=](void *buf) { return scale_from_wire(*(uint8_t *) buf, min_val, max_val, 255); };
+      to_wire = [=, this](float state) { return scale_to_wire(state, min_val, max_val, 255); };
+      from_wire = [=, this](void *buf) { return scale_from_wire(*(uint8_t *) buf, min_val, max_val, 255); };
       type = CO_TUNSIGNED8;
       cmd_type = CO_TCMD8;
       break;
     case 2:
-      to_wire = [=](float state) { return scale_to_wire(state, min_val, max_val, 65535); };
-      from_wire = [=](void *buf) { return scale_from_wire(*(uint16_t *) buf, min_val, max_val, 65535); };
+      to_wire = [=, this](float state) { return scale_to_wire(state, min_val, max_val, 65535); };
+      from_wire = [=, this](void *buf) { return scale_from_wire(*(uint16_t *) buf, min_val, max_val, 65535); };
       type = CO_TUNSIGNED16;
       cmd_type = CO_TCMD16;
       break;
@@ -124,12 +124,12 @@ void NumberEntity::setup(CanopenComponent *canopen) {
   }
   auto casted_state = to_wire(state);
   state_key = canopen->od_add_state(entity_id, type, &casted_state, size, tpdo);
-  number->add_on_state_callback([=](float value) {
+  number->add_on_state_callback([=, this](float value) {
     auto casted_state = to_wire(value);
     od_set_state(canopen, state_key, &casted_state, size);
   });
   canopen->od_add_cmd(
-      entity_id, [=](void *buffer, uint32_t size) { number->publish_state(from_wire(buffer)); }, cmd_type);
+      entity_id, [=, this](void *buffer, uint32_t size) { number->publish_state(from_wire(buffer)); }, cmd_type);
 }
 #endif
 
@@ -157,8 +157,8 @@ void SwitchEntity::setup(CanopenComponent *canopen) {
   canopen->od_add_metadata(entity_id, ENTITY_TYPE_SWITCH, switch_->get_name(),
                            switch_->get_device_class_to(dc_buf), "", "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
-  switch_->add_on_state_callback([=](bool value) { od_set_state(canopen, state_key, &value, 1); });
-  canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+  switch_->add_on_state_callback([=, this](bool value) { od_set_state(canopen, state_key, &value, 1); });
+  canopen->od_add_cmd(entity_id, [=, this](void *buffer, uint32_t size) {
     if (((uint8_t *) buffer)[0]) {
       switch_->turn_on();
     } else {
