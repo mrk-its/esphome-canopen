@@ -30,11 +30,13 @@ float color_temp_from_wire(uint32_t value) { return scale_from_wire(value, 100.0
 
 #ifdef USE_SENSOR
 void SensorEntity::setup(CanopenComponent *canopen) {
+  char dc_buf[MAX_DEVICE_CLASS_LENGTH];
+
   canopen->od_add_metadata(entity_id,
                            size == 1   ? ENTITY_TYPE_SENSOR_UINT8
                            : size == 2 ? ENTITY_TYPE_SENSOR_UINT16
                                        : ENTITY_TYPE_SENSOR,
-                           sensor->get_name(), sensor->get_device_class_ref(), sensor->get_unit_of_measurement_ref(),
+                           sensor->get_name(), sensor->get_device_class_to(dc_buf), sensor->get_unit_of_measurement_ref(),
                            (char *) esphome::sensor::state_class_to_string(sensor->get_state_class()));
   canopen->od_add_min_max_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
@@ -57,7 +59,11 @@ void SensorEntity::setup(CanopenComponent *canopen) {
       cmd_type = CO_TCMD16;
       break;
     case 4:
-      to_wire = [=](float state) { return *(uint32_t *) &state; };
+      to_wire = [=](float state) {
+        uint32_t val;
+        std::memcpy(&val, &state, sizeof(val));
+        return val;
+      };
       from_wire = [=](void *buf) { return *(float *) buf; };
       type = CO_TUNSIGNED32;
       cmd_type = CO_TCMD32;
@@ -82,11 +88,13 @@ void SensorEntity::setup(CanopenComponent *canopen) {
 #ifdef USE_NUMBER
 void NumberEntity::setup(CanopenComponent *canopen) {
   float state = number->state;
+  char dc_buf[MAX_DEVICE_CLASS_LENGTH];
+
   canopen->od_add_metadata(entity_id,
                            size == 1   ? ENTITY_TYPE_NUMBER_UINT8
                            : size == 2 ? ENTITY_TYPE_NUMBER_UINT16
                                        : ENTITY_TYPE_NUMBER,
-                           number->get_name(), number->traits.get_device_class(), "", "");
+                           number->get_name(), number->get_device_class_to(dc_buf), "", "");
 
   canopen->od_add_min_max_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
@@ -97,19 +105,23 @@ void NumberEntity::setup(CanopenComponent *canopen) {
 
   switch (size) {
     case 1:
-      to_wire = [=](float state) { return scale_to_wire(state, min_val, max_val, 255); };
-      from_wire = [=](void *buf) { return scale_from_wire(*(uint8_t *) buf, min_val, max_val, 255); };
+      to_wire = [=, this](float state) { return scale_to_wire(state, min_val, max_val, 255); };
+      from_wire = [=, this](void *buf) { return scale_from_wire(*(uint8_t *) buf, min_val, max_val, 255); };
       type = CO_TUNSIGNED8;
       cmd_type = CO_TCMD8;
       break;
     case 2:
-      to_wire = [=](float state) { return scale_to_wire(state, min_val, max_val, 65535); };
-      from_wire = [=](void *buf) { return scale_from_wire(*(uint16_t *) buf, min_val, max_val, 65535); };
+      to_wire = [=, this](float state) { return scale_to_wire(state, min_val, max_val, 65535); };
+      from_wire = [=, this](void *buf) { return scale_from_wire(*(uint16_t *) buf, min_val, max_val, 65535); };
       type = CO_TUNSIGNED16;
       cmd_type = CO_TCMD16;
       break;
     case 4:
-      to_wire = [=](float state) { return *(uint32_t *) &state; };
+      to_wire = [=](float state) {
+        uint32_t val;
+        std::memcpy(&val, &state, sizeof(val));
+        return val;
+      };
       from_wire = [=](void *buf) { return *(float *) buf; };
       type = CO_TUNSIGNED32;
       cmd_type = CO_TCMD32;
@@ -120,19 +132,22 @@ void NumberEntity::setup(CanopenComponent *canopen) {
   }
   auto casted_state = to_wire(state);
   state_key = canopen->od_add_state(entity_id, type, &casted_state, size, tpdo);
-  number->add_on_state_callback([=](float value) {
+  number->add_on_state_callback([=, this](float value) {
     auto casted_state = to_wire(value);
     od_set_state(canopen, state_key, &casted_state, size);
   });
   canopen->od_add_cmd(
-      entity_id, [=](void *buffer, uint32_t size) { number->publish_state(from_wire(buffer)); }, cmd_type);
+      entity_id, [=, this](void *buffer, uint32_t size) { number->publish_state(from_wire(buffer)); }, cmd_type);
 }
 #endif
 
 #ifdef USE_BINARY_SENSOR
 
 void BinarySensorEntity::setup(CanopenComponent *canopen) {
-  canopen->od_add_metadata(entity_id, ENTITY_TYPE_BINARY_SENSOR, sensor->get_name(), sensor->get_device_class(), "",
+  char dc_buf[MAX_DEVICE_CLASS_LENGTH];
+
+  canopen->od_add_metadata(entity_id, ENTITY_TYPE_BINARY_SENSOR, sensor->get_name(),
+                           sensor->get_device_class_to(dc_buf), "",
                            "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &sensor->state, 1, tpdo);
   sensor->add_on_state_callback([=, this](bool x) { od_set_state(canopen, state_key, &x, 1); });
@@ -144,11 +159,14 @@ void BinarySensorEntity::setup(CanopenComponent *canopen) {
 
 #ifdef USE_SWITCH
 void SwitchEntity::setup(CanopenComponent *canopen) {
+  char dc_buf[MAX_DEVICE_CLASS_LENGTH];
+
   auto state = switch_->get_initial_state_with_restore_mode().value_or(false);
-  canopen->od_add_metadata(entity_id, ENTITY_TYPE_SWITCH, switch_->get_name(), switch_->get_device_class(), "", "");
+  canopen->od_add_metadata(entity_id, ENTITY_TYPE_SWITCH, switch_->get_name(),
+                           switch_->get_device_class_to(dc_buf), "", "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
-  switch_->add_on_state_callback([=](bool value) { od_set_state(canopen, state_key, &value, 1); });
-  canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
+  switch_->add_on_state_callback([=, this](bool value) { od_set_state(canopen, state_key, &value, 1); });
+  canopen->od_add_cmd(entity_id, [=, this](void *buffer, uint32_t size) {
     if (((uint8_t *) buffer)[0]) {
       switch_->turn_on();
     } else {
@@ -241,6 +259,7 @@ uint8_t get_cover_state(esphome::cover::Cover *cover) {
 }
 
 void CoverEntity::setup(CanopenComponent *canopen) {
+  char dc_buf[MAX_DEVICE_CLASS_LENGTH];
   uint8_t state = get_cover_state(cover);
 
   auto traits = cover->get_traits();
@@ -259,7 +278,7 @@ void CoverEntity::setup(CanopenComponent *canopen) {
   }
 
   canopen->od_add_metadata(entity_id, ENTITY_TYPE_COVER | (version << 8) | (caps << 16), cover->get_name(),
-                           cover->get_device_class(), "", "");
+                           cover->get_device_class_to(dc_buf), "", "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
 
   canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t size) {
