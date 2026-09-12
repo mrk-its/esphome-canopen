@@ -30,11 +30,13 @@ float color_temp_from_wire(uint32_t value) { return scale_from_wire(value, 100.0
 
 #ifdef USE_SENSOR
 void SensorEntity::setup(CanopenComponent *canopen) {
+  char dc_buf[MAX_DEVICE_CLASS_LENGTH];
+
   canopen->od_add_metadata(entity_id,
                            size == 1   ? ENTITY_TYPE_SENSOR_UINT8
                            : size == 2 ? ENTITY_TYPE_SENSOR_UINT16
                                        : ENTITY_TYPE_SENSOR,
-                           sensor->get_name(), sensor->get_device_class_ref(), sensor->get_unit_of_measurement_ref(),
+                           sensor->get_name(), sensor->get_device_class_to(dc_buf), sensor->get_unit_of_measurement_ref(),
                            (char *) esphome::sensor::state_class_to_string(sensor->get_state_class()));
   canopen->od_add_min_max_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
@@ -82,11 +84,13 @@ void SensorEntity::setup(CanopenComponent *canopen) {
 #ifdef USE_NUMBER
 void NumberEntity::setup(CanopenComponent *canopen) {
   float state = number->state;
+  char dc_buf[MAX_DEVICE_CLASS_LENGTH];
+
   canopen->od_add_metadata(entity_id,
                            size == 1   ? ENTITY_TYPE_NUMBER_UINT8
                            : size == 2 ? ENTITY_TYPE_NUMBER_UINT16
                                        : ENTITY_TYPE_NUMBER,
-                           number->get_name(), number->get_device_class_ref(), "", "");
+                           number->get_name(), number->get_device_class_to(dc_buf), "", "");
 
   canopen->od_add_min_max_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
@@ -132,7 +136,10 @@ void NumberEntity::setup(CanopenComponent *canopen) {
 #ifdef USE_BINARY_SENSOR
 
 void BinarySensorEntity::setup(CanopenComponent *canopen) {
-  canopen->od_add_metadata(entity_id, ENTITY_TYPE_BINARY_SENSOR, sensor->get_name(), sensor->get_device_class_ref(), "",
+  char dc_buf[MAX_DEVICE_CLASS_LENGTH];
+
+  canopen->od_add_metadata(entity_id, ENTITY_TYPE_BINARY_SENSOR, sensor->get_name(),
+                           sensor->get_device_class_to(dc_buf), "",
                            "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &sensor->state, 1, tpdo);
   sensor->add_on_state_callback([=, this](bool x) { od_set_state(canopen, state_key, &x, 1); });
@@ -144,8 +151,11 @@ void BinarySensorEntity::setup(CanopenComponent *canopen) {
 
 #ifdef USE_SWITCH
 void SwitchEntity::setup(CanopenComponent *canopen) {
+  char dc_buf[MAX_DEVICE_CLASS_LENGTH];
+
   auto state = switch_->get_initial_state_with_restore_mode().value_or(false);
-  canopen->od_add_metadata(entity_id, ENTITY_TYPE_SWITCH, switch_->get_name(), switch_->get_device_class_ref(), "", "");
+  canopen->od_add_metadata(entity_id, ENTITY_TYPE_SWITCH, switch_->get_name(),
+                           switch_->get_device_class_to(dc_buf), "", "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
   switch_->add_on_state_callback([=](bool value) { od_set_state(canopen, state_key, &value, 1); });
   canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
@@ -241,6 +251,7 @@ uint8_t get_cover_state(esphome::cover::Cover *cover) {
 }
 
 void CoverEntity::setup(CanopenComponent *canopen) {
+  char dc_buf[MAX_DEVICE_CLASS_LENGTH];
   uint8_t state = get_cover_state(cover);
 
   auto traits = cover->get_traits();
@@ -259,7 +270,7 @@ void CoverEntity::setup(CanopenComponent *canopen) {
   }
 
   canopen->od_add_metadata(entity_id, ENTITY_TYPE_COVER | (version << 8) | (caps << 16), cover->get_name(),
-                           cover->get_device_class_ref(), "", "");
+                           cover->get_device_class_to(dc_buf), "", "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
 
   canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t size) {
