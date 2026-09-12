@@ -86,7 +86,7 @@ void NumberEntity::setup(CanopenComponent *canopen) {
                            size == 1   ? ENTITY_TYPE_NUMBER_UINT8
                            : size == 2 ? ENTITY_TYPE_NUMBER_UINT16
                                        : ENTITY_TYPE_NUMBER,
-                           number->get_name(), number->traits.get_device_class(), "", "");
+                           number->get_name(), number->get_device_class_ref(), "", "");
 
   canopen->od_add_min_max_metadata(entity_id, min_val, max_val);
   uint32_t state_key;
@@ -132,7 +132,7 @@ void NumberEntity::setup(CanopenComponent *canopen) {
 #ifdef USE_BINARY_SENSOR
 
 void BinarySensorEntity::setup(CanopenComponent *canopen) {
-  canopen->od_add_metadata(entity_id, ENTITY_TYPE_BINARY_SENSOR, sensor->get_name(), sensor->get_device_class(), "",
+  canopen->od_add_metadata(entity_id, ENTITY_TYPE_BINARY_SENSOR, sensor->get_name(), sensor->get_device_class_ref(), "",
                            "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &sensor->state, 1, tpdo);
   sensor->add_on_state_callback([=, this](bool x) { od_set_state(canopen, state_key, &x, 1); });
@@ -145,7 +145,7 @@ void BinarySensorEntity::setup(CanopenComponent *canopen) {
 #ifdef USE_SWITCH
 void SwitchEntity::setup(CanopenComponent *canopen) {
   auto state = switch_->get_initial_state_with_restore_mode().value_or(false);
-  canopen->od_add_metadata(entity_id, ENTITY_TYPE_SWITCH, switch_->get_name(), switch_->get_device_class(), "", "");
+  canopen->od_add_metadata(entity_id, ENTITY_TYPE_SWITCH, switch_->get_name(), switch_->get_device_class_ref(), "", "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
   switch_->add_on_state_callback([=](bool value) { od_set_state(canopen, state_key, &value, 1); });
   canopen->od_add_cmd(entity_id, [=](void *buffer, uint32_t size) {
@@ -259,7 +259,7 @@ void CoverEntity::setup(CanopenComponent *canopen) {
   }
 
   canopen->od_add_metadata(entity_id, ENTITY_TYPE_COVER | (version << 8) | (caps << 16), cover->get_name(),
-                           cover->get_device_class(), "", "");
+                           cover->get_device_class_ref(), "", "");
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
 
   canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t size) {
