@@ -59,7 +59,11 @@ void SensorEntity::setup(CanopenComponent *canopen) {
       cmd_type = CO_TCMD16;
       break;
     case 4:
-      to_wire = [=](float state) { return *(uint32_t *) &state; };
+      to_wire = [=](float state) {
+        uint32_t val;
+        std::memcpy(&val, &state, sizeof(val));
+        return val;
+      };
       from_wire = [=](void *buf) { return *(float *) buf; };
       type = CO_TUNSIGNED32;
       cmd_type = CO_TCMD32;
@@ -113,7 +117,11 @@ void NumberEntity::setup(CanopenComponent *canopen) {
       cmd_type = CO_TCMD16;
       break;
     case 4:
-      to_wire = [=](float state) { return *(uint32_t *) &state; };
+      to_wire = [=](float state) {
+        uint32_t val;
+        std::memcpy(&val, &state, sizeof(val));
+        return val;
+      };
       from_wire = [=](void *buf) { return *(float *) buf; };
       type = CO_TUNSIGNED32;
       cmd_type = CO_TCMD32;
