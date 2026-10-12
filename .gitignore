@@ -7,6 +7,7 @@ config/can-node-*
 config/common.yaml
 config/wifi.yaml
 config/.*
+test/config.yaml
 
 .vscode
 
