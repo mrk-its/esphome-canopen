@@ -188,22 +188,22 @@ def to_code(config_list):
         extra_build_flags = ()
 
     for config in config_list:
-        cg.add_platformio_option(
-            "build_flags",
-            [
-                "-DCO_SDO_BUF_SEG={}".format(config["sdo_block_transfer_size"]),
-                "-DCO_SSDO_N=1",
-                "-DCO_CSDO_N=1",
-                "-DCO_RPDO_N=4",
-                "-DCO_TPDO_N=8",
-                "-DUSE_LSS=0",
-                "-DUSE_CSDO=0",
-                "-DMINIZ_NO_STDIO=1",
-                *extra_build_flags,
-            ],
-        )
+        for flag in [
+            "-DCO_SDO_BUF_SEG={}".format(config["sdo_block_transfer_size"]),
+            "-DCO_SSDO_N=1",
+            "-DCO_CSDO_N=1",
+            "-DCO_RPDO_N=4",
+            "-DCO_TPDO_N=8",
+            "-DUSE_LSS=0",
+            "-DUSE_CSDO=0",
+            "-DMINIZ_NO_STDIO=1",
+            "-DMINIZ_NO_TIME=1",
+            *extra_build_flags,
+        ]:
+            cg.add_build_flag(flag)
+
         cg.add_library(
-            "canopenstack=https://github.com/mrk-its/canopen-stack#test", None
+            "canopenstack", None, "https://github.com/mrk-its/canopen-stack#test"
         )
         node_id = config["node_id"]
         canopen = cg.new_Pvariable(config[CONF_ID], node_id)
