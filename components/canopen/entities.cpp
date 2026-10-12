@@ -324,8 +324,7 @@ void AlarmEntity::setup(CanopenComponent *canopen) {
   ESP_LOGI(TAG, "Alarm initial state: %d", state);
 
   auto state_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &state, 1, tpdo);
-  alarm->add_on_state_callback([=]() {
-    auto state = alarm->get_state();
+  alarm->add_on_state_callback([=](alarm_control_panel::AlarmControlPanelState state) {
     od_set_state(canopen, state_key, &state, 1);
   });
 
