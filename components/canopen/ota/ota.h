@@ -43,6 +43,8 @@ class CanopenOTAComponent : public ota::OTAComponent {
 #endif
 
   bool dry_run = false;
+  // first chunk of the image not yet checked for the MCUboot header (zephyr)
+  bool check_header = false;
 
   void ota_finish();
 

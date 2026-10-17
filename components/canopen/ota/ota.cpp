@@ -10,6 +10,7 @@
 
 #include <cerrno>
 #include <cstdio>
+#include <cstring>
 
 namespace esphome {
 namespace canopen {
@@ -87,6 +88,7 @@ esphome::ota::OTAResponseTypes CanopenOTAComponent::begin(uint32_t size) {
     return esphome::ota::OTAResponseTypes::OTA_RESPONSE_ERROR_UNKNOWN;
   }
 #endif
+  this->check_header = true;
   return !dry_run ? backend->begin(size) : esphome::ota::OTAResponseTypes::OTA_RESPONSE_OK;
 }
 
@@ -130,7 +132,18 @@ esphome::ota::OTAResponseTypes CanopenOTAComponent::write(uint8_t *data, size_t 
     }
   }
 #else
-  ESP_LOGI(TAG, "ota write %d bytes", len);
+  ESP_LOGV(TAG, "ota write %d bytes", len);
+#if defined(USE_ZEPHYR) && !defined(USE_ZEPHYR_VARIANT_NATIVE_SIM)
+  if (this->check_header) {
+    this->check_header = false;
+    // MCUboot IMAGE_MAGIC 0x96f3b83d, little-endian
+    static const uint8_t MCUBOOT_MAGIC[4] = {0x3d, 0xb8, 0xf3, 0x96};
+    if (len < sizeof(MCUBOOT_MAGIC) || memcmp(data, MCUBOOT_MAGIC, sizeof(MCUBOOT_MAGIC)) != 0) {
+      ESP_LOGE(TAG, "not an MCUboot-signed image (use zephyr.signed.bin)");
+      return esphome::ota::OTAResponseTypes::OTA_RESPONSE_ERROR_MAGIC;
+    }
+  }
+#endif
   if (!dry_run) {
     return backend->write(data, len);
   }

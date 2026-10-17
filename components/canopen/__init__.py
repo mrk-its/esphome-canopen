@@ -182,7 +182,8 @@ TYPE_TO_CANOPEN_TYPE = {
 
 
 def to_code(config_list):
-    if not getattr(CORE, "is_stm32", False):
+    # No compression on stm32 or zephyr: miniz needs ~43 KB of heap for inflate
+    if not (getattr(CORE, "is_stm32", False) or getattr(CORE, "is_zephyr", False)):
         extra_build_flags = ("-DOTA_COMPRESSION=1", )
     else:
         extra_build_flags = ()

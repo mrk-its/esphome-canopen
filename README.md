@@ -65,6 +65,14 @@ ota:
   - platform: canopen
 ```
 
+### Zephyr (`platform: zephyr`) with MCUboot
+On `platform: zephyr` the update is written to MCUboot's secondary slot and swapped in on the next reboot:
+* MCUboot is required: set `advanced: bootloader: mcuboot` in the `zephyr:` block (with a partition layout that has `slot0_partition` / `slot1_partition`).
+* `swap_method:` (`scratch`, `move` or `offset`) can be set on the `canopen` OTA platform, same as on `platform: esphome`.
+* Upload the signed image: `.esphome/build/<node>/.west_build/zephyr/zephyr/zephyr.signed.bin`. Never upload `zephyr.bin` (unsigned); the node rejects it at the start of the transfer.
+* The new image boots in test mode. `safe_mode` confirms it after a good boot; if it's never confirmed, MCUboot rolls back to the previous image on the next reboot.
+* OTA compression is disabled on Zephyr (and on stm32), so can2mqtt sends the image uncompressed.
+
 # How to start
 ## Hardware requirements
  * any ESP8266/ESP32 board with CAN controller. ESP32 boards are preferred, as they have [integrated can controller](https://esphome.io/components/canbus.html#esp32-can-component) (but still cheap external CAN transceiver is needed). For ESP8266 external [MCP2515](https://esphome.io/components/canbus.html#mcp2515-component) CAN controller can be used.
