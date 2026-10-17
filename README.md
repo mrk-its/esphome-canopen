@@ -5,43 +5,65 @@ This project provides ESPHome external_component named `canopen` for easy conver
 The [can2mqtt](https://github.com/mrk-its/can2mqtt) project provides can2mqtt bridge exposing ESPHome CANopen entities onto MQTT topics. It follows MQTT Discovery protocol, so entities appear automatically in HomeAssistant.
 
 ## Configuration
-`canopen` plafrom recognizes following parameters:
+`canopen` platform recognizes following parameters:
 * `node_id` (Required, int): canopen node_id, in 0..127 range
+* `canbus_id` (Optional, id): id of `canbus` component to use, defaults to the only configured one
+* `entities` (Required, list of `entity` objects): list of ESPHome entities exposed via CANopen, see `entity` schema below
 * `heartbeat_interval` (Optional, time interval, default=5000ms): Heartbeat interval
+* `heartbeat_clients` (Optional, list of `heartbeat_client`): list of nodes to track heartbeat messages for, see below.
 * `on_pre_operational` (Optional, Automation): An automation to perform when node enters pre_operational state
-* `on_operational` (Optional, Automation): An automation to perform when node enters  perational state
-* `on_hb_consumer_event` (Optional, Automation): An automation to perform when heartbeat clients are configured and heartbeat is received
-* `sdo_block_transfer_size` (Optional, int, defaults to 63): number of messages confirmed with single ACK for SDO block transfer mode
-* `heartbeat_clients` (Optional, list of 'heartbeat_client'): list of nodes to track hearbeat messages for, see below.
-
-* `pdo_od_writer` (Optional, bool, default=True): when enabled then `RPDO #3` is reserved for node to node communication (remote OD writes)
-* `entities` (Optional, list of `entity` objects): list of ESPHome entities exposed via CANOpen, see `entity` schema below
+* `on_operational` (Optional, Automation): An automation to perform when node enters operational state
+* `on_hb_consumer_event` (Optional, Automation): An automation to perform when heartbeat clients are configured and heartbeat event occurs. `node_id` (uint8) variable is available in the automation.
+* `sdo_block_transfer_size` (Optional, int, 1..127, default=63): number of messages confirmed with single ACK for SDO block transfer mode
+* `pdo_od_writer` (Optional, bool, default=True): when enabled then `RPDO #3` is reserved for node to node communication (remote OD writes, see [OD writer](OBJECT_DICTIONARY.md#od-writer))
+* `hw_version` (Optional, string): value of Manufacturer Hardware Version (`0x1009`)
+* `sw_version` (Optional, string): currently ignored, `0x100A` always contains generated ESPHome version string (see [#30](https://github.com/mrk-its/esphome-canopen/issues/30))
+* `template_entities` (Optional, list of `template_entity` objects): custom OD entities not backed by ESPHome entity, see below
 
 ### `entity` schema:
 * `id` (Required, string): id of ESPHome entity
-* `index` (Required, int): index of entity, range 1..64. Together with `node_id` forms unique id of CAN-exposed entity, so it should be changed with a care.
+* `index` (Required, int): index of entity, range 1..64. Together with `node_id` forms unique id of CAN-exposed entity, so it should be changed with a care. Indices must be unique.
 * `tpdo` (Optional, `TPDO` schema (see below)): when defined then state changes will be broadcasted via TPDO
-* `rpdo` (Optional, `RPDO` schema (see below)): when defined then received TPDO frames will be automatically mapped to OD entity command entries
+* `rpdo` (Optional, list of `RPDO` schema (see below)): when defined then received TPDO frames will be automatically mapped to OD entity command entries
+* `size` (Optional, int, `sensor` / `number` only): size of state on the wire: `4` (default, REAL32), `1` (scaled UINT8) or `2` (scaled UINT16). See [Sensor8 / Sensor16](OBJECT_DICTIONARY.md#sensor8--sensor16)
+* `min_value` (Optional, float, default=0): minimal value for scaled states (`size` 1 or 2)
+* `max_value` (Optional, float, default=254 for `size: 1`, 65534 for `size: 2`): maximal value for scaled states (`size` 1 or 2)
 
 ### `TPDO` schema:
 Any of:
 - object with following properties:
   * `number` (Required, integer): integer in 0..7 range (7 is typically reserved for node to node communication, unless `pdo_od_writer` is disabled, see above)
-  * `is_async` (Optinal, bool, default=true): When true then state is automaticall published on change. When false, TPDO transmission needs to be manually triggered
-- integer representing `number` defined above.
+  * `is_async` (Optional, bool, default=true): When true then TPDO is sent immediately on every state change. When false, changed TPDOs are marked dirty and sent once per component loop.
+- integer representing `number` defined above. Note: in this form `is_async` is **false**.
 
 ### `RPDO` schema:
 * `node_id` (Required, integer): id of node sending mapped TPDO frame
 * `tpdo` (Required, integer): TPDO number
-* `offset` (Required, integer): TPDO offset, 0..7 range
-* `cmd` (Optional, defaults to 0): current entity command index (starting from 0) where received TPDO fragemnt is mapped to, it also determines size of mappend fragment.
+* `offset` (Required, integer): byte offset inside TPDO frame, 0..7 range
+* `cmd` (Optional, defaults to 0): entity command index (starting from 0) where received TPDO fragment is mapped to. It also determines size of mapped fragment.
 
 ### `heartbeat_client` schema:
 * `node_id` (Required, int): tracked node id
 * `timeout` (Required, time interval): when exceeded `on_hb_consumer_event` automations will be triggered
 
+### `template_entity` schema:
+Template entities allow to define custom OD entries at given entity index, without ESPHome entity behind them.
+* `index` (Required, int): entity index (same meaning as in `entity`)
+* `tpdo` (Optional, int, default=-1): TPDO number states are mapped to
+* `metadata` (Optional): entity metadata
+  * `type` (Required, int): EntityTypeCode
+  * `name`, `device_class`, `unit`, `state_class` (Optional, string)
+* `states` (Optional, list): each item has `type` (Required, one of `uint8`, `uint16`, `uint32`, `int8`, `int16`, `int32`)
+* `commands` (Optional, list): each item has:
+  * `type` (Required, one of `uint8`, `uint16`, `uint32`)
+  * `handler` (Required, Automation): automation run when command is written, value is available as `x` variable
 
-
+## OTA over CAN
+The `canopen` OTA platform allows to flash firmware over CAN bus:
+```
+ota:
+  - platform: canopen
+```
 
 # How to start
 ## Hardware requirements
@@ -65,16 +87,16 @@ Any of:
 
   # Enable Home Assistant API
   api:
-    password: ""
     reboot_timeout: 0s
 
   ota:
-    password: ""
+    - platform: esphome
+    - platform: canopen
 
   esp32:
     board: esp32dev
     framework:
-      type: arduino
+      type: esp-idf
 
   wifi:
     <<: !include {file: wifi.yaml}
@@ -103,9 +125,6 @@ Any of:
         tpdo: 0
       - id: cover1
         index: 4
-        tpdo: 1
-      - id: cover2
-        index: 5
         tpdo: 1
 
   sensor:
@@ -148,6 +167,8 @@ Any of:
         - logger.log: stop_action
 
   ```
+
+More examples can be found in [examples](examples/) directory.
 
 # Support
 ## Community
