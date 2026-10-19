@@ -93,7 +93,7 @@ def RPDO_SCHEMA(value):
 TPDO_SCHEMA = cv.Schema(
     {
         cv.Required("number"): cv.int_,
-        cv.Optional("is_async", default=False): cv.boolean,
+        cv.Optional("immediate", default=False): cv.boolean,
     }
 )
 
@@ -573,10 +573,10 @@ def to_code(config_list):
             caps, _ = entity_layout(CORE.config, entity_config)
             tpdo = entity_config.get("tpdo", -1)
             if not isinstance(tpdo, dict):
-                tpdo = {"number": tpdo, "is_async": False}
+                tpdo = {"number": tpdo, "immediate": False}
 
             tpdo_struct = cg.StructInitializer(
-                TPDO, ("number", tpdo["number"]), ("is_async", tpdo["is_async"])
+                TPDO, ("number", tpdo["number"]), ("immediate", tpdo["immediate"])
             )
 
             size = entity_config.get("size")

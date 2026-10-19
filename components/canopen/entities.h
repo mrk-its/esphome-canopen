@@ -57,7 +57,7 @@ namespace canopen {
 
 struct TPDO {
   int number;
-  bool is_async;
+  bool immediate;
 };
 
 // wire encoding of scaled states, see "Scaled values" in OBJECT_DICTIONARY.md

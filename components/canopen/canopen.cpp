@@ -59,7 +59,7 @@ CO_OBJ_STR *od_string(const std::string &str) {
 
 void BaseCanopenEntity::od_set_state(CanopenComponent *canopen, uint32_t key, void *state, uint8_t size) {
   canopen->od_set_state(key, state, size);
-  if (tpdo.number >= 0 && !tpdo.is_async) {
+  if (tpdo.number >= 0 && !tpdo.immediate) {
     canopen->dirty_tpdo_mask |= (1 << tpdo.number);
   }
 }
@@ -248,7 +248,7 @@ void CanopenComponent::od_add_min_max_metadata(uint32_t entity_id, float min_val
 
 uint32_t CanopenComponent::od_add_state(uint32_t entity_id, const CO_OBJ_TYPE *type, void *state, uint8_t size,
                                         TPDO &tpdo) {
-  uint32_t pdo_mask = tpdo.number >= 0 ? (tpdo.is_async ? CO_OBJ___A___ : 0) | CO_OBJ____P__ : 0;
+  uint32_t pdo_mask = tpdo.number >= 0 ? (tpdo.immediate ? CO_OBJ___A___ : 0) | CO_OBJ____P__ : 0;
   uint32_t entity_index = ENTITY_INDEX(entity_id);
 
   uint8_t state_sub_index = 0;
