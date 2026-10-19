@@ -208,12 +208,12 @@ void LightStateEntity::setup(CanopenComponent *canopen) {
   if (traits.supports_color_mode(light::ColorMode::ON_OFF)) {
     traits_caps |= 1;
   }
-  if (traits.supports_color_mode(light::ColorMode::BRIGHTNESS)) {
-    traits_caps |= 2;
-  }
-  if (traits.supports_color_mode(light::ColorMode::COLOR_TEMPERATURE) ||
-      traits.supports_color_mode(light::ColorMode::COLD_WARM_WHITE)) {
+  // color temperature implies brightness, the two bits are exclusive (same as layout.py)
+  if (traits.supports_color_capability(light::ColorCapability::COLOR_TEMPERATURE) ||
+      traits.supports_color_capability(light::ColorCapability::COLD_WARM_WHITE)) {
     traits_caps |= 4;
+  } else if (traits.supports_color_capability(light::ColorCapability::BRIGHTNESS)) {
+    traits_caps |= 2;
   }
   if (traits_caps != caps) {
     ESP_LOGW(TAG, "light '%s': caps from config 0x%02lx differ from traits 0x%02lx", light->get_name().c_str(),

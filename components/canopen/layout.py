@@ -110,15 +110,36 @@ class LayoutError(Exception):
         self.entity_pos = entity_pos
 
 
+# Color capabilities of ESPHome color modes (light::ColorMode in color_mode.h),
+# ON_OFF left out: every mode has it.
+COLOR_MODE_CAPABILITIES = {
+    "ON_OFF": set(),
+    "BRIGHTNESS": {"BRIGHTNESS"},
+    "WHITE": {"BRIGHTNESS", "WHITE"},
+    "COLOR_TEMPERATURE": {"BRIGHTNESS", "COLOR_TEMPERATURE"},
+    "COLD_WARM_WHITE": {"BRIGHTNESS", "COLD_WARM_WHITE"},
+    "RGB": {"BRIGHTNESS", "RGB"},
+    "RGB_WHITE": {"BRIGHTNESS", "RGB", "WHITE"},
+    "RGB_COLOR_TEMPERATURE": {"BRIGHTNESS", "RGB", "WHITE", "COLOR_TEMPERATURE"},
+    "RGB_COLD_WARM_WHITE": {"BRIGHTNESS", "RGB", "COLD_WARM_WHITE"},
+}
+
+
 def light_caps_from_color_modes(color_modes):
-    """Same rules as the former trait-based detection in LightStateEntity::setup()."""
+    """Same rules as the trait check in LightStateEntity::setup().
+
+    Brightness and color temperature bits are exclusive (Home Assistant
+    doesn't allow `brightness` combined with other color modes); color
+    temperature implies the brightness state.
+    """
+    capabilities = set().union(*(COLOR_MODE_CAPABILITIES[mode] for mode in color_modes))
     caps = 0
     if "ON_OFF" in color_modes:
         caps |= LIGHT_CAP_ON_OFF
-    if "BRIGHTNESS" in color_modes:
-        caps |= LIGHT_CAP_BRIGHTNESS
-    if "COLOR_TEMPERATURE" in color_modes or "COLD_WARM_WHITE" in color_modes:
+    if capabilities & {"COLOR_TEMPERATURE", "COLD_WARM_WHITE"}:
         caps |= LIGHT_CAP_COLOR_TEMPERATURE
+    elif "BRIGHTNESS" in capabilities:
+        caps |= LIGHT_CAP_BRIGHTNESS
     return caps
 
 

@@ -110,7 +110,7 @@ Capabilities are determined at build time from the cover platform config (see [T
 EntityTypeCode: 5, version: 1
 
 Capabilities: bit 0 - on/off, bit 1 - brightness, bit 2 - color temperature. Brightness objects are present if brightness or color temperature is supported, color temperature objects only if color temperature is supported.
-Capabilities are determined at build time from the light platform's color modes (see [TPDO layout](#tpdo-layout)): bit 0 for `ON_OFF`, bit 1 for `BRIGHTNESS`, bit 2 for `COLOR_TEMPERATURE` / `COLD_WARM_WHITE` (e.g. `binary`: 1, `monochromatic`: 2, `cwww`: 4).
+Capabilities are determined at build time from the light platform's color modes (see [TPDO layout](#tpdo-layout)): bit 0 if the `ON_OFF` mode is supported, bit 2 if any mode has color temperature or cold / warm white capability, otherwise bit 1 if any mode has brightness capability (e.g. `binary`: 1, `monochromatic`, `rgb`, `rgbw`: 2, `cwww`, `rgbww`, `rgbct`: 4). Bits 1 and 2 are never both set.
 
 | Index             | SubIndex | Object Name             | Type   | Access | Description     |
 |-------------------|----------|-------------------------|--------|:------:|-----------------|
