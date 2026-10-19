@@ -200,6 +200,18 @@ build time. The hash is readable in the OD:
 |--------|----------|------------------|--------|:------:|-|
 | 0x3002 | 0x01     | TPDO layout hash | UINT32 | R      | FNV-1a 32 of the TPDO mappings: for each TPDO 0..7 its entry count followed by its 0x1A00+n entries, as little-endian UINT32 |
 
+## Remote state slots
+
+Remote states a node reads (`platform: canopen` entities, toggle actions, see
+[Linking nodes](README.md#linking-nodes)) are received by RPDO into local objects outside the entity area, so
+can2mqtt doesn't see them:
+
+| Index      | SubIndex | Object Name         | Type                     | Access | Description |
+|------------|----------|---------------------|--------------------------|:------:|-|
+| 0x4000 + n | 0x01     | Remote state slot n | UINT8 / UINT16 / UINT32  | RW     | raw value of the remote state, as in the remote node's TPDO |
+
+Slots are numbered at build time (sorted by remote node, entity and state); the build logs them.
+
 ## OD writer
 
 When `pdo_od_writer` is enabled (default), node listens on COB-ID `0x500 + sender_node_id` (the same COB-ID as TPDO 7 of the sender) for remote OD writes. Frame layout:

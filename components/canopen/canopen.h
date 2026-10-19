@@ -49,6 +49,8 @@ static const char *const TAG = "canopen";
 #define ENTITY_INDEX(entity_id) (0x2000 + entity_id * 16)
 #define ENTITY_STATE_KEY(entity_id, state_num) (CO_KEY(ENTITY_INDEX(entity_id) + 1, state_num + 1, 0))
 #define ENTITY_CMD_KEY(entity_id, cmd_num) (CO_KEY(ENTITY_INDEX(entity_id) + 2, cmd_num + 1, 0))
+// remote state slot n (REMOTE_STATE_INDEX in __init__.py), subindex 1
+#define REMOTE_STATE_INDEX(n) (0x4000 + (n))
 
 namespace esphome {
 
@@ -167,6 +169,10 @@ class CanopenComponent : public Component {
   // TPDO layout hash computed by codegen (layout.py), 0 = don't check
   uint32_t expected_tpdo_layout_hash = 0;
 
+  // remote state slots, raw values received by RPDO (see remote_state_slots() in __init__.py)
+  std::vector<uint32_t> remote_states;
+  std::vector<std::vector<std::function<void(uint32_t)>>> remote_state_listeners;
+
   void parse_od_writer_frame(CO_IF_FRM *frm);
 
  public:
@@ -210,6 +216,11 @@ class CanopenComponent : public Component {
   void add_rpdo_dummy(uint8_t idx, uint8_t size);
   void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
   void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd, uint8_t bit_size = 8);
+  void add_rpdo_slot(uint8_t idx, uint32_t n, uint8_t bit_size);
+
+  void add_remote_state(uint32_t n, uint8_t size);
+  void add_remote_state_listener(uint32_t n, std::function<void(uint32_t raw)> &&listener);
+  uint32_t get_remote_state(uint32_t n) { return n < remote_states.size() ? remote_states[n] : 0; }
 
   void enable_pdo_od_writer(bool enable) { pdo_od_writer_enabled = enable; };
   void set_expected_tpdo_layout_hash(uint32_t hash) { expected_tpdo_layout_hash = hash; }
@@ -316,7 +327,7 @@ class CanopenComponent : public Component {
 extern CanopenComponent *current_canopen;
 extern std::vector<CanopenComponent *> all_instances;
 
-// canopen.entity_cmd / canopen.light_toggle: write a command of a remote node's entity
+// canopen.entity_cmd: write a command of a remote node's entity
 template<typename... Ts> class EntityCmdAction : public Action<Ts...>, public Parented<CanopenComponent> {
  public:
   TEMPLATABLE_VALUE(uint8_t, value)
@@ -335,6 +346,53 @@ template<typename... Ts> class EntityCmdAction : public Action<Ts...>, public Pa
   uint8_t node_id_{0};
   uint32_t entity_index_{0};
   uint8_t cmd_{0};
+};
+
+// encodings of RemoteCommandAction writes, ENC_* in __init__.py
+enum RemoteCmdEncoding : uint8_t {
+  REMOTE_CMD_RAW = 0,
+  REMOTE_CMD_PERCENTAGE = 1,
+  REMOTE_CMD_COLOR_TEMP = 2,
+  REMOTE_CMD_SCALED = 3,
+  REMOTE_CMD_REAL32 = 4,
+};
+
+uint32_t encode_remote_cmd(uint8_t encoding, float value, uint8_t size, float min_value, float max_value);
+
+// canopen.<domain>.<action>: write one or more commands of a remote node's entity
+template<typename... Ts> class RemoteCommandAction : public Action<Ts...>, public Parented<CanopenComponent> {
+ public:
+  void set_target(uint8_t node_id, uint32_t entity_index) {
+    this->node_id_ = node_id;
+    this->entity_index_ = entity_index;
+  }
+
+  void add_write(uint8_t cmd, uint8_t size, uint8_t encoding, float min_value, float max_value,
+                 TemplatableValue<float, Ts...> value) {
+    this->writes_.push_back({cmd, size, encoding, min_value, max_value, value});
+  }
+
+  void play(const Ts &...x) override {
+    for (auto &write : this->writes_) {
+      uint32_t raw =
+          encode_remote_cmd(write.encoding, write.value.value(x...), write.size, write.min_value, write.max_value);
+      this->parent_->remote_entity_write_od(this->node_id_, ENTITY_INDEX(this->entity_index_) + 2, write.cmd + 1, &raw,
+                                            write.size);
+    }
+  }
+
+ protected:
+  struct Write {
+    uint8_t cmd;
+    uint8_t size;
+    uint8_t encoding;
+    float min_value;
+    float max_value;
+    TemplatableValue<float, Ts...> value;
+  };
+  uint8_t node_id_{0};
+  uint32_t entity_index_{0};
+  std::vector<Write> writes_;
 };
 
 }  // namespace canopen

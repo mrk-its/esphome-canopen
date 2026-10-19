@@ -37,6 +37,23 @@ canopen:
     - index: 4
       id: temperature      # REAL32
       tpdo: 2
+    - index: 5
+      id: cover_hall       # state, position, tilt
+      tpdo: 3
+    - index: 6
+      id: alarm_house
+      tpdo: 3
+    - index: 7
+      id: setpoint         # scaled UINT8
+      size: 1
+      min_value: 10
+      max_value: 30
+      tpdo: 3
+    - index: 8
+      id: relay
+      tpdo: 3
+    - index: 9
+      id: pump             # no tpdo: commands only
 
 output:
   - platform: template
@@ -75,3 +92,37 @@ sensor:
     id: temperature
     name: "Temperature"
     lambda: 'return 21.5;'
+
+cover:
+  - platform: template
+    id: cover_hall
+    name: "Hall cover"
+    optimistic: true
+    has_position: true
+    tilt_action:
+      - lambda: ''
+
+alarm_control_panel:
+  - platform: template
+    id: alarm_house
+    name: "House"
+    codes: ["1234"]
+
+number:
+  - platform: template
+    id: setpoint
+    name: "Setpoint"
+    min_value: 10
+    max_value: 30
+    step: 0.5
+    optimistic: true
+
+switch:
+  - platform: template
+    id: relay
+    name: "Relay"
+    optimistic: true
+  - platform: template
+    id: pump
+    name: "Pump"
+    optimistic: true

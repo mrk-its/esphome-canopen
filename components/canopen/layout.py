@@ -166,33 +166,60 @@ def _unknown_platform_msg(domain, platform):
     )
 
 
-def entity_states(domain, caps=None, size=None):
-    """(name, size in bytes) of the entity's OD states, in subindex order.
+# State kinds: how a state is encoded on the wire (see OBJECT_DICTIONARY.md)
+KIND_BOOL = "bool"  # 0 / 1
+KIND_PERCENTAGE = "percentage"  # UINT8 0..254 -> 0..1, 255 unknown
+KIND_COLOR_TEMP = "color_temp"  # UINT8 0..254 -> 100..1000 mireds
+KIND_COVER_STATE = "cover_state"  # 0 open, 1 opening, 2 closed, 3 closing
+KIND_ALARM_STATE = "alarm_state"  # 0..9
+KIND_VALUE = "value"  # sensor / number: REAL32, or UINT8 / UINT16 scaled to min_value..max_value
 
-    Must match the order of od_add_state() calls in entities.cpp.
+# C++ RemoteStateKind (remote_entities.h)
+KIND_CODES = {
+    KIND_BOOL: 0,
+    KIND_PERCENTAGE: 1,
+    KIND_COLOR_TEMP: 2,
+    KIND_COVER_STATE: 3,
+    KIND_ALARM_STATE: 4,
+    KIND_VALUE: 5,
+}
+
+
+def entity_state_kinds(domain, caps=None, size=None):
+    """(name, size in bytes, kind) of the entity's OD states, in subindex order.
+
+    Must match the order of od_add_state() calls in entities.cpp. Commands are
+    added in the same order, so a state's position is also its command index.
     """
     if domain in (DOMAIN_SENSOR, DOMAIN_NUMBER):
         size = 4 if size is None else size
         if size not in (1, 2, 4):
             raise LayoutError(f"Unsupported {domain} size: {size}")
-        return [("value", size)]
-    if domain in (DOMAIN_BINARY_SENSOR, DOMAIN_SWITCH, DOMAIN_ALARM):
-        return [("state", 1)]
+        return [("value", size, KIND_VALUE)]
+    if domain in (DOMAIN_BINARY_SENSOR, DOMAIN_SWITCH):
+        return [("state", 1, KIND_BOOL)]
+    if domain == DOMAIN_ALARM:
+        return [("state", 1, KIND_ALARM_STATE)]
     if domain == DOMAIN_LIGHT:
-        states = [("state", 1)]
+        states = [("state", 1, KIND_BOOL)]
         if caps & (LIGHT_CAP_BRIGHTNESS | LIGHT_CAP_COLOR_TEMPERATURE):
-            states.append(("brightness", 1))
+            states.append(("brightness", 1, KIND_PERCENTAGE))
         if caps & LIGHT_CAP_COLOR_TEMPERATURE:
-            states.append(("color_temp", 1))
+            states.append(("color_temp", 1, KIND_COLOR_TEMP))
         return states
     if domain == DOMAIN_COVER:
-        states = [("state", 1)]
+        states = [("state", 1, KIND_COVER_STATE)]
         if caps & COVER_CAP_POSITION:
-            states.append(("position", 1))
+            states.append(("position", 1, KIND_PERCENTAGE))
         if caps & COVER_CAP_TILT:
-            states.append(("tilt", 1))
+            states.append(("tilt", 1, KIND_PERCENTAGE))
         return states
     raise LayoutError(f"Unsupported entity domain: {domain}")
+
+
+def entity_states(domain, caps=None, size=None):
+    """(name, size in bytes) of the entity's OD states, in subindex order."""
+    return [(name, size) for name, size, _ in entity_state_kinds(domain, caps, size)]
 
 
 def entity_state_sizes(domain, caps=None, size=None):

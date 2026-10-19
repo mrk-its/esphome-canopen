@@ -10,8 +10,12 @@ OD layout for entities: see OBJECT_DICTIONARY.md.
 - `layout.py`: entity states and TPDO layout computed from YAML (single source of truth; C++ gets caps from
   codegen and checks the layout hash at boot, OD `0x3002:1`). ESPHome-free, tested by `test/test_layout.py`.
 - `remote.py`: `remote_nodes` - loads another node's YAML (packages/substitutions/extend passes only, no
-  validation) to resolve `rpdo: {node, entity}` and the `canopen.entity_cmd` / `canopen.light_toggle` actions.
+  validation) to resolve `rpdo: {node, entity}`, `platform: canopen` entities and the `canopen.*` actions.
   Raw YAML values may be strings after substitution: coerce (`_normalize_node_config`, `layout.flag`).
+- Remote state slots: remote states read by `platform: canopen` entities (`binary_sensor.py`, `sensor.py`,
+  `text_sensor.py`, C++ in `remote_entities.*`) and toggle actions are collected from the full validated config
+  (`remote_state_slots()`, entries marked with `CONF_REMOTE_STATE`), OD `0x4000+n:1`, filled by RPDO.
+  Typed actions `canopen.<domain>.<action>` (`_remote_action()`) -> `RemoteCommandAction` writes.
 - `canopen.cpp/.h`: node setup, OD construction (`od.add_update(...)`), main `loop()`.
 - `driver_can.cpp`: glue between canopen-stack's CAN/timer/NVM driver interface and ESPHome `canbus`.
   Frames arrive via the canbus callback (`on_frame`) and are processed immediately (`CONodeProcess`).

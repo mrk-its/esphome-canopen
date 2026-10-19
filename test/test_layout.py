@@ -153,3 +153,21 @@ def test_layout_table():
     ]
     # labels don't change the mapping
     assert layout.tpdo_mapping(states) == layout.tpdo_mapping([s[:3] for s in states])
+
+
+@pytest.mark.parametrize(
+    "domain, caps, size, kinds",
+    [
+        (layout.DOMAIN_LIGHT, 4, None, [("state", 1, "bool"), ("brightness", 1, "percentage"), ("color_temp", 1, "color_temp")]),
+        (layout.DOMAIN_SWITCH, None, None, [("state", 1, "bool")]),
+        (layout.DOMAIN_BINARY_SENSOR, None, None, [("state", 1, "bool")]),
+        (layout.DOMAIN_COVER, 2, None, [("state", 1, "cover_state"), ("tilt", 1, "percentage")]),
+        (layout.DOMAIN_ALARM, None, None, [("state", 1, "alarm_state")]),
+        (layout.DOMAIN_SENSOR, None, None, [("value", 4, "value")]),
+        (layout.DOMAIN_NUMBER, None, 2, [("value", 2, "value")]),
+    ],
+)
+def test_state_kinds(domain, caps, size, kinds):
+    assert layout.entity_state_kinds(domain, caps, size) == kinds
+    assert layout.entity_states(domain, caps, size) == [(n, s) for n, s, _ in kinds]
+    assert all(kind in layout.KIND_CODES for _, _, kind in kinds)

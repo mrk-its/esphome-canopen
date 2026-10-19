@@ -60,6 +60,14 @@ struct TPDO {
   bool is_async;
 };
 
+// wire encoding of scaled states, see "Scaled values" in OBJECT_DICTIONARY.md
+uint32_t scale_to_wire(float value, float min_val, float max_val, uint32_t max_int);
+float scale_from_wire(uint32_t value, float min_val, float max_val, uint32_t max_int);
+uint32_t percentage_to_wire(float state);
+float percentage_from_wire(uint32_t value);
+uint32_t color_temp_to_wire(float value);
+float color_temp_from_wire(uint32_t value);
+
 class CanopenComponent;
 
 class BaseCanopenEntity {

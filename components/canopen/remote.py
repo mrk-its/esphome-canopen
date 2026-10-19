@@ -95,6 +95,10 @@ def _int(value):
     return value if isinstance(value, int) else int(str(value), 0)
 
 
+def _float(value):
+    return value if isinstance(value, (int, float)) else float(str(value))
+
+
 def _normalize_node_config(canopen):
     """Coerce the raw `canopen:` options layout.py reads to ints."""
     canopen = {**canopen, "node_id": _int(canopen["node_id"])}
@@ -108,6 +112,9 @@ def _normalize_node_config(canopen):
             entity["tpdo"] = _int(tpdo)
         if entity.get("size") is not None:
             entity["size"] = _int(entity["size"])
+        for key in ("min_value", "max_value"):
+            if entity.get(key) is not None:
+                entity[key] = _float(entity[key])
         entities.append(entity)
     canopen["entities"] = entities
     canopen["template_entities"] = [
@@ -139,6 +146,15 @@ class RemoteNode:
                 canopen, lambda entity: find_entity(config, entity["id"])
             )
             self.mapping = layout.tpdo_mapping(self.states)
+            # entity index -> (domain, [(state name, size, kind)])
+            self.entity_states = {}
+            for entity in self.entities:
+                domain, platform_config = find_entity(config, entity["id"])
+                caps = layout.entity_caps(domain, platform_config, entity.get("caps"))
+                self.entity_states[entity["index"]] = (
+                    domain,
+                    layout.entity_state_kinds(domain, caps, entity.get("size")),
+                )
         except layout.LayoutError as err:
             raise RemoteError(f"{path}: {err}") from err
         self.layout_hash = layout.layout_hash(self.mapping)
@@ -155,25 +171,42 @@ class RemoteNode:
             f"{what} is not exposed by {self.name} (not in canopen.entities of {self.path})"
         )
 
+    def domain(self, entity_id=None, index=None):
+        return self.entity_states[self.entity(entity_id, index)["index"]][0]
+
+    def state_names(self, entity_id=None, index=None):
+        """State names of a remote entity; a state's position is its command index."""
+        entity = self.entity(entity_id, index)
+        return [name for name, _, _ in self.entity_states[entity["index"]][1]]
+
+    def scaling(self, entity):
+        """(min_value, max_value) of a scaled (size 1 / 2) sensor / number, defaults as in __init__.py."""
+        size = entity.get("size")
+        default_max = 254 if size == 1 else 65534  # 255 / 65535 reserved for NaN
+        return entity.get("min_value", 0.0), entity.get("max_value", default_max)
+
     def state(self, entity_id=None, index=None, state=None):
         """Locate a remote entity state in the remote TPDOs.
 
-        Returns dict(node_id, index, entity, state, tpdo, offset, size); `state`
+        Returns dict(node_id, index, entity, state, tpdo, offset, size, domain,
+        kind, cmd), plus min_value / max_value for scaled values; `state`
         defaults to the entity's first state ("state" / "value").
         """
         entity = self.entity(entity_id, index)
         entity_name = str(entity["id"])
-        names = [
-            label.split(".", 1)[1]
-            for idx, _, _, label in self.states
-            if idx == entity["index"]
-        ]
+        domain, state_kinds = self.entity_states[entity["index"]]
+        names = [name for name, _, _ in state_kinds]
         if state is None:
             state = names[0]
         if state not in names:
             raise RemoteError(
                 f"{self.name} entity '{entity_name}' has no state '{state}' (states: {', '.join(names)})"
             )
+        cmd = names.index(state)
+        _, size, kind = state_kinds[cmd]
+        info = {"domain": domain, "kind": kind, "cmd": cmd}
+        if kind == layout.KIND_VALUE and size != 4:
+            info["min_value"], info["max_value"] = self.scaling(entity)
         tpdo = layout.tpdo_number(entity)
         if tpdo < 0:
             raise RemoteError(
@@ -192,6 +225,7 @@ class RemoteNode:
                     "tpdo": tpdo,
                     "offset": offset,
                     "size": size,
+                    **info,
                 }
             offset += size
         raise AssertionError("state not found in its TPDO")

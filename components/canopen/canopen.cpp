@@ -380,6 +380,54 @@ void CanopenComponent::add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8
   rpdo_map_append(idx, index + 2, cmd + 1, bit_size);
 }
 
+void CanopenComponent::add_rpdo_slot(uint8_t idx, uint32_t n, uint8_t bit_size) {
+  rpdo_map_append(idx, REMOTE_STATE_INDEX(n), 1, bit_size);
+}
+
+void CanopenComponent::add_remote_state(uint32_t n, uint8_t size) {
+  if (n >= remote_states.size()) {
+    remote_states.resize(n + 1, 0);
+    remote_state_listeners.resize(n + 1);
+  }
+  const CO_OBJ_TYPE *type = size == 1 ? CO_TCMD8 : size == 2 ? CO_TCMD16 : CO_TCMD32;
+  auto key = CO_KEY(REMOTE_STATE_INDEX(n), 1, 0);
+  od.add_update(CO_KEY(REMOTE_STATE_INDEX(n), 1, CO_OBJ_D___RW), type, (CO_DATA) 0);
+  can_cmd_handlers[key] = [this, n, size](void *buffer, uint32_t) {
+    uint32_t raw = 0;
+    memcpy(&raw, buffer, size);
+    remote_states[n] = raw;
+    for (auto &listener : remote_state_listeners[n]) {
+      listener(raw);
+    }
+  };
+}
+
+void CanopenComponent::add_remote_state_listener(uint32_t n, std::function<void(uint32_t raw)> &&listener) {
+  if (n >= remote_states.size()) {
+    remote_states.resize(n + 1, 0);
+    remote_state_listeners.resize(n + 1);
+  }
+  remote_state_listeners[n].push_back(std::move(listener));
+}
+
+uint32_t encode_remote_cmd(uint8_t encoding, float value, uint8_t size, float min_value, float max_value) {
+  switch (encoding) {
+    case REMOTE_CMD_PERCENTAGE:
+      return percentage_to_wire(value);
+    case REMOTE_CMD_COLOR_TEMP:
+      return color_temp_to_wire(value);
+    case REMOTE_CMD_SCALED:
+      return scale_to_wire(value, min_value, max_value, size == 1 ? 255 : 65535);
+    case REMOTE_CMD_REAL32: {
+      uint32_t raw;
+      memcpy(&raw, &value, sizeof(raw));
+      return raw;
+    }
+    default:
+      return (uint32_t) value;
+  }
+}
+
 void CanopenComponent::add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<uint8_t> *trigger) {
   od_add_cmd(entity_id, [=](void *buffer, uint32_t size) { trigger->trigger(*((uint8_t *) buffer)); }, CO_TCMD8);
 }

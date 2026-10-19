@@ -77,9 +77,6 @@ canopen:
     - index: 16
       id: hall_state
       rpdo: {node: dimmer, entity: light_hall}
-    - index: 17
-      id: table_state
-      rpdo: {node: dimmer, entity: light_table}
     - index: 18
       id: table_brightness
       size: 1
@@ -92,6 +89,9 @@ canopen:
     - index: 20
       id: mudroom_state
       rpdo: {node: dimmer, index: 3}
+    # `platform: canopen` entity exposed for debugging (state from a remote state slot)
+    - index: 21
+      id: remote_cover_position
 
 output:
   - platform: template
@@ -203,6 +203,32 @@ sensor:
     id: table_brightness
   - platform: template
     id: dimmer_temperature
+  # remote states, from remote state slots
+  - platform: canopen
+    id: remote_cover_position
+    name: "Remote cover position"
+    node: dimmer
+    entity: cover_hall
+    state: position
+  - platform: canopen
+    id: remote_setpoint
+    node: dimmer
+    entity: setpoint
+  - platform: canopen
+    id: remote_hall_color_temp
+    node: dimmer
+    entity: light_hall
+    state: color_temp
+
+text_sensor:
+  - platform: canopen
+    id: remote_cover_state
+    node: dimmer
+    entity: cover_hall
+  - platform: canopen
+    id: remote_alarm_state
+    node: dimmer
+    entity: alarm_house
 
 binary_sensor:
   - platform: template
@@ -210,8 +236,36 @@ binary_sensor:
     name: "Test Binary Sensor 1"
     device_class: door
     on_press:
-      - canopen.light_toggle: {node: dimmer, entity: light_hall}
-      - canopen.light_toggle: {node: dimmer, entity: light_mudroom}
+      - canopen.light.toggle: {node: dimmer, entity: light_table}
+      - canopen.light.toggle: {node: dimmer, index: 2}  # same remote state slot
+      - canopen.light.turn_on: {node: dimmer, entity: light_table}
+      - canopen.light.turn_on: {node: dimmer, entity: light_table, brightness: 50%}
+      - canopen.light.turn_on:
+          node: dimmer
+          entity: light_hall
+          brightness: !lambda 'return id(table_brightness).state;'
+          color_temperature: 3000 K
+      - canopen.light.turn_off: {node: dimmer, entity: light_hall}
+      - canopen.switch.turn_on: {node: dimmer, entity: pump}
+      - canopen.switch.turn_off: {node: dimmer, entity: relay}
+      - canopen.switch.toggle: {node: dimmer, entity: relay}
+      - canopen.cover.open: {node: dimmer, entity: cover_hall}
+      - canopen.cover.close: {node: dimmer, entity: cover_hall}
+      - canopen.cover.stop: {node: dimmer, entity: cover_hall}
+      - canopen.cover.toggle: {node: dimmer, entity: cover_hall}
+      - canopen.cover.control: {node: dimmer, entity: cover_hall, position: 30%, tilt: 100%}
+      - canopen.cover.control: {node: dimmer, entity: cover_hall, stop: true}
+      - canopen.alarm_control_panel.disarm: {node: dimmer, entity: alarm_house}
+      - canopen.alarm_control_panel.arm_away: {node: dimmer, entity: alarm_house}
+      - canopen.alarm_control_panel.arm_home: {node: dimmer, entity: alarm_house}
+      - canopen.alarm_control_panel.arm_night: {node: dimmer, entity: alarm_house}
+      - canopen.alarm_control_panel.arm_vacation: {node: dimmer, entity: alarm_house}
+      - canopen.alarm_control_panel.arm_custom_bypass: {node: dimmer, entity: alarm_house}
+      - canopen.number.set: {node: dimmer, entity: setpoint, value: 21.5}
+      - canopen.number.set:
+          node: dimmer
+          entity: setpoint
+          value: !lambda 'return id(remote_setpoint).state + 0.5;'
       - canopen.entity_cmd: {node: dimmer, entity: light_table, cmd: 1, value: 127}
       - canopen.entity_cmd:
           node: dimmer
@@ -219,10 +273,12 @@ binary_sensor:
           cmd: 1
           value: !lambda 'return id(table_brightness).state < 0.5 ? 254 : 0;'
       - canopen.entity_cmd: {node_id: 0x36, index: 2, value: 1}
+  - platform: canopen
+    id: remote_relay
+    node: dimmer
+    entity: relay
   - platform: template
     id: hall_state
-  - platform: template
-    id: table_state
   - platform: template
     id: mudroom_state
 
