@@ -93,7 +93,7 @@ def RPDO_SCHEMA(value):
 TPDO_SCHEMA = cv.Schema(
     {
         cv.Required("number"): cv.int_,
-        cv.Optional("is_async", default=True): cv.boolean,
+        cv.Optional("is_async", default=False): cv.boolean,
     }
 )
 

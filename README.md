@@ -35,8 +35,8 @@ The [can2mqtt](https://github.com/mrk-its/can2mqtt) project provides can2mqtt br
 Any of:
 - object with following properties:
   * `number` (Required, integer): integer in 0..7 range (7 is typically reserved for node to node communication, unless `pdo_od_writer` is disabled, see above)
-  * `is_async` (Optional, bool, default=true): When true then TPDO is sent immediately on every state change. When false, changed TPDOs are marked dirty and sent once per component loop.
-- integer representing `number` defined above. Note: in this form `is_async` is **false**.
+  * `is_async` (Optional, bool, default=false): When true then TPDO is sent immediately on every state change. When false, changed TPDOs are marked dirty and sent once per component loop.
+- integer representing `number` defined above (equivalent to `{number: N}`, `is_async: false`).
 
 ### `RPDO` schema:
 Any of:
