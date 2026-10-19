@@ -164,6 +164,8 @@ class CanopenComponent : public Component {
 
   ESPPreferenceObject comm_state;
   bool pdo_od_writer_enabled = true;
+  // TPDO layout hash computed by codegen (layout.py), 0 = don't check
+  uint32_t expected_tpdo_layout_hash = 0;
 
   void parse_od_writer_frame(CO_IF_FRM *frm);
 
@@ -210,6 +212,8 @@ class CanopenComponent : public Component {
   void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd);
 
   void enable_pdo_od_writer(bool enable) { pdo_od_writer_enabled = enable; };
+  void set_expected_tpdo_layout_hash(uint32_t hash) { expected_tpdo_layout_hash = hash; }
+  uint32_t compute_tpdo_layout_hash();
 
 #ifdef USE_SENSOR
   void add_entity(sensor::Sensor *sensor, uint32_t entity_id, TPDO tpdo, uint8_t size = 4, float min_val = 0,
@@ -239,14 +243,14 @@ class CanopenComponent : public Component {
 #endif
 
 #ifdef USE_LIGHT
-  void add_entity(esphome::light::LightState *light, uint32_t entity_id, TPDO tpdo) {
-    entities.push_back(new LightStateEntity(light, entity_id, tpdo));
+  void add_entity(esphome::light::LightState *light, uint32_t entity_id, TPDO tpdo, uint32_t caps) {
+    entities.push_back(new LightStateEntity(light, entity_id, tpdo, caps));
   }
 #endif
 
 #ifdef USE_COVER
-  void add_entity(esphome::cover::Cover *cover, uint32_t entity_id, TPDO tpdo) {
-    entities.push_back(new CoverEntity(cover, entity_id, tpdo));
+  void add_entity(esphome::cover::Cover *cover, uint32_t entity_id, TPDO tpdo, uint32_t caps) {
+    entities.push_back(new CoverEntity(cover, entity_id, tpdo, caps));
   }
 #endif
 

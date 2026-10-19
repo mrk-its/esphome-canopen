@@ -46,11 +46,61 @@ canopen:
       id: switch1
     - index: 7
       id: alarm1
+    # one light of each built-in platform, see components/canopen/layout.py
+    - index: 8
+      id: light_binary
+      tpdo: 1
+    - index: 9
+      id: light_cwww
+      tpdo: 1
+    - index: 10
+      id: light_ct
+      tpdo: 1
+    - index: 11
+      id: light_rgb
+      tpdo: 2
+    - index: 12
+      id: light_rgbw
+      tpdo: 2
+    - index: 13
+      id: light_rgbww
+      tpdo: 2
+    - index: 14
+      id: light_rgbct
+      tpdo: 3
+    - index: 15
+      id: cover_position_tilt
+      tpdo: 3
 
 output:
   - platform: template
     id: output1
     type: float
+    write_action:
+      - lambda: ''
+  - platform: template
+    id: output2
+    type: float
+    write_action:
+      - lambda: ''
+  - platform: template
+    id: output3
+    type: float
+    write_action:
+      - lambda: ''
+  - platform: template
+    id: output4
+    type: float
+    write_action:
+      - lambda: ''
+  - platform: template
+    id: output5
+    type: float
+    write_action:
+      - lambda: ''
+  - platform: template
+    id: output_binary
+    type: binary
     write_action:
       - lambda: ''
 
@@ -61,6 +111,65 @@ light:
     output: output1
     gamma_correct: 1
     default_transition_length: 0s
+
+  - platform: binary
+    id: light_binary
+    name: "Test Light Binary"
+    output: output_binary
+
+  - platform: cwww
+    id: light_cwww
+    name: "Test Light CWWW"
+    cold_white: output1
+    warm_white: output2
+    cold_white_color_temperature: 6000 K
+    warm_white_color_temperature: 2000 K
+
+  - platform: color_temperature
+    id: light_ct
+    name: "Test Light CT"
+    color_temperature: output1
+    brightness: output2
+    cold_white_color_temperature: 6000 K
+    warm_white_color_temperature: 2000 K
+
+  - platform: rgb
+    id: light_rgb
+    name: "Test Light RGB"
+    red: output1
+    green: output2
+    blue: output3
+
+  - platform: rgbw
+    id: light_rgbw
+    name: "Test Light RGBW"
+    red: output1
+    green: output2
+    blue: output3
+    white: output4
+
+  - platform: rgbww
+    id: light_rgbww
+    name: "Test Light RGBWW"
+    red: output1
+    green: output2
+    blue: output3
+    cold_white: output4
+    warm_white: output5
+    cold_white_color_temperature: 6000 K
+    warm_white_color_temperature: 2000 K
+    color_interlock: true
+
+  - platform: rgbct
+    id: light_rgbct
+    name: "Test Light RGBCT"
+    red: output1
+    green: output2
+    blue: output3
+    color_temperature: output4
+    white_brightness: output5
+    cold_white_color_temperature: 6000 K
+    warm_white_color_temperature: 2000 K
 
 sensor:
   - platform: template
@@ -82,6 +191,14 @@ cover:
     name: "Test Cover 1"
     device_class: shutter
     optimistic: true
+
+  - platform: template
+    id: cover_position_tilt
+    name: "Test Cover Position Tilt"
+    optimistic: true
+    has_position: true
+    tilt_action:
+      - lambda: ''
 
 number:
   - platform: template

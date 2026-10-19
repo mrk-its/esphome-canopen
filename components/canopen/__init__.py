@@ -4,9 +4,12 @@ from itertools import groupby
 import esphome.config_validation as cv
 import esphome.codegen as cg
 from esphome import automation
+import esphome.final_validate as fv
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.components.canbus import CanbusComponent
 from esphome.core import CORE
+
+from . import layout
 
 ns = cg.esphome_ns.namespace("canopen")
 
@@ -68,6 +71,8 @@ ENTITY_SCHEMA = cv.Schema(
         cv.Optional("max_value"): cv.float_,
         cv.Optional("tpdo"): cv.Any(cv.int_, TPDO_SCHEMA),
         cv.Optional("rpdo"): cv.ensure_list(RPDO_SCHEMA),
+        # light / cover capabilities, for platforms not known to layout.py
+        cv.Optional("caps"): cv.ensure_list(cv.string),
     }
 )
 
@@ -180,6 +185,83 @@ TYPE_TO_CANOPEN_TYPE = {
     "int32": (cg.RawExpression("CO_TSIGNED32"), 4),
 }
 
+# entity C++ class -> layout domain; order matters only for classes inheriting from each other
+ENTITY_DOMAINS = [
+    (cg.esphome_ns.namespace("sensor").class_("Sensor"), layout.DOMAIN_SENSOR),
+    (cg.esphome_ns.namespace("number").class_("Number"), layout.DOMAIN_NUMBER),
+    (
+        cg.esphome_ns.namespace("binary_sensor").class_("BinarySensor"),
+        layout.DOMAIN_BINARY_SENSOR,
+    ),
+    (cg.esphome_ns.namespace("switch_").class_("Switch"), layout.DOMAIN_SWITCH),
+    (cg.esphome_ns.namespace("light").class_("LightState"), layout.DOMAIN_LIGHT),
+    (cg.esphome_ns.namespace("cover").class_("Cover"), layout.DOMAIN_COVER),
+    (
+        cg.esphome_ns.namespace("alarm_control_panel").class_("AlarmControlPanel"),
+        layout.DOMAIN_ALARM,
+    ),
+]
+
+
+def tpdo_number(entity_config):
+    tpdo = entity_config.get("tpdo", -1)
+    return tpdo["number"] if isinstance(tpdo, dict) else tpdo
+
+
+def entity_layout(full_config, entity_config):
+    """(caps, state sizes) of an exposed entity, see layout.py."""
+    entity_id = entity_config["id"]
+    for declared_id, path in full_config.declare_ids:
+        if declared_id.id == entity_id.id:
+            break
+    else:
+        raise layout.LayoutError(f"ID {entity_id} not found in configuration")
+    domain = next(
+        (d for cls, d in ENTITY_DOMAINS if declared_id.type.inherits_from(cls)), None
+    )
+    if domain is None:
+        raise layout.LayoutError(
+            f"Entity '{entity_id}' of type {declared_id.type} is not supported"
+        )
+    platform_config = full_config.get_config_for_path(path[:-1])
+    caps = layout.entity_caps(domain, platform_config, entity_config.get("caps"))
+    sizes = layout.entity_state_sizes(domain, caps, entity_config.get("size"))
+    return caps, sizes
+
+
+def node_tpdo_mapping(full_config, config):
+    """TPDO mapping of a node, in the order states are added to the OD at runtime:
+    template entity states (added in codegen), then entities by index (setup())."""
+    states = []
+    for tmpl_entity in config.get("template_entities", []):
+        for state in tmpl_entity.get("states", ()):
+            _, size = TYPE_TO_CANOPEN_TYPE[state["type"]]
+            states.append((tmpl_entity["index"], tmpl_entity["tpdo"], size))
+    for entity_config in sorted(config.get(CONF_ENTITIES, []), key=lambda x: x["index"]):
+        try:
+            _, sizes = entity_layout(full_config, entity_config)
+        except layout.LayoutError as err:
+            raise cv.Invalid(
+                f"entity '{entity_config['id']}': {err}",
+                path=[CONF_ENTITIES, config[CONF_ENTITIES].index(entity_config)],
+            ) from err
+        tpdo = tpdo_number(entity_config)
+        states.extend((entity_config["index"], tpdo, size) for size in sizes)
+    return layout.tpdo_mapping(states)
+
+
+def _final_validate(config_list):
+    full_config = fv.full_config.get()
+    for config in config_list:
+        try:
+            node_tpdo_mapping(full_config, config)
+        except layout.LayoutError as err:
+            raise cv.Invalid(str(err)) from err
+    return config_list
+
+
+FINAL_VALIDATE_SCHEMA = _final_validate
+
 
 def to_code(config_list):
     # No compression on stm32 or zephyr: miniz needs ~43 KB of heap for inflate
@@ -238,8 +320,12 @@ def to_code(config_list):
         assert len(entities) == len(
             set(e["index"] for e in entities)
         ), "All entity indices must be unique!"
+        mapping = node_tpdo_mapping(CORE.config, config)
+        cg.add(canopen.set_expected_tpdo_layout_hash(layout.layout_hash(mapping)))
+
         for entity_config in entities:
             entity = yield cg.get_variable(entity_config["id"])
+            caps, _ = entity_layout(CORE.config, entity_config)
             tpdo = entity_config.get("tpdo", -1)
             if not isinstance(tpdo, dict):
                 tpdo = {"number": tpdo, "is_async": False}
@@ -262,6 +348,12 @@ def to_code(config_list):
                         size,
                         min_val,
                         max_val,
+                    )
+                )
+            elif caps is not None:
+                cg.add(
+                    canopen.add_entity(
+                        entity, entity_config["index"], tpdo_struct, caps
                     )
                 )
             else:

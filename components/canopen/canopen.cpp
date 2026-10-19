@@ -283,6 +283,28 @@ void CanopenComponent::od_setup_tpdo(uint32_t index, uint8_t sub_index, uint8_t 
                 CO_LINK(index, sub_index, bits));
 }
 
+// FNV-1a 32 over (count, entries...) of every TPDO mapping (0x1A00..0x1A07) as little-endian u32,
+// must match layout_hash() in layout.py
+uint32_t CanopenComponent::compute_tpdo_layout_hash() {
+  uint32_t hash = 0x811C9DC5;
+  auto add_word = [&hash](uint32_t word) {
+    for (int i = 0; i < 4; i++) {
+      hash ^= (word >> (8 * i)) & 0xff;
+      hash *= 0x01000193;
+    }
+  };
+  for (uint8_t n = 0; n < 8; n++) {
+    auto obj = od.find(CO_DEV(0x1a00 + n, 0));
+    uint8_t count = obj ? obj->Data : 0;
+    add_word(count);
+    for (uint8_t sub = 1; sub <= count; sub++) {
+      auto entry = od.find(CO_DEV(0x1a00 + n, sub));
+      add_word(entry ? entry->Data : 0);
+    }
+  }
+  return hash;
+}
+
 void CanopenComponent::od_set_state(uint32_t key, void *state, uint8_t size) {
   auto obj = CODictFind(&node->Dict, key);
   if (!obj)
@@ -462,6 +484,16 @@ void CanopenComponent::setup() {
 
   for (auto it = entities.begin(); it != entities.end(); it++) {
     (*it)->setup(this);
+  }
+
+  uint32_t tpdo_layout_hash = compute_tpdo_layout_hash();
+  od.add_update(CO_KEY(0x3002, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 1);
+  od.add_update(CO_KEY(0x3002, 1, CO_OBJ_D___R_), CO_TUNSIGNED32, (CO_DATA) tpdo_layout_hash);
+  if (expected_tpdo_layout_hash && tpdo_layout_hash != expected_tpdo_layout_hash) {
+    ESP_LOGE(TAG, "TPDO layout hash %08lx differs from expected %08lx (codegen / layout.py mismatch)",
+             (unsigned long) tpdo_layout_hash, (unsigned long) expected_tpdo_layout_hash);
+  } else {
+    ESP_LOGI(TAG, "TPDO layout hash: %08lx", (unsigned long) tpdo_layout_hash);
   }
 
   CO_NODE_SPEC_T NodeSpec = {

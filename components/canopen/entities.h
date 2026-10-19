@@ -144,9 +144,11 @@ class LightStateEntity : public BaseCanopenEntity, public esphome::light::LightR
 
  public:
   esphome::light::LightState *light;
-  LightStateEntity(esphome::light::LightState *light, uint32_t entity_id, TPDO tpdo)
+  uint32_t caps;  // from codegen (layout.py), not from traits
+  LightStateEntity(esphome::light::LightState *light, uint32_t entity_id, TPDO tpdo, uint32_t caps)
       : BaseCanopenEntity(entity_id, tpdo) {
     this->light = light;
+    this->caps = caps;
     this->state_key = 0;
     this->brightness_key = 0;
     this->colortemp_key = 0;
@@ -161,8 +163,11 @@ class LightStateEntity : public BaseCanopenEntity, public esphome::light::LightR
 class CoverEntity : public BaseCanopenEntity {
  public:
   esphome::cover::Cover *cover;
-  CoverEntity(esphome::cover::Cover *cover, uint32_t entity_id, TPDO tpdo) : BaseCanopenEntity(entity_id, tpdo) {
+  uint32_t caps;  // from codegen (layout.py), not from traits
+  CoverEntity(esphome::cover::Cover *cover, uint32_t entity_id, TPDO tpdo, uint32_t caps)
+      : BaseCanopenEntity(entity_id, tpdo) {
     this->cover = cover;
+    this->caps = caps;
   }
   void setup(CanopenComponent *canopen) override;
 };

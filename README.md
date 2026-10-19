@@ -28,6 +28,7 @@ The [can2mqtt](https://github.com/mrk-its/can2mqtt) project provides can2mqtt br
 * `size` (Optional, int, `sensor` / `number` only): size of state on the wire: `4` (default, REAL32), `1` (scaled UINT8) or `2` (scaled UINT16). See [Sensor8 / Sensor16](OBJECT_DICTIONARY.md#sensor8--sensor16)
 * `min_value` (Optional, float, default=0): minimal value for scaled states (`size` 1 or 2)
 * `max_value` (Optional, float, default=254 for `size: 1`, 65534 for `size: 2`): maximal value for scaled states (`size` 1 or 2)
+* `caps` (Optional, list, `light` / `cover` only): capabilities of the entity, needed only for platforms whose capabilities the component can't derive from the config (the build fails with a hint). Light: `on_off`, `brightness`, `color_temperature`; cover: `position`, `tilt`. See [TPDO layout](OBJECT_DICTIONARY.md#tpdo-layout)
 
 ### `TPDO` schema:
 Any of:

@@ -201,21 +201,23 @@ void LightStateEntity::setup(CanopenComponent *canopen) {
       entity_id, [this](void *buffer, uint32_t size) { light->make_call().set_state(*(uint8_t *) buffer).perform(); });
 
   uint32_t version = 1;
-  uint32_t caps = 0;
-
   auto traits = light->get_traits();
 
+  // caps (and so the OD layout) come from codegen, traits are only checked
+  uint32_t traits_caps = 0;
   if (traits.supports_color_mode(light::ColorMode::ON_OFF)) {
-    caps |= 1;
-    ESP_LOGI(TAG, "SUPPORTS ON OFF");
+    traits_caps |= 1;
   }
-
   if (traits.supports_color_mode(light::ColorMode::BRIGHTNESS)) {
-    caps |= 2;
+    traits_caps |= 2;
   }
   if (traits.supports_color_mode(light::ColorMode::COLOR_TEMPERATURE) ||
       traits.supports_color_mode(light::ColorMode::COLD_WARM_WHITE)) {
-    caps |= 4;
+    traits_caps |= 4;
+  }
+  if (traits_caps != caps) {
+    ESP_LOGW(TAG, "light '%s': caps from config 0x%02lx differ from traits 0x%02lx", light->get_name().c_str(),
+             (unsigned long) caps, (unsigned long) traits_caps);
   }
 
   canopen->od_add_metadata(entity_id, ENTITY_TYPE_LIGHT | (version << 8) | (caps << 16), light->get_name(), "", "", "");
@@ -225,11 +227,9 @@ void LightStateEntity::setup(CanopenComponent *canopen) {
     canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t size) {
       light->make_call().set_brightness_if_supported(percentage_from_wire(*(uint8_t *) buffer)).perform();
     });
-    ESP_LOGI(TAG, "SUPPORTS BRIGHTNESS");
   }
 
   if (caps & 4) {
-    ESP_LOGI(TAG, "SUPPORTS COLOR_TEMPERATURE");
     colortemp_key = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &colortemp, 1, tpdo);
     canopen->od_add_cmd(entity_id, [=, this](void *buffer, uint32_t size) {
       light->make_call().set_color_temperature_if_supported(color_temp_from_wire(*(uint8_t *) buffer)).perform();
@@ -265,16 +265,14 @@ void CoverEntity::setup(CanopenComponent *canopen) {
   auto traits = cover->get_traits();
 
   uint32_t version = 1;
-  uint32_t caps = 0;
   uint32_t pos_key = 0;
   uint32_t tilt_key = 0;
 
-  if (traits.get_supports_position()) {
-    caps |= 1;
-  }
-
-  if (traits.get_supports_tilt()) {
-    caps |= 2;
+  // caps (and so the OD layout) come from codegen, traits are only checked
+  uint32_t traits_caps = (traits.get_supports_position() ? 1 : 0) | (traits.get_supports_tilt() ? 2 : 0);
+  if (traits_caps != caps) {
+    ESP_LOGW(TAG, "cover '%s': caps from config 0x%02lx differ from traits 0x%02lx", cover->get_name().c_str(),
+             (unsigned long) caps, (unsigned long) traits_caps);
   }
 
   canopen->od_add_metadata(entity_id, ENTITY_TYPE_COVER | (version << 8) | (caps << 16), cover->get_name(),

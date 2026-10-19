@@ -94,6 +94,7 @@ EntityTypeCode: 3
 EntityTypeCode: 4, version: 1
 
 Capabilities: bit 0 - supports position, bit 1 - supports tilt. Position / tilt objects are present only when supported, so subindices are assigned in order (e.g. tilt is at 0x02 if position is not supported).
+Capabilities are determined at build time from the cover platform config (see [TPDO layout](#tpdo-layout)).
 
 | Index             | SubIndex | Object Name             | Type   | Access | Description     |
 |-------------------|----------|-------------------------|--------|:------:|-|
@@ -109,6 +110,7 @@ Capabilities: bit 0 - supports position, bit 1 - supports tilt. Position / tilt 
 EntityTypeCode: 5, version: 1
 
 Capabilities: bit 0 - on/off, bit 1 - brightness, bit 2 - color temperature. Brightness objects are present if brightness or color temperature is supported, color temperature objects only if color temperature is supported.
+Capabilities are determined at build time from the light platform's color modes (see [TPDO layout](#tpdo-layout)): bit 0 for `ON_OFF`, bit 1 for `BRIGHTNESS`, bit 2 for `COLOR_TEMPERATURE` / `COLD_WARM_WHITE` (e.g. `binary`: 1, `monochromatic`: 2, `cwww`: 4).
 
 | Index             | SubIndex | Object Name             | Type   | Access | Description     |
 |-------------------|----------|-------------------------|--------|:------:|-----------------|
@@ -179,6 +181,24 @@ States of entities with `tpdo` configured are mapped to TPDO with given number, 
 |------|-----------------|
 | 0..3 | standard, 0x180 / 0x280 / 0x380 / 0x480 + node_id |
 | 4..7 | 0x200 / 0x300 / 0x400 / 0x500 + node_id |
+
+### TPDO layout
+
+The TPDO layout (which states an entity has and where they are in the TPDO) is computed at build time from the
+YAML config (`components/canopen/layout.py`): states of `template_entities` first, then entities by index, each
+with its states in subindex order. A TPDO can carry at most 8 bytes.
+
+Light / cover capabilities come from the platform config (e.g. `cwww`, `monochromatic`, `time_based`,
+`template` with `has_position` / `tilt_action`). For platforms the component doesn't know, set them with the
+entity's `caps` option. The C++ side uses these capabilities as given and only logs a warning if the entity's
+traits differ.
+
+At boot the node hashes its actual TPDO mapping and logs an error if it differs from the hash computed at
+build time. The hash is readable in the OD:
+
+| Index  | SubIndex | Object Name      | Type   | Access | Description |
+|--------|----------|------------------|--------|:------:|-|
+| 0x3002 | 0x01     | TPDO layout hash | UINT32 | R      | FNV-1a 32 of the TPDO mappings: for each TPDO 0..7 its entry count followed by its 0x1A00+n entries, as little-endian UINT32 |
 
 ## OD writer
 
