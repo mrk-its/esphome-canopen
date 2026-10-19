@@ -138,3 +138,18 @@ def test_layout_hash():
     one = layout.tpdo_mapping([(1, 0, 1)])
     other = layout.tpdo_mapping([(1, 1, 1)])
     assert layout.layout_hash(one) != layout.layout_hash(other)
+
+
+def test_layout_table():
+    states = [
+        (1, 0, 1, "light1.state"),
+        (1, 0, 1, "light1.brightness"),
+        (2, -1, 1, "sw.state"),
+        (3, 4, 4, "temp.value"),
+    ]
+    assert layout.layout_table(states, 0x36) == [
+        "TPDO0 (COB-ID 0x1b6, 2 B): [0] light1.state, [1] light1.brightness",
+        "TPDO4 (COB-ID 0x236, 4 B): [0..3] temp.value",
+    ]
+    # labels don't change the mapping
+    assert layout.tpdo_mapping(states) == layout.tpdo_mapping([s[:3] for s in states])

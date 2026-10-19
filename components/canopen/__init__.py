@@ -1,5 +1,6 @@
 import datetime
 from itertools import groupby
+import logging
 
 import esphome.config_validation as cv
 import esphome.codegen as cg
@@ -10,6 +11,8 @@ from esphome.components.canbus import CanbusComponent
 from esphome.core import CORE
 
 from . import layout
+
+_LOGGER = logging.getLogger(__name__)
 
 ns = cg.esphome_ns.namespace("canopen")
 
@@ -225,36 +228,41 @@ def entity_layout(full_config, entity_config):
         )
     platform_config = full_config.get_config_for_path(path[:-1])
     caps = layout.entity_caps(domain, platform_config, entity_config.get("caps"))
-    sizes = layout.entity_state_sizes(domain, caps, entity_config.get("size"))
-    return caps, sizes
+    states = layout.entity_states(domain, caps, entity_config.get("size"))
+    return caps, states
 
 
-def node_tpdo_mapping(full_config, config):
-    """TPDO mapping of a node, in the order states are added to the OD at runtime:
-    template entity states (added in codegen), then entities by index (setup())."""
+def node_states(full_config, config):
+    """(entity_index, tpdo, size, label) of all OD states of a node, in the order they
+    are added to the OD at runtime: template entity states (added in codegen), then
+    entities by index (setup())."""
     states = []
     for tmpl_entity in config.get("template_entities", []):
-        for state in tmpl_entity.get("states", ()):
+        for num, state in enumerate(tmpl_entity.get("states", ()), 1):
             _, size = TYPE_TO_CANOPEN_TYPE[state["type"]]
-            states.append((tmpl_entity["index"], tmpl_entity["tpdo"], size))
+            label = f"template{tmpl_entity['index']}.{num}"
+            states.append((tmpl_entity["index"], tmpl_entity["tpdo"], size, label))
     for entity_config in sorted(config.get(CONF_ENTITIES, []), key=lambda x: x["index"]):
         try:
-            _, sizes = entity_layout(full_config, entity_config)
+            _, entity_states = entity_layout(full_config, entity_config)
         except layout.LayoutError as err:
             raise cv.Invalid(
                 f"entity '{entity_config['id']}': {err}",
                 path=[CONF_ENTITIES, config[CONF_ENTITIES].index(entity_config)],
             ) from err
         tpdo = tpdo_number(entity_config)
-        states.extend((entity_config["index"], tpdo, size) for size in sizes)
-    return layout.tpdo_mapping(states)
+        states.extend(
+            (entity_config["index"], tpdo, size, f"{entity_config['id']}.{name}")
+            for name, size in entity_states
+        )
+    return states
 
 
 def _final_validate(config_list):
     full_config = fv.full_config.get()
     for config in config_list:
         try:
-            node_tpdo_mapping(full_config, config)
+            layout.tpdo_mapping(node_states(full_config, config))
         except layout.LayoutError as err:
             raise cv.Invalid(str(err)) from err
     return config_list
@@ -320,8 +328,16 @@ def to_code(config_list):
         assert len(entities) == len(
             set(e["index"] for e in entities)
         ), "All entity indices must be unique!"
-        mapping = node_tpdo_mapping(CORE.config, config)
-        cg.add(canopen.set_expected_tpdo_layout_hash(layout.layout_hash(mapping)))
+        states = node_states(CORE.config, config)
+        tpdo_layout_hash = layout.layout_hash(layout.tpdo_mapping(states))
+        cg.add(canopen.set_expected_tpdo_layout_hash(tpdo_layout_hash))
+        _LOGGER.info(
+            "CANopen node 0x%02x TPDO layout (hash %08x):%s",
+            node_id,
+            tpdo_layout_hash,
+            "".join(f"\n  {line}" for line in layout.layout_table(states, node_id))
+            or " no TPDOs",
+        )
 
         for entity_config in entities:
             entity = yield cg.get_variable(entity_config["id"])

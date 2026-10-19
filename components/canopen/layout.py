@@ -144,8 +144,8 @@ def _unknown_platform_msg(domain, platform):
     )
 
 
-def entity_state_sizes(domain, caps=None, size=None):
-    """Sizes (bytes) of the entity's OD states, in subindex order.
+def entity_states(domain, caps=None, size=None):
+    """(name, size in bytes) of the entity's OD states, in subindex order.
 
     Must match the order of od_add_state() calls in entities.cpp.
     """
@@ -153,24 +153,28 @@ def entity_state_sizes(domain, caps=None, size=None):
         size = 4 if size is None else size
         if size not in (1, 2, 4):
             raise LayoutError(f"Unsupported {domain} size: {size}")
-        return [size]
+        return [("value", size)]
     if domain in (DOMAIN_BINARY_SENSOR, DOMAIN_SWITCH, DOMAIN_ALARM):
-        return [1]
+        return [("state", 1)]
     if domain == DOMAIN_LIGHT:
-        sizes = [1]  # state
+        states = [("state", 1)]
         if caps & (LIGHT_CAP_BRIGHTNESS | LIGHT_CAP_COLOR_TEMPERATURE):
-            sizes.append(1)  # brightness
+            states.append(("brightness", 1))
         if caps & LIGHT_CAP_COLOR_TEMPERATURE:
-            sizes.append(1)  # color temperature
-        return sizes
+            states.append(("color_temp", 1))
+        return states
     if domain == DOMAIN_COVER:
-        sizes = [1]  # state
+        states = [("state", 1)]
         if caps & COVER_CAP_POSITION:
-            sizes.append(1)
+            states.append(("position", 1))
         if caps & COVER_CAP_TILT:
-            sizes.append(1)
-        return sizes
+            states.append(("tilt", 1))
+        return states
     raise LayoutError(f"Unsupported entity domain: {domain}")
+
+
+def entity_state_sizes(domain, caps=None, size=None):
+    return [size for _, size in entity_states(domain, caps, size)]
 
 
 def co_link(index, sub, bits):
@@ -186,13 +190,13 @@ def entity_od_index(entity_index):
 def tpdo_mapping(states):
     """TPDO mapping entries (0x1A00 + n, subindex 1..) in OD creation order.
 
-    `states` is an iterable of (entity_index, tpdo_number, size) in the order
-    od_add_state() is called at runtime; tpdo_number < 0 means not mapped.
+    `states` is an iterable of (entity_index, tpdo_number, size[, label]) in the
+    order od_add_state() is called at runtime; tpdo_number < 0 means not mapped.
     Returns a list of TPDO_COUNT lists of CO_LINK words.
     """
     mapping = [[] for _ in range(TPDO_COUNT)]
     state_sub = {}
-    for entity_index, tpdo, size in states:
+    for entity_index, tpdo, size, *_ in states:
         sub = state_sub.get(entity_index, 0) + 1
         state_sub[entity_index] = sub
         if tpdo < 0:
@@ -213,6 +217,34 @@ def tpdo_offsets_str(entries):
         f"0x{word >> 16:04x}:{(word >> 8) & 0xFF} ({(word & 0xFF) // 8} B)"
         for word in entries
     )
+
+
+def tpdo_cob_id(tpdo, node_id):
+    """Default TPDO COB-IDs, see od_setup_tpdo() in canopen.cpp."""
+    base = 0x180 + 0x100 * tpdo if tpdo < 4 else 0x200 + 0x100 * (tpdo - 4)
+    return base + node_id
+
+
+def layout_table(states, node_id):
+    """Human-readable TPDO layout, one line per TPDO.
+
+    `states` as for tpdo_mapping(), with labels.
+    """
+    lines = []
+    for tpdo in range(TPDO_COUNT):
+        offset, fields = 0, []
+        for _, state_tpdo, size, *label in states:
+            if state_tpdo != tpdo:
+                continue
+            name = label[0] if label else "?"
+            fields.append(f"[{offset}{'' if size == 1 else f'..{offset + size - 1}'}] {name}")
+            offset += size
+        if fields:
+            lines.append(
+                f"TPDO{tpdo} (COB-ID 0x{tpdo_cob_id(tpdo, node_id):03x}, {offset} B): "
+                + ", ".join(fields)
+            )
+    return lines
 
 
 def fnv1a_32(data):
