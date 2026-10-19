@@ -59,7 +59,7 @@ CO_OBJ_STR *od_string(const std::string &str) {
 
 void BaseCanopenEntity::od_set_state(CanopenComponent *canopen, uint32_t key, void *state, uint8_t size) {
   canopen->od_set_state(key, state, size);
-  if (!tpdo.is_async) {
+  if (tpdo.number >= 0 && !tpdo.is_async) {
     canopen->dirty_tpdo_mask |= (1 << tpdo.number);
   }
 }

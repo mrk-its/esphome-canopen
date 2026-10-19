@@ -4,6 +4,10 @@ ESPHome external component exposing ESPHome entities over CANopen, plus CAN OTA.
 [can2mqtt](https://github.com/mrk-its/can2mqtt) (MQTT/Home Assistant bridge, also the OTA uploader).
 OD layout for entities: see OBJECT_DICTIONARY.md.
 
+## Workflow
+- Always do new features and fixes on a `feature/<short-name>` branch (created from the current branch,
+  usually `dev`), never directly on `dev` or `main`.
+
 ## Layout
 - `components/canopen/__init__.py`: config schema and codegen. Global build flags for the stack
   (`-DCO_SDO_BUF_SEG`, `-DCO_TPDO_N`, `-DCO_RPDO_N`, `-DCO_SSDO_N`, `OTA_COMPRESSION`, ...) are added in `to_code()`.
