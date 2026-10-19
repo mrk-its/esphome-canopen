@@ -8,9 +8,9 @@ from esphome import automation
 import esphome.final_validate as fv
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 from esphome.components.canbus import CanbusComponent
-from esphome.core import CORE
+from esphome.core import CORE, Lambda
 
-from . import layout
+from . import layout, remote
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,8 +36,11 @@ CmdTriggerUInt32 = ns.class_("CmdTriggerUInt32", automation.Trigger.template())
 CmdTriggerInt8 = ns.class_("CmdTriggerInt8", automation.Trigger.template())
 CmdTriggerInt16 = ns.class_("CmdTriggerInt16", automation.Trigger.template())
 CmdTriggerInt32 = ns.class_("CmdTriggerInt32", automation.Trigger.template())
+EntityCmdAction = ns.class_("EntityCmdAction", automation.Action)
 
 CONF_ENTITIES = "entities"
+CONF_REMOTE_NODES = "remote_nodes"
+CONF_RPDO = "rpdo"
 
 DEPENDENCIES = []
 
@@ -49,7 +52,7 @@ CSDO_SCHEMA = cv.Schema(
     }
 )
 
-RPDO_SCHEMA = cv.Schema(
+RPDO_RAW_SCHEMA = cv.Schema(
     {
         cv.Required("node_id"): cv.int_,
         cv.Required("tpdo"): cv.int_,
@@ -57,6 +60,28 @@ RPDO_SCHEMA = cv.Schema(
         cv.Optional("cmd", 0): cv.int_,
     }
 )
+
+# remote state by node name (remote_nodes) and entity, resolved to the raw form
+# by resolve_remote_rpdo()
+RPDO_REMOTE_SCHEMA = cv.Schema(
+    {
+        cv.Required("node"): cv.string,
+        cv.Exclusive("entity", "remote_entity"): cv.string,
+        cv.Exclusive("index", "remote_entity"): cv.int_,
+        cv.Optional("state"): cv.string,
+        cv.Optional("cmd", 0): cv.int_,
+    }
+)
+
+
+def RPDO_SCHEMA(value):
+    if isinstance(value, dict) and "node" in value:
+        value = RPDO_REMOTE_SCHEMA(value)
+        if "entity" not in value and "index" not in value:
+            raise cv.Invalid("'entity' or 'index' is required")
+        return value
+    return RPDO_RAW_SCHEMA(value)
+
 
 TPDO_SCHEMA = cv.Schema(
     {
@@ -144,6 +169,8 @@ CONFIG_SCHEMA = cv.ensure_list(
             cv.Required("node_id"): cv.All(cv.int_, cv.Range(min=0, max=127)),
             # cv.Optional("status"): STATUS_ENTITY_SCHEMA,
             cv.Optional("csdo"): cv.ensure_list(CSDO_SCHEMA),
+            # name -> YAML file of another node, see remote.py
+            cv.Optional(CONF_REMOTE_NODES): cv.Schema({cv.string: cv.file_}),
             cv.Required(CONF_ENTITIES): cv.ensure_list(ENTITY_SCHEMA),
             cv.Optional("sdo_block_transfer_size", 63): cv.All(
                 cv.int_, cv.Range(min=1, max=127)
@@ -176,7 +203,8 @@ CONFIG_SCHEMA = cv.ensure_list(
             cv.Optional("sw_version"): cv.string,
             cv.Optional("hw_version"): cv.string,
         }
-    ).extend(cv.COMPONENT_SCHEMA)
+    ).extend(cv.COMPONENT_SCHEMA),
+    lambda config: resolve_remote_rpdo(config),
 )
 
 TYPE_TO_CANOPEN_TYPE = {
@@ -206,13 +234,12 @@ ENTITY_DOMAINS = [
 ]
 
 
-def tpdo_number(entity_config):
-    tpdo = entity_config.get("tpdo", -1)
-    return tpdo["number"] if isinstance(tpdo, dict) else tpdo
+CO_RPDO_N = 4  # -DCO_RPDO_N, see to_code()
+RPDO_MAX_ENTRIES = 8  # 0x1600+n subindices 1..8 (rpdo_buf in canopen.h)
 
 
-def entity_layout(full_config, entity_config):
-    """(caps, state sizes) of an exposed entity, see layout.py."""
+def resolve_local_entity(full_config, entity_config):
+    """(domain, platform config) of a locally exposed entity, via its declared C++ type."""
     entity_id = entity_config["id"]
     for declared_id, path in full_config.declare_ids:
         if declared_id.id == entity_id.id:
@@ -226,36 +253,143 @@ def entity_layout(full_config, entity_config):
         raise layout.LayoutError(
             f"Entity '{entity_id}' of type {declared_id.type} is not supported"
         )
-    platform_config = full_config.get_config_for_path(path[:-1])
+    return domain, full_config.get_config_for_path(path[:-1])
+
+
+def entity_layout(full_config, entity_config):
+    """(caps, [(state name, size)]) of a locally exposed entity, see layout.py."""
+    domain, platform_config = resolve_local_entity(full_config, entity_config)
     caps = layout.entity_caps(domain, platform_config, entity_config.get("caps"))
-    states = layout.entity_states(domain, caps, entity_config.get("size"))
-    return caps, states
+    return caps, layout.entity_states(domain, caps, entity_config.get("size"))
 
 
 def node_states(full_config, config):
-    """(entity_index, tpdo, size, label) of all OD states of a node, in the order they
-    are added to the OD at runtime: template entity states (added in codegen), then
-    entities by index (setup())."""
-    states = []
-    for tmpl_entity in config.get("template_entities", []):
-        for num, state in enumerate(tmpl_entity.get("states", ()), 1):
-            _, size = TYPE_TO_CANOPEN_TYPE[state["type"]]
-            label = f"template{tmpl_entity['index']}.{num}"
-            states.append((tmpl_entity["index"], tmpl_entity["tpdo"], size, label))
-    for entity_config in sorted(config.get(CONF_ENTITIES, []), key=lambda x: x["index"]):
-        try:
-            _, entity_states = entity_layout(full_config, entity_config)
-        except layout.LayoutError as err:
-            raise cv.Invalid(
-                f"entity '{entity_config['id']}': {err}",
-                path=[CONF_ENTITIES, config[CONF_ENTITIES].index(entity_config)],
-            ) from err
-        tpdo = tpdo_number(entity_config)
-        states.extend(
-            (entity_config["index"], tpdo, size, f"{entity_config['id']}.{name}")
-            for name, size in entity_states
+    """layout.node_states() of a local node, with config errors pointing at the entity."""
+    try:
+        return layout.node_states(
+            config, lambda entity: resolve_local_entity(full_config, entity)
         )
-    return states
+    except layout.LayoutError as err:
+        path = [CONF_ENTITIES, err.entity_pos] if err.entity_pos is not None else []
+        raise cv.Invalid(str(err), path=path) from err
+
+
+def resolve_remote_rpdo(config):
+    """Rewrite `rpdo: {node, entity|index, state, cmd}` entries into the raw form
+    `{node_id, tpdo, offset, cmd}` using the remote node's TPDO layout.
+
+    Resolved entries keep `size` (bytes of the remote state) and `remote`
+    (dict from RemoteNode.state()).
+    """
+    remote_nodes = config.get(CONF_REMOTE_NODES, {})
+    for entity_pos, entity in enumerate(config.get(CONF_ENTITIES, [])):
+        for rpdo_pos, rpdo in enumerate(entity.get(CONF_RPDO, [])):
+            if "node" not in rpdo:
+                continue
+            path = [CONF_ENTITIES, entity_pos, CONF_RPDO, rpdo_pos]
+            node = rpdo["node"]
+            if node not in remote_nodes:
+                raise cv.Invalid(
+                    f"Unknown node '{node}', add it to '{CONF_REMOTE_NODES}'",
+                    path=path + ["node"],
+                )
+            try:
+                remote_node = remote.get_remote_node(node, remote_nodes[node])
+                state = remote_node.state(
+                    rpdo.get("entity"), rpdo.get("index"), rpdo.get("state")
+                )
+            except remote.RemoteError as err:
+                raise cv.Invalid(str(err), path=path) from err
+            entity[CONF_RPDO][rpdo_pos] = {
+                "node_id": state["node_id"],
+                "tpdo": state["tpdo"],
+                "offset": state["offset"],
+                "cmd": rpdo["cmd"],
+                "size": state["size"],
+                "remote": {**state, "node": node},
+            }
+    return config
+
+
+def rpdo_plan(config):
+    """RPDOs of a node: [(node_id, tpdo, [("dummy", size) | ("cmd", entity_index, cmd, size)])].
+
+    One RPDO per remote (node_id, tpdo); entries sorted by offset, gaps filled with
+    dummy entries. Sizes in bytes; raw-form entries map 1 byte.
+    """
+    rpdos = sorted(
+        (
+            {**rpdo, "entity_index": entity["index"], "size": rpdo.get("size", 1)}
+            for entity in config.get(CONF_ENTITIES, [])
+            for rpdo in entity.get(CONF_RPDO, ())
+        ),
+        key=lambda rpdo: (rpdo["node_id"], rpdo["tpdo"], rpdo["offset"]),
+    )
+    plan = []
+    for (node_id, tpdo), group in groupby(
+        rpdos, key=lambda rpdo: (rpdo["node_id"], rpdo["tpdo"])
+    ):
+        entries = []
+        curr_offs = 0
+        for rpdo in group:
+            if rpdo["offset"] < curr_offs:
+                raise cv.Invalid(
+                    f"RPDO from node 0x{node_id:02x} TPDO{tpdo}: entity "
+                    f"{rpdo['entity_index']} at offset {rpdo['offset']} overlaps the previous entry"
+                )
+            if rpdo["offset"] > curr_offs:
+                entries.append(("dummy", rpdo["offset"] - curr_offs))
+            entries.append(("cmd", rpdo["entity_index"], rpdo["cmd"], rpdo["size"]))
+            curr_offs = rpdo["offset"] + rpdo["size"]
+        plan.append((node_id, tpdo, entries))
+    return plan
+
+
+def rpdo_dummy_entries(size):
+    """Number of mapping entries CanopenComponent::add_rpdo_dummy() uses for `size` bytes."""
+    return size // 4 + {0: 0, 1: 1, 2: 1, 3: 2}[size % 4]
+
+
+def validate_rpdo_plan(plan):
+    if len(plan) > CO_RPDO_N:
+        sources = ", ".join(f"node 0x{n:02x} TPDO{t}" for n, t, _ in plan)
+        raise cv.Invalid(
+            f"Too many RPDOs: {len(plan)} (max {CO_RPDO_N}, one per remote node TPDO): {sources}"
+        )
+    for node_id, tpdo, entries in plan:
+        count = sum(
+            rpdo_dummy_entries(entry[1]) if entry[0] == "dummy" else 1
+            for entry in entries
+        )
+        if count > RPDO_MAX_ENTRIES:
+            raise cv.Invalid(
+                f"RPDO from node 0x{node_id:02x} TPDO{tpdo} needs {count} mapping entries "
+                f"(max {RPDO_MAX_ENTRIES})"
+            )
+
+
+def validate_remote_rpdo_sizes(full_config, config):
+    """A remote state must have the size of the local command it's mapped to."""
+    for entity_pos, entity in enumerate(config.get(CONF_ENTITIES, [])):
+        local_states = None
+        for rpdo_pos, rpdo in enumerate(entity.get(CONF_RPDO, ())):
+            if "remote" not in rpdo:
+                continue
+            if local_states is None:
+                local_states = entity_layout(full_config, entity)[1]
+            path = [CONF_ENTITIES, entity_pos, CONF_RPDO, rpdo_pos]
+            if rpdo["cmd"] >= len(local_states):
+                raise cv.Invalid(
+                    f"'{entity['id']}' has no command {rpdo['cmd']}", path=path
+                )
+            local_name, local_size = local_states[rpdo["cmd"]]
+            if local_size != rpdo["size"]:
+                src = rpdo["remote"]
+                raise cv.Invalid(
+                    f"{src['node']} {src['entity']}.{src['state']} is {rpdo['size']} B, but "
+                    f"'{entity['id']}' command {rpdo['cmd']} ({local_name}) is {local_size} B",
+                    path=path,
+                )
 
 
 def _final_validate(config_list):
@@ -265,6 +399,8 @@ def _final_validate(config_list):
             layout.tpdo_mapping(node_states(full_config, config))
         except layout.LayoutError as err:
             raise cv.Invalid(str(err)) from err
+        validate_remote_rpdo_sizes(full_config, config)
+        validate_rpdo_plan(rpdo_plan(config))
     return config_list
 
 
@@ -441,26 +577,148 @@ def to_code(config_list):
             )
             cg.add(canopen.add_trigger(trigger))
 
-        rpdo_entities = [
-            {**rpdo, "entity_index": entity["index"]}
-            for entity in entities
-            for rpdo in entity.get("rpdo", ())
-        ]
-        rpdo_entities.sort(
-            key=lambda rpdo: (rpdo["node_id"], rpdo["tpdo"], rpdo["offset"])
-        )
-        for idx, ((node_id, tpdo), rpdos) in enumerate(
-            groupby(rpdo_entities, key=lambda rpdo: (rpdo["node_id"], rpdo["tpdo"]))
-        ):
+        for idx, (node_id, tpdo, entries) in enumerate(rpdo_plan(config)):
             cg.add(canopen.add_rpdo_node(idx, node_id, tpdo))
-            rpdos = list(rpdos)
-            curr_offs = 0
-            for rpdo in rpdos:
-                assert rpdo["offset"] >= curr_offs, f"RPDO: invalid TPDO offset {rpdo}"
-                if rpdo["offset"] > curr_offs:
-                    cg.add(canopen.add_rpdo_dummy(idx, rpdo["offset"] - curr_offs))
-                    curr_offs = rpdo["offset"]
-                cg.add(
-                    canopen.add_rpdo_entity_cmd(idx, rpdo["entity_index"], rpdo["cmd"])
-                )
-                curr_offs += 1
+            for entry in entries:
+                if entry[0] == "dummy":
+                    cg.add(canopen.add_rpdo_dummy(idx, entry[1]))
+                else:
+                    _, entity_index, cmd, size = entry
+                    cg.add(
+                        canopen.add_rpdo_entity_cmd(idx, entity_index, cmd, size * 8)
+                    )
+
+
+def _raw_canopen_configs():
+    """`canopen:` node configs of the local raw config (packages and substitutions
+    applied, not validated yet), available while actions are validated."""
+    canopen = (CORE.raw_config or {}).get("canopen") or []
+    return canopen if isinstance(canopen, list) else [canopen]
+
+
+def _raw_remote_node(node):
+    for canopen in _raw_canopen_configs():
+        path = (canopen.get(CONF_REMOTE_NODES) or {}).get(node)
+        if path is not None:
+            return remote.get_remote_node(node, CORE.relative_config_path(path))
+    raise cv.Invalid(f"Unknown node '{node}', add it to canopen '{CONF_REMOTE_NODES}'")
+
+
+def _resolve_action_target(config):
+    """Set `node_id` / `index` from `node` + `entity` / `index` (remote_nodes)."""
+    if "node" not in config:
+        if "node_id" not in config or "index" not in config:
+            raise cv.Invalid("either 'node' + 'entity' / 'index', or 'node_id' + 'index' is required")
+        return config
+    if "entity" not in config and "index" not in config:
+        raise cv.Invalid("'entity' or 'index' is required")
+    remote_node = _raw_remote_node(config["node"])
+    try:
+        entity = remote_node.entity(config.get("entity"), config.get("index"))
+    except remote.RemoteError as err:
+        raise cv.Invalid(str(err)) from err
+    return {**config, "node_id": remote_node.node_id, "index": entity["index"]}
+
+
+def _find_mirror(config):
+    """Local entity whose rpdo maps the target's first state ("state"), for light_toggle."""
+    remote_node = _raw_remote_node(config["node"])
+    target = remote_node.state(index=config["index"])
+    mirrors = []
+    for canopen in _raw_canopen_configs():
+        for entity in canopen.get(CONF_ENTITIES) or ():
+            rpdos = entity.get(CONF_RPDO) or []
+            for rpdo in rpdos if isinstance(rpdos, list) else [rpdos]:
+                if rpdo.get("node") != config["node"] or rpdo.get("cmd", 0) != 0:
+                    continue
+                try:
+                    state = remote_node.state(
+                        rpdo.get("entity"), rpdo.get("index"), rpdo.get("state")
+                    )
+                except remote.RemoteError:
+                    continue  # reported by the canopen config validation
+                if (state["index"], state["state"]) == (target["index"], target["state"]):
+                    mirrors.append(str(entity["id"]))
+    if len(mirrors) != 1:
+        found = f"found {', '.join(mirrors)}" if mirrors else "found none"
+        raise cv.Invalid(
+            f"light_toggle needs exactly one local entity with rpdo "
+            f"{{node: {config['node']}, entity: {target['entity']}}} ({found}); "
+            f"set 'state_id' to choose"
+        )
+    return mirrors[0]
+
+
+def _resolve_light_toggle(config):
+    config = _resolve_action_target(config)
+    if "node" not in config:
+        raise cv.Invalid("light_toggle needs 'node' (remote_nodes)")
+    if "state_id" not in config:
+        config["state_id"] = cv.use_id(cg.EntityBase)(_find_mirror(config))
+    try:
+        domain, _ = remote.find_entity(CORE.raw_config, config["state_id"].id)
+    except layout.LayoutError as err:
+        raise cv.Invalid(str(err)) from err
+    if domain not in (layout.DOMAIN_BINARY_SENSOR, layout.DOMAIN_SWITCH):
+        raise cv.Invalid(
+            f"state_id '{config['state_id']}' must be a binary_sensor or switch, not {domain}"
+        )
+    return config
+
+
+ACTION_TARGET_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(): cv.use_id(CanopenComponent),
+        cv.Exclusive("node", "remote_node"): cv.string,
+        cv.Exclusive("node_id", "remote_node"): cv.int_range(min=1, max=127),
+        cv.Exclusive("entity", "remote_entity"): cv.string,
+        cv.Exclusive("index", "remote_entity"): cv.int_,
+    }
+)
+
+
+@automation.register_action(
+    "canopen.entity_cmd",
+    EntityCmdAction,
+    cv.All(
+        ACTION_TARGET_SCHEMA.extend(
+            {
+                cv.Optional("cmd", 0): cv.int_range(min=0, max=254),
+                cv.Required("value"): cv.templatable(cv.uint8_t),
+            }
+        ),
+        _resolve_action_target,
+    ),
+    synchronous=True,
+)
+async def entity_cmd_action_to_code(config, action_id, template_arg, args):
+    var = cg.new_Pvariable(action_id, template_arg)
+    await cg.register_parented(var, config[CONF_ID])
+    cg.add(var.set_target(config["node_id"], config["index"], config["cmd"]))
+    cg.add(var.set_value(await cg.templatable(config["value"], args, cg.uint8)))
+    return var
+
+
+@automation.register_action(
+    "canopen.light_toggle",
+    EntityCmdAction,
+    cv.All(
+        ACTION_TARGET_SCHEMA.extend(
+            {
+                # local mirror of the remote state (found from `rpdo` when not set)
+                cv.Optional("state_id"): cv.use_id(cg.EntityBase),
+            }
+        ),
+        _resolve_light_toggle,
+    ),
+    synchronous=True,
+)
+async def light_toggle_action_to_code(config, action_id, template_arg, args):
+    var = cg.new_Pvariable(action_id, template_arg)
+    await cg.register_parented(var, config[CONF_ID])
+    cg.add(var.set_target(config["node_id"], config["index"], 0))
+    value = await cg.process_lambda(
+        Lambda(f"return !id({config['state_id']}).state;"), args, return_type=cg.uint8
+    )
+    cg.add(var.set_value(value))
+    return var

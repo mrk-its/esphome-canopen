@@ -209,7 +209,7 @@ class CanopenComponent : public Component {
   bool is_initialized() { return node->Nmt.Mode == CO_PREOP || node->Nmt.Mode == CO_OPERATIONAL; }
   void add_rpdo_dummy(uint8_t idx, uint8_t size);
   void add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo);
-  void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd);
+  void add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd, uint8_t bit_size = 8);
 
   void enable_pdo_od_writer(bool enable) { pdo_od_writer_enabled = enable; };
   void set_expected_tpdo_layout_hash(uint32_t hash) { expected_tpdo_layout_hash = hash; }
@@ -315,6 +315,27 @@ class CanopenComponent : public Component {
 };
 extern CanopenComponent *current_canopen;
 extern std::vector<CanopenComponent *> all_instances;
+
+// canopen.entity_cmd / canopen.light_toggle: write a command of a remote node's entity
+template<typename... Ts> class EntityCmdAction : public Action<Ts...>, public Parented<CanopenComponent> {
+ public:
+  TEMPLATABLE_VALUE(uint8_t, value)
+
+  void set_target(uint8_t node_id, uint32_t entity_index, uint8_t cmd) {
+    this->node_id_ = node_id;
+    this->entity_index_ = entity_index;
+    this->cmd_ = cmd;
+  }
+
+  void play(const Ts &...x) override {
+    this->parent_->send_entity_cmd(this->node_id_, this->entity_index_, this->value_.value(x...), this->cmd_);
+  }
+
+ protected:
+  uint8_t node_id_{0};
+  uint32_t entity_index_{0};
+  uint8_t cmd_{0};
+};
 
 }  // namespace canopen
 }  // namespace esphome

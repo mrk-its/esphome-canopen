@@ -39,6 +39,14 @@ CAPS_NAMES = {
     },
 }
 
+def flag(conf, key):
+    """Boolean option of a validated or raw (possibly substituted, so string) config."""
+    value = conf.get(key, False)
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "yes", "on", "1")
+    return bool(value)
+
+
 # Supported color modes of light platforms, mirroring each platform's
 # get_traits() in ESPHome.
 LIGHT_PLATFORM_COLOR_MODES = {
@@ -51,16 +59,16 @@ LIGHT_PLATFORM_COLOR_MODES = {
     "sonoff_d1": lambda conf: {"BRIGHTNESS"},
     "rgb": lambda conf: {"RGB"},
     "rgbw": lambda conf: (
-        {"RGB", "WHITE"} if conf.get("color_interlock") else {"RGB_WHITE"}
+        {"RGB", "WHITE"} if flag(conf, "color_interlock") else {"RGB_WHITE"}
     ),
     "rgbww": lambda conf: (
         {"RGB", "COLD_WARM_WHITE"}
-        if conf.get("color_interlock")
+        if flag(conf, "color_interlock")
         else {"RGB_COLD_WARM_WHITE"}
     ),
     "rgbct": lambda conf: (
         {"RGB", "COLOR_TEMPERATURE"}
-        if conf.get("color_interlock")
+        if flag(conf, "color_interlock")
         else {"RGB_COLOR_TEMPERATURE", "COLOR_TEMPERATURE"}
     ),
 }
@@ -74,7 +82,7 @@ COVER_PLATFORM_CAPS = {
     "template": lambda conf: (
         (
             COVER_CAP_POSITION
-            if conf.get("has_position") or "position_action" in conf
+            if flag(conf, "has_position") or "position_action" in conf
             else 0
         )
         | (COVER_CAP_TILT if "tilt_action" in conf else 0)
@@ -84,8 +92,22 @@ COVER_PLATFORM_CAPS = {
 }
 
 
+# sizes of `template_entities` state types (TYPE_TO_CANOPEN_TYPE in __init__.py)
+TEMPLATE_STATE_SIZES = {
+    "uint8": 1,
+    "uint16": 2,
+    "uint32": 4,
+    "int8": 1,
+    "int16": 2,
+    "int32": 4,
+}
+
+
 class LayoutError(Exception):
-    pass
+    def __init__(self, message, entity_pos=None):
+        super().__init__(message)
+        # position of the offending entity in the node's `entities` list, if known
+        self.entity_pos = entity_pos
 
 
 def light_caps_from_color_modes(color_modes):
@@ -175,6 +197,45 @@ def entity_states(domain, caps=None, size=None):
 
 def entity_state_sizes(domain, caps=None, size=None):
     return [size for _, size in entity_states(domain, caps, size)]
+
+
+def tpdo_number(entity_config):
+    """`tpdo:` of an entity: int, or {number: ...} mapping; -1 when not set."""
+    tpdo = entity_config.get("tpdo", -1)
+    return tpdo["number"] if isinstance(tpdo, dict) else tpdo
+
+
+def node_states(node_config, resolve_entity):
+    """(entity_index, tpdo, size, label) of all OD states of a node.
+
+    In the order they are added to the OD at runtime: template entity states
+    (added in codegen), then entities by index (CanopenComponent::setup()).
+    Labels are "<entity id>.<state name>".
+
+    `node_config` is a `canopen:` node config (validated or raw YAML);
+    `resolve_entity(entity_config)` returns (domain, platform_config) of the
+    entity the config refers to.
+    """
+    states = []
+    for tmpl_entity in node_config.get("template_entities") or ():
+        for num, state in enumerate(tmpl_entity.get("states") or (), 1):
+            size = TEMPLATE_STATE_SIZES[state["type"]]
+            label = f"template{tmpl_entity['index']}.{num}"
+            states.append((tmpl_entity["index"], tmpl_entity.get("tpdo", -1), size, label))
+    entities = list(enumerate(node_config.get("entities") or ()))
+    for pos, entity_config in sorted(entities, key=lambda x: x[1]["index"]):
+        try:
+            domain, platform_config = resolve_entity(entity_config)
+            caps = entity_caps(domain, platform_config, entity_config.get("caps"))
+            entity_state_list = entity_states(domain, caps, entity_config.get("size"))
+        except LayoutError as err:
+            raise LayoutError(f"entity '{entity_config['id']}': {err}", pos) from err
+        tpdo = tpdo_number(entity_config)
+        states.extend(
+            (entity_config["index"], tpdo, size, f"{entity_config['id']}.{name}")
+            for name, size in entity_state_list
+        )
+    return states
 
 
 def co_link(index, sub, bits):

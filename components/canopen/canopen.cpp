@@ -375,9 +375,9 @@ void CanopenComponent::add_rpdo_node(uint8_t idx, uint8_t node_id, uint8_t tpdo)
   *(uint8_t *) (obj[2].Data) = 254;
 }
 
-void CanopenComponent::add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd) {
+void CanopenComponent::add_rpdo_entity_cmd(uint8_t idx, uint8_t entity_id, uint8_t cmd, uint8_t bit_size) {
   uint32_t index = ENTITY_INDEX(entity_id);
-  rpdo_map_append(idx, index + 2, cmd + 1, 8);
+  rpdo_map_append(idx, index + 2, cmd + 1, bit_size);
 }
 
 void CanopenComponent::add_entity_cmd(uint32_t entity_id, int8_t tpdo, Trigger<uint8_t> *trigger) {

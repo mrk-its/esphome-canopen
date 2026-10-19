@@ -26,6 +26,8 @@ canbus:
 
 canopen:
   node_id: 1
+  remote_nodes:
+    dimmer: remote_node.yaml
   entities:
     - index: 1
       id: light1
@@ -71,6 +73,25 @@ canopen:
     - index: 15
       id: cover_position_tilt
       tpdo: 3
+    # mirrors of remote_node.yaml states, offsets computed from its TPDO layout
+    - index: 16
+      id: hall_state
+      rpdo: {node: dimmer, entity: light_hall}
+    - index: 17
+      id: table_state
+      rpdo: {node: dimmer, entity: light_table}
+    - index: 18
+      id: table_brightness
+      size: 1
+      min_value: 0
+      max_value: 1
+      rpdo: {node: dimmer, entity: light_table, state: brightness}
+    - index: 19
+      id: dimmer_temperature
+      rpdo: {node: dimmer, entity: temperature}
+    - index: 20
+      id: mudroom_state
+      rpdo: {node: dimmer, index: 3}
 
 output:
   - platform: template
@@ -178,12 +199,32 @@ sensor:
     device_class: temperature
     unit_of_measurement: "°C"
     lambda: 'return 21.5;'
+  - platform: template
+    id: table_brightness
+  - platform: template
+    id: dimmer_temperature
 
 binary_sensor:
   - platform: template
     id: binary_sensor1
     name: "Test Binary Sensor 1"
     device_class: door
+    on_press:
+      - canopen.light_toggle: {node: dimmer, entity: light_hall}
+      - canopen.light_toggle: {node: dimmer, entity: light_mudroom}
+      - canopen.entity_cmd: {node: dimmer, entity: light_table, cmd: 1, value: 127}
+      - canopen.entity_cmd:
+          node: dimmer
+          entity: light_table
+          cmd: 1
+          value: !lambda 'return id(table_brightness).state < 0.5 ? 254 : 0;'
+      - canopen.entity_cmd: {node_id: 0x36, index: 2, value: 1}
+  - platform: template
+    id: hall_state
+  - platform: template
+    id: table_state
+  - platform: template
+    id: mudroom_state
 
 cover:
   - platform: template

@@ -1,0 +1,77 @@
+# Dimmer-like node referenced by config.yaml.template via `canopen: remote_nodes:`.
+# Only read (not built) by the test node: its TPDO layout is computed from this file.
+substitutions:
+  dimmer_node_id: "0x36"
+
+external_components:
+  - source: ../components
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+esphome:
+  name: "test-remote-node"
+
+canbus:
+  platform: esp32_can
+  id: can_bus
+  can_id: 1
+  bit_rate: 125kbps
+  rx_pin: GPIO5
+  tx_pin: GPIO4
+
+canopen:
+  node_id: ${dimmer_node_id}
+  entities:
+    - index: 1
+      id: light_hall       # cwww: state, brightness, color_temp
+      tpdo: 0
+    - index: 2
+      id: light_table      # monochromatic: state, brightness
+      tpdo: 0
+    - index: 3
+      id: light_mudroom
+      tpdo: 1
+    - index: 4
+      id: temperature      # REAL32
+      tpdo: 2
+
+output:
+  - platform: template
+    id: out1
+    type: float
+    write_action:
+      - lambda: ''
+  - platform: template
+    id: out2
+    type: float
+    write_action:
+      - lambda: ''
+
+light:
+  - platform: cwww
+    id: light_hall
+    name: "Hall"
+    cold_white: out1
+    warm_white: out2
+    cold_white_color_temperature: 6000 K
+    warm_white_color_temperature: 2000 K
+  - platform: monochromatic
+    id: light_table
+    name: "Table"
+    output: out1
+  - platform: cwww
+    id: light_mudroom
+    name: "Mudroom"
+    cold_white: out1
+    warm_white: out2
+    cold_white_color_temperature: 6000 K
+    warm_white_color_temperature: 2000 K
+
+sensor:
+  - platform: template
+    id: temperature
+    name: "Temperature"
+    lambda: 'return 21.5;'

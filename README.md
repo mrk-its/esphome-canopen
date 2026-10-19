@@ -19,6 +19,7 @@ The [can2mqtt](https://github.com/mrk-its/can2mqtt) project provides can2mqtt br
 * `hw_version` (Optional, string): value of Manufacturer Hardware Version (`0x1009`)
 * `sw_version` (Optional, string): currently ignored, `0x100A` always contains generated ESPHome version string (see [#30](https://github.com/mrk-its/esphome-canopen/issues/30))
 * `template_entities` (Optional, list of `template_entity` objects): custom OD entities not backed by ESPHome entity, see below
+* `remote_nodes` (Optional, mapping of name to YAML file): other nodes this node receives states from or sends commands to, by the ESPHome YAML file they are built from (path relative to this config). Their TPDO layout is computed from that file, so `rpdo` and the `canopen.*` actions can refer to remote entities by id. See [Linking nodes](#linking-nodes)
 
 ### `entity` schema:
 * `id` (Required, string): id of ESPHome entity
@@ -38,10 +39,19 @@ Any of:
 - integer representing `number` defined above. Note: in this form `is_async` is **false**.
 
 ### `RPDO` schema:
-* `node_id` (Required, integer): id of node sending mapped TPDO frame
-* `tpdo` (Required, integer): TPDO number
-* `offset` (Required, integer): byte offset inside TPDO frame, 0..7 range
-* `cmd` (Optional, defaults to 0): entity command index (starting from 0) where received TPDO fragment is mapped to. It also determines size of mapped fragment.
+Any of:
+- remote entity of a node from `remote_nodes`:
+  * `node` (Required, string): name of the node in `remote_nodes`
+  * `entity` (string) or `index` (int) (one of them Required): id or index of the remote entity (must be in the remote node's `canopen.entities`, with `tpdo`)
+  * `state` (Optional, string): remote entity state, defaults to the first one: `state` (light, switch, binary sensor, cover, alarm) or `value` (sensor, number). Others: light `brightness`, `color_temp`; cover `position`, `tilt`
+  * `cmd` (Optional, defaults to 0): entity command index the state is mapped to; its size must match the remote state's size
+- raw TPDO position:
+  * `node_id` (Required, integer): id of node sending mapped TPDO frame
+  * `tpdo` (Required, integer): TPDO number
+  * `offset` (Required, integer): byte offset inside TPDO frame, 0..7 range
+  * `cmd` (Optional, defaults to 0): entity command index (starting from 0) where received TPDO fragment is mapped to. One byte is mapped.
+
+A node has at most 4 RPDOs (one per remote node TPDO), each with at most 8 mapping entries (gaps included).
 
 ### `heartbeat_client` schema:
 * `node_id` (Required, int): tracked node id
@@ -58,6 +68,69 @@ Template entities allow to define custom OD entries at given entity index, witho
 * `commands` (Optional, list): each item has:
   * `type` (Required, one of `uint8`, `uint16`, `uint32`)
   * `handler` (Required, Automation): automation run when command is written, value is available as `x` variable
+
+## Linking nodes
+A node can mirror states of another node's entities (via its TPDOs) and send commands to them. With
+`remote_nodes` the other node is referred to by the YAML file it's built from, and its entities by id:
+TPDO numbers, offsets, node ids and entity indices are taken from that file. E.g. a wall switch node
+controlling a light of a dimmer node:
+
+```yaml
+# dimmer3.yaml
+canopen:
+  node_id: 0x36
+  entities:
+    - id: light_mudroom
+      index: 3
+      tpdo: 1
+```
+
+```yaml
+# wall-switch.yaml
+canopen:
+  node_id: 0x62
+  remote_nodes:
+    dimmer3: dimmer3.yaml
+  entities:
+    - id: light_state_mudroom        # local mirror of the remote light state
+      index: 2
+      rpdo: {node: dimmer3, entity: light_mudroom}
+    - id: brightness_mudroom         # optional: remote brightness, 0..1
+      index: 3
+      size: 1
+      min_value: 0
+      max_value: 1
+      rpdo: {node: dimmer3, entity: light_mudroom, state: brightness}
+
+binary_sensor:
+  - platform: template
+    id: light_state_mudroom
+  - platform: gpio
+    pin: ...
+    on_press:
+      - canopen.light_toggle: {node: dimmer3, entity: light_mudroom}
+
+sensor:
+  - platform: template
+    id: brightness_mudroom
+```
+
+Only the remote YAML's `canopen:` section and the configs of its exposed entities are read (after
+packages and substitutions); the remote node isn't built. Rebuild the linked nodes after changing the
+TPDO layout of a remote node (the build logs each node's [TPDO layout](OBJECT_DICTIONARY.md#tpdo-layout)).
+
+### Actions
+* `canopen.entity_cmd`: writes a command of a remote entity (via [OD writer](OBJECT_DICTIONARY.md#od-writer)):
+  * `node` + `entity` / `index` (remote node from `remote_nodes`), or `node_id` + `index`
+  * `cmd` (Optional, int, default=0): command index, see entity types in [OBJECT_DICTIONARY.md](OBJECT_DICTIONARY.md)
+  * `value` (Required, templatable uint8): command value
+* `canopen.light_toggle`: toggles a remote light / switch: sends the inverse of its local mirror's state as command 0.
+  * `node` + `entity` / `index`: remote entity (from `remote_nodes`)
+  * `state_id` (Optional, id): local binary sensor / switch mirroring the remote state; by default the local entity
+    with `rpdo` of that remote entity's state.
+
+  The mirror is only up to date after the remote node has sent its TPDO (e.g. after a reboot of this node the first
+  press may switch the light on even if it's already on), see [#32](https://github.com/mrk-its/esphome-canopen/issues/32).
 
 ## OTA over CAN
 The `canopen` OTA platform allows to flash firmware over CAN bus:

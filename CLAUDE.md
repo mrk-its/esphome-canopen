@@ -7,6 +7,11 @@ OD layout for entities: see OBJECT_DICTIONARY.md.
 ## Layout
 - `components/canopen/__init__.py`: config schema and codegen. Global build flags for the stack
   (`-DCO_SDO_BUF_SEG`, `-DCO_TPDO_N`, `-DCO_RPDO_N`, `-DCO_SSDO_N`, `OTA_COMPRESSION`, ...) are added in `to_code()`.
+- `layout.py`: entity states and TPDO layout computed from YAML (single source of truth; C++ gets caps from
+  codegen and checks the layout hash at boot, OD `0x3002:1`). ESPHome-free, tested by `test/test_layout.py`.
+- `remote.py`: `remote_nodes` - loads another node's YAML (packages/substitutions/extend passes only, no
+  validation) to resolve `rpdo: {node, entity}` and the `canopen.entity_cmd` / `canopen.light_toggle` actions.
+  Raw YAML values may be strings after substitution: coerce (`_normalize_node_config`, `layout.flag`).
 - `canopen.cpp/.h`: node setup, OD construction (`od.add_update(...)`), main `loop()`.
 - `driver_can.cpp`: glue between canopen-stack's CAN/timer/NVM driver interface and ESPHome `canbus`.
   Frames arrive via the canbus callback (`on_frame`) and are processed immediately (`CONodeProcess`).
