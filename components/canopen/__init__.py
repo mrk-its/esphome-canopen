@@ -651,6 +651,9 @@ def to_code(config_list):
                 )
             )
             cg.add(canopen.set_log_block_size(remote_logs["block_size"]))
+            # register the log callback now, not in setup(): codegen runs before App.setup(), so the setup()
+            # logs of components with a higher setup priority are captured too
+            cg.add(canopen.start_logs())
 
         entities = sorted(config.get(CONF_ENTITIES, []), key=lambda x: x["index"])
         assert len(entities) == len(

@@ -25,7 +25,8 @@ OD layout for entities: see OBJECT_DICTIONARY.md.
   Frames arrive via the canbus callback (`on_frame`) and are processed immediately (`CONodeProcess`).
 - `fw.cpp/.h`: OD object types for firmware upload (`FwImage*`, `FwCtrl*`).
 - `logs.cpp/.h`: remote logs (`remote_logs:` -> `USE_CANOPEN_LOGS`), OD 0x3100, global `canopen_logs` (static
-  ring buffer) fed by a logger callback registered in `CanopenComponent::setup()`.
+  ring buffer) fed by a logger callback registered in `start_logs()`, which codegen calls before `App.setup()` (so
+  the setup logs of all components are captured).
 - `ota/`: the `ota: - platform: canopen` component (`CanopenOTAComponent`), wraps the platform's
   `esphome::ota::make_ota_backend()`; optional zlib (miniz) decompression.
 - canopen-stack itself is pulled in with `cg.add_library("canopenstack", None, "https://github.com/mrk-its/canopen-stack#test")`.

@@ -479,6 +479,19 @@ void CanopenComponent::od_set_string(uint32_t index, uint32_t sub, const char *v
 
 float CanopenComponent::get_setup_priority() const { return setup_priority::PROCESSOR; }
 
+#ifdef USE_CANOPEN_LOGS
+// Called from codegen before App.setup(), so the setup() logs of all components are captured.
+void CanopenComponent::start_logs() {
+  canopen_logs.setup();
+  if (logger::global_logger != nullptr) {
+    logger::global_logger->add_log_callback(
+        &canopen_logs, [](void *self, uint8_t level, const char *tag, const char *message, size_t message_len) {
+          static_cast<CanopenLogs *>(self)->on_log(level, tag, message, message_len);
+        });
+  }
+}
+#endif
+
 void CanopenComponent::setup() {
   all_instances.push_back(this);
   current_canopen = this;
@@ -534,13 +547,6 @@ void CanopenComponent::setup() {
 #endif
 
 #ifdef USE_CANOPEN_LOGS
-  canopen_logs.setup();
-  if (logger::global_logger != nullptr) {
-    logger::global_logger->add_log_callback(
-        &canopen_logs, [](void *self, uint8_t level, const char *tag, const char *message, size_t message_len) {
-          static_cast<CanopenLogs *>(self)->on_log(level, tag, message, message_len);
-        });
-  }
   od.add_update(CO_KEY(0x3100, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 7);
   od.add_update(CO_KEY(0x3100, 1, CO_OBJ_____R_), LOGS_DATA, (CO_DATA) (&canopen_logs));
   od.add_update(CO_KEY(0x3100, 2, CO_OBJ_____R_), LOGS_PENDING, (CO_DATA) (&canopen_logs));

@@ -103,9 +103,10 @@ segmented and block paths), so the host always reads `:2` first.
 - `struct CanopenLogs` holding: `uint8_t buf[CANOPEN_LOG_BUFFER_SIZE]` (static, see "Footprint"), `head`, `tail`
   (ring buffer), `uint32_t pending`, `uint32_t dropped`, `uint32_t unreported_drops`, `uint32_t xfer_remaining`,
   `uint8_t level`, `uint8_t default_level`, `uint32_t timeout_ms`, `uint32_t last_poll_ms`.
-- At setup: `level = default_level`, `last_poll_ms = millis()`, so with a default level the node buffers from the
-  first line logged after the callback is registered, and the timeout counts from boot. Lines logged before
-  `CanopenComponent::setup()` runs (earlier setup priorities) are not captured.
+- At start (`CanopenComponent::start_logs()`, called from codegen right after the setters, i.e. in the generated
+  `setup()` before `App.setup()`): `level = default_level`, `last_poll_ms = millis()`, register the callback. So with
+  a default level the node buffers the `setup()` logs of every component (also those with a higher setup priority
+  than canopen), and the timeout counts from boot. Only what the logger prints before that (its own init) is lost.
 - `on_log(level, tag, message, len)`: return if `level == 0` or msg level > `level`; skip the `canbus` and
   `canopen` tags below INFO (`canbus` logs every frame at DEBUG; anything logged on the SDO/OD path while serving
   a log read would feed itself). Append `message` + `'\n'` only if the whole line fits, else `dropped++`,
@@ -134,10 +135,10 @@ segmented and block paths), so the host always reads `:2` first.
     0 → >0, sets `last_poll_ms`.
   - `:4` dropped: plain `CO_TUNSIGNED32` with `CO_OBJ_____R_` pointing at `dropped`.
   - `:5` default level, `:6` timeout: plain constants, `CO_OBJ_D___R_` (`CO_TUNSIGNED8` / `CO_TUNSIGNED32`).
-- Register the callback in `CanopenComponent::setup()` with
+- Register the callback in `start_logs()` (see above) with
   `logger::global_logger->add_log_callback(this_logs, [](void *self, uint8_t lvl, const char *tag, const char *msg, size_t len){...})`
-  (upstream API from `logger.h`), next to the 0x3000 block (`canopen.cpp:522`), and add the six
-  `od.add_update(CO_KEY(0x3100, n, ...), ...)` entries there.
+  (upstream API from `logger.h`); add the `od.add_update(CO_KEY(0x3100, n, ...), ...)` entries in
+  `CanopenComponent::setup()`, next to the 0x3000 block.
 
 ### Auto-off (`CanopenComponent::loop()`, `canopen.cpp:755`)
 - `last_poll_ms` is set by: Log Pending read, every Log Data `Read`, any Log Level write. Not by reads of

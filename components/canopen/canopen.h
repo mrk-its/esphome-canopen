@@ -190,6 +190,8 @@ class CanopenComponent : public Component {
   void set_log_default_level(uint8_t level) { canopen_logs.default_level = level; }
   void set_log_timeout(uint32_t timeout_ms) { canopen_logs.timeout_ms = timeout_ms; }
   void set_log_block_size(uint8_t block_size) { canopen_logs.block_size = block_size; }
+  /// Starts buffering (default level) and registers the logger callback; called before App.setup().
+  void start_logs();
 #endif
 
   canbus::Canbus *canbus;
