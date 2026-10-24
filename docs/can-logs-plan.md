@@ -38,6 +38,33 @@ segmented and block paths), so the host always reads `:2` first.
 - Block: `Read(len = SegNum * 7)` per block, and **the last block also passes the full `SegNum * 7`**, not the
   remaining size (`COSdoUploadBlock`, ~line 919). For block size ≤ 4 `RdBufStart` (and so `Reset`) is skipped.
 - Block retransmits (`BLK_REPEAT`) resend from the SDO buffer, not from the object: consuming in `Read` is safe.
+
+### Block size for log uploads
+- The block size is negotiated per direction. **Download** (host → node, CAN OTA): the node announces it,
+  `COSdoBlockSizeRequest(size, CO_SDO_BUF_SEG)` (`co_ssdo.c:592`), i.e. `sdo_block_transfer_size`. **Upload**
+  (node → host, logs): the client requests it in the initiate request (byte 4) and again in every block ack; the node
+  caps it at `CO_SDO_BUF_SEG` (`co_ssdo.c:829-838`, `:1002-1010`). So log uploads can use a small block size without
+  touching OTA.
+- **Zephyr TX limit**: `zephyr_can` sends with `can_send(K_NO_WAIT)` and has no software TX queue; the STM32 bxCAN
+  and FDCAN drivers have 3 TX mailboxes/buffers. canopen-stack sends a whole upload block in a tight loop
+  (`COSdoUploadBlock`, ~line 935) and ignores send errors (`(void)COIfCanSend`; our `DrvCanSend` returns 0 even when
+  `send_data` fails). Every segment past the 3rd in a block is silently lost. Until `zephyr_can` gets a TX queue,
+  log uploads use **block size 3** on all platforms (constant in can2mqtt; switch to 2 if `Will start
+  retransmission` shows up, which means a heartbeat/TPDO was still occupying a mailbox).
+- **canopen-python / canopen-stack mismatch** (affects any block upload from our nodes, not just logs):
+  canopen-python's `BlockUploadStream` requests `blksize = 64` (class attribute; `sdo.open()` gives no way to change
+  it). canopen-stack silently caps it at `CO_SDO_BUF_SEG` and the initiate response has no field to tell the client.
+  The node then sends e.g. 16 segments and waits for an ack, the client waits for segment 17, times out, acks 16 with
+  blksize 64, its `_ackseq` doesn't reset, and the next block's seq 1 looks out of order → "Some data were lost".
+  So **the client must request a block size ≤ the node's `CO_SDO_BUF_SEG`**. can2mqtt uses a subclass:
+  ```python
+  class LogUploadStream(BlockUploadStream):
+      blksize = 3   # Zephyr: 3 TX mailboxes; must also be <= node's CO_SDO_BUF_SEG
+  ```
+- Node validation: with `remote_logs:` present, require `sdo_block_transfer_size >= 3` (its range is 1..127),
+  so the request of 3 is never capped.
+- Throughput with block size 3: 3 data frames + 1 ack per 21 B, vs. 2 frames per 7 B segmented; the host round-trip
+  time is the real limit. Plenty for logs.
 - Accepted limitation: an aborted / timed-out transfer loses the bytes already consumed by `Read`.
 
 ## Node side (esphome-canopen)
@@ -57,7 +84,8 @@ segmented and block paths), so the host always reads `:2` first.
   `logger` is in the config (`cv.requires_component("logger")` or a final_validate check).
 - Validation: warn if `level` is more verbose than the logger's compile-time `logger: level:` (those messages are
   compiled out and would never arrive). Warn if `timeout: never` is used with `level: NONE` (harmless but pointless:
-  nothing buffers until a host subscribes, and then the subscription never expires).
+  nothing buffers until a host subscribes, and then the subscription never expires). Error if
+  `sdo_block_transfer_size < 3` (see "Block size for log uploads").
 
 ### New `components/canopen/logs.h` / `logs.cpp` (pattern: `fw.h`/`fw.cpp`, guarded by `#ifdef USE_CANOPEN_LOGS`)
 - `struct CanopenLogs` holding: `uint8_t buf[CANOPEN_LOG_BUFFER_SIZE]` (static, see "Footprint"), `head`, `tail`
@@ -189,8 +217,9 @@ segmented and block paths), so the host always reads `:2` first.
       default level);
     - every poll interval read Log Pending; if >0 read Log Data: `aget_data`/`aupload` (segmented/expedited) for small
       amounts, block upload for larger ones (> ~64 B) via `async with node.sdo.lock: await asyncio.to_thread(lambda:
-      node.sdo.open(0x3100, 1, "rb", block_transfer=True).read())` (same lock `aupload` uses, `sdo/client.py:145`).
-      The node replies without CRC (`0xC2`) and caps blksize at `CO_SDO_BUF_SEG`; canopen-python handles both;
+      LogUploadStream(node.sdo, 0x3100, 1, request_crc_support=False).readall())` (block size 3, see "Block size
+      for log uploads"; not `sdo.open(..., block_transfer=True)`, which always requests 64; same lock `aupload`
+      uses, `sdo/client.py:145`). The node never does CRC (`0xC2`), so CRC isn't requested;
     - **drain loop**: after a Log Data read, re-read Log Pending and read again right away while it is > 0
       (bounded, e.g. max 16 reads, yielding with `await asyncio.sleep(0)` in between), so the bus speed, not the
       1 s poll interval, limits throughput;
@@ -232,13 +261,16 @@ segmented and block paths), so the host always reads `:2` first.
    `SegNum * 7`; compare against the serial log: no lines missing or duplicated except at reported drop markers.
 7. Drain loop: a burst larger than one read (e.g. `dump_config` at boot with `buffer_size: 4096`) arrives within
    one poll cycle, not spread over several seconds.
+6a. Zephyr (STM32 bxCAN) node with `sdo_block_transfer_size: 16`: log block uploads (block size 3) complete without
+   `Will start retransmission` in can2mqtt's DEBUG log; CAN OTA still uses block size 16 and its usual speed.
+   `esphome config` with `remote_logs:` and `sdo_block_transfer_size: 2` fails validation.
 8. Run a CAN OTA with logging on: upload still completes; node reboots, can2mqtt re-subscribes.
 9. Node with old firmware (no 0x3100): can2mqtt starts normally, no log task.
 
 ## Appendix: protocol walkthrough
 
-Assumptions: node id `0x05` (client → node `0x605`, node → client `0x585`), SDO block size 16
-(`sdo_block_transfer_size`), `buffer_size` 2048, can2mqtt `--remote-log-level DEBUG`. Index 0x3100 is sent
+Assumptions: node id `0x05` (client → node `0x605`, node → client `0x585`), log upload block size 3 (requested by
+can2mqtt; the node's `sdo_block_transfer_size` is larger and only used for OTA), `buffer_size` 2048, can2mqtt `--remote-log-level DEBUG`. Index 0x3100 is sent
 little-endian as `00 31`; all multi-byte values are little-endian.
 
 The log callback gets each line with ANSI colors (`\x1b[0;36m` … `\x1b[0m`, +11 bytes); the node appends `\n`.
@@ -310,36 +342,38 @@ Drain loop: can2mqtt reads Log Pending again → 0 → waits for the next 1 s po
 ```
 183 > 64 → block upload, holding `node.sdo.lock`:
 ```
-605: A4 00 31 01 10 00 00 00     initiate block upload, client supports CRC, blksize 16, pst 0
+605: A0 00 31 01 03 00 00 00     initiate block upload, no CRC requested, blksize 3, pst 0
 585: C2 00 31 01 B7 00 00 00     no CRC, size 183         <- Size() = 183, Reset() snapshots xfer_remaining = 183
 605: A3 00 00 00 00 00 00 00     start
 ```
-Block 1: the node fills its SDO buffer with `Read(len = 16×7 = 112)`, which consumes 112 bytes
-(`xfer_remaining = 71`), then streams the segments without waiting:
+Block 1: the node fills its SDO buffer with `Read(len = 3×7 = 21)`, which consumes 21 bytes
+(`xfer_remaining = 162`), then sends the 3 segments back to back. They fit in the 3 TX mailboxes on STM32:
 ```
 585: 01 <7 bytes>
 585: 02 <7 bytes>
-   …
-585: 10 <7 bytes>                segment 16
-605: A2 10 10 00 …               ack: last good seq 16, next blksize 16
+585: 03 <7 bytes>
+605: A2 03 03 00 …               ack: last good seq 3, next blksize 3
 ```
 If a frame had been lost, the ack would carry a lower seq. The node resends from its SDO buffer without calling
 `Read` again, so nothing is consumed twice.
 
-t = 2.01, during block 2: L4 is logged. `on_log` appends 40 bytes at `head`, `pending = 111`. `xfer_remaining`
-stays 71: this transfer announced 183 bytes and sends exactly that.
+Blocks 2..8 are the same: each one `Read(21)` + 3 segments + ack. 183 = 8×21 + 15.
 
-Block 2: canopen-stack again calls `Read(len = 112)` although only 71 bytes are left. `Read` takes
-`n = min(112, 71) = 71` and zero-fills the rest. Without the cap it would also consume L4, which can2mqtt would
-never receive.
+t = 2.01, around block 5: L4 is logged. `on_log` appends 40 bytes at `head`, `pending` grows by 40.
+`xfer_remaining` doesn't change: this transfer announced 183 bytes and sends exactly that.
+
+Block 9: canopen-stack again calls `Read(len = 21)` although only 15 bytes are left. `Read` takes
+`n = min(21, 15) = 15` and zero-fills the rest. Without the cap it would also consume the first 6 bytes of L4,
+which can2mqtt would never receive.
 ```
 585: 01 <7 bytes>
-   … 71 bytes = 10×7 + 1 → 11 segments
-585: 8B <1 byte> 00 00 00 00 00 00   seq 11, bit 7 = last segment
-605: A2 0B 10 00 …               ack seq 11
+585: 02 <7 bytes>
+585: 83 <1 byte> 00 00 00 00 00 00   seq 3, bit 7 = last segment (15 = 2×7 + 1)
+605: A2 03 03 00 …               ack seq 3
 585: D9 00 00 00 00 00 00 00     end block: 6 unused bytes in last segment, CRC 0 (no CRC agreed)
 605: A1 00 00 00 00 00 00 00     end ack
 ```
+In total: 27 data segments + 9 acks + initiate/start/end frames, about 41 frames for 183 B.
 Drain loop: can2mqtt reads Log Pending again → 40 (L4) → segmented upload as at t = 1.00 → Pending 0 → back to
 the 1 s poll.
 
