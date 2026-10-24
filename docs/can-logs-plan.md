@@ -24,8 +24,9 @@ ESPHome log output over CAN to can2mqtt, which prints it in its own log. Decisio
 | 4 | Log Dropped | UINT32 | R | messages dropped because the buffer was full (monotonic) |
 | 5 | Log Default Level | UINT8 | R | from `remote_logs: level:` (0 = NONE); also the level the node starts with at boot |
 | 6 | Log Timeout | UINT32 | R | auto-off timeout in ms from `remote_logs: timeout:` (0 = never) |
+| 7 | Log Block Size | UINT8 | R | SDO block size the host must request for Log Data uploads (see "Block size for log uploads") |
 
-`:5` and `:6` are read-only on purpose: the node YAML is the single owner of these settings (no question of what
+`:5`..`:7` are read-only on purpose: the node YAML is the single owner of these settings (no question of what
 happens to a host-written value after a reboot).
 
 Upload with size 0 makes canopen-stack abort (`COSdoGetSize`: size 0 → `CO_SDO_ERR_TOS`, in expedited,
@@ -46,26 +47,34 @@ segmented and block paths), so the host always reads `:2` first.
   (node → host, logs): the client requests it in the initiate request (byte 4) and again in every block ack; the node
   caps it at `CO_SDO_BUF_SEG` (`co_ssdo.c:829-838`, `:1002-1010`). So log uploads can use a small block size without
   touching OTA.
-- **Zephyr TX limit**: `zephyr_can` sends with `can_send(K_NO_WAIT)` and has no software TX queue; the STM32 bxCAN
-  and FDCAN drivers have 3 TX mailboxes/buffers. canopen-stack sends a whole upload block in a tight loop
-  (`COSdoUploadBlock`, ~line 935) and ignores send errors (`(void)COIfCanSend`; our `DrvCanSend` returns 0 even when
-  `send_data` fails). Every segment past the 3rd in a block is silently lost. Until `zephyr_can` gets a TX queue,
-  log uploads use **block size 3** on all platforms (constant in can2mqtt; switch to 2 if `Will start
-  retransmission` shows up, which means a heartbeat/TPDO was still occupying a mailbox).
+- **TX queue limit**: canopen-stack sends a whole upload block in a tight loop (`COSdoUploadBlock`, ~line 935) and
+  ignores send errors (`(void)COIfCanSend`; our `DrvCanSend` returns 0 even when `send_data` fails), so every segment
+  that doesn't fit the node's TX queue is silently lost (and costs an SDO timeout + retransmit). Without a software
+  queue only the controller's TX mailboxes hold frames: 3 on STM32 bxCAN / FDCAN (`zephyr_can` before the
+  esphomeplatformzephyr software TX queue, `tx_buffer_size`).
+- **The block size is configured** as `remote_logs: block_size:` (default 3, the TX mailboxes) and advertised in
+  `0x3100:7` Log Block Size; can2mqtt requests it (3 if `:7` is missing). The platform's TX queue isn't detected. Pick
+  it so that a block goes out back to back, so it must fit the TX queue next to frames that may already be waiting (up to 8 TPDOs and a heartbeat): e.g. about 7 with `zephyr_can`'s default `tx_buffer_size: 16`, 23 with 32.
+- **`block_size` vs `sdo_block_transfer_size`**: `sdo_block_transfer_size` (`CO_SDO_BUF_SEG`) is the SDO buffer, 7 B
+  per frame. It is the download block size the node announces (CAN OTA, bounded by the RX queue) and the cap for
+  upload blocks, which are read into and retransmitted from that buffer. `block_size` is bounded by the TX queue. So
+  both are needed; validation requires `block_size <= sdo_block_transfer_size` (a larger request would be capped by
+  the node without telling the client, see below).
 - **canopen-python / canopen-stack mismatch** (affects any block upload from our nodes, not just logs):
   canopen-python's `BlockUploadStream` requests `blksize = 64` (class attribute; `sdo.open()` gives no way to change
   it). canopen-stack silently caps it at `CO_SDO_BUF_SEG` and the initiate response has no field to tell the client.
   The node then sends e.g. 16 segments and waits for an ack, the client waits for segment 17, times out, acks 16 with
   blksize 64, its `_ackseq` doesn't reset, and the next block's seq 1 looks out of order → "Some data were lost".
-  So **the client must request a block size ≤ the node's `CO_SDO_BUF_SEG`**. can2mqtt uses a subclass:
+  So **the client must request a block size ≤ the node's `CO_SDO_BUF_SEG`**. can2mqtt uses a subclass that sets
+  `blksize` per instance, before `BlockUploadStream.__init__()` sends the initiate request:
   ```python
   class LogUploadStream(BlockUploadStream):
-      blksize = 3   # Zephyr: 3 TX mailboxes; must also be <= node's CO_SDO_BUF_SEG
+      def __init__(self, sdo_client, index, subindex, blksize, **kwargs):
+          self.blksize = blksize  # 0x3100:7
+          super().__init__(sdo_client, index, subindex, **kwargs)
   ```
-- Node validation: with `remote_logs:` present, require `sdo_block_transfer_size >= 3` (its range is 1..127),
-  so the request of 3 is never capped.
-- Throughput with block size 3: 3 data frames + 1 ack per 21 B, vs. 2 frames per 7 B segmented; the host round-trip
-  time is the real limit. Plenty for logs.
+- Throughput with block size 3: 3 data frames + 1 ack per 21 B, vs. 2 frames per 7 B segmented; block size 8:
+  8 + 1 per 56 B. The host round-trip time is the real limit. Plenty for logs either way.
 - Accepted limitation: an aborted / timed-out transfer loses the bytes already consumed by `Read`.
 
 ## Node side (esphome-canopen)
@@ -77,6 +86,7 @@ segmented and block paths), so the host always reads `:2` first.
     buffer_size: 2048   # int, 256..16384
     level: INFO         # NONE/ERROR/WARN/INFO/CONFIG/DEBUG/VERBOSE/VERY_VERBOSE (logger's level names)
     timeout: 30s        # cv.positive_time_period_milliseconds, 1s..1h, or "never" (-> 0)
+    block_size: 3       # int, 1..127, <= sdo_block_transfer_size; advertised in 0x3100:7
   ```
 - In `to_code()` when present: `cg.add_define("USE_CANOPEN_LOGS")`, `cg.add_define("CANOPEN_LOG_BUFFER_SIZE", n)`,
   `cg.add(canopen.set_log_default_level(lvl))`, `cg.add(canopen.set_log_timeout(ms))`, and call `esphome.components.logger.request_log_listener()` (exists in upstream and in the
@@ -86,8 +96,8 @@ segmented and block paths), so the host always reads `:2` first.
 - Validation: warn if `level` is more verbose than the logger's compile-time `logger: level:` (those messages are
   compiled out and would never arrive; with the INFO default this also fires for a bare `remote_logs: {}` on a
   `logger: level: WARN`/`ERROR` node, which is intended). Warn if `timeout: never` is used with `level: NONE` (harmless but pointless:
-  nothing buffers until a host subscribes, and then the subscription never expires). Error if
-  `sdo_block_transfer_size < 3` (see "Block size for log uploads").
+  nothing buffers until a host subscribes, and then the subscription never expires). Error if `block_size` >
+  `sdo_block_transfer_size`.
 
 ### New `components/canopen/logs.h` / `logs.cpp` (pattern: `fw.h`/`fw.cpp`, guarded by `#ifdef USE_CANOPEN_LOGS`)
 - `struct CanopenLogs` holding: `uint8_t buf[CANOPEN_LOG_BUFFER_SIZE]` (static, see "Footprint"), `head`, `tail`
@@ -199,8 +209,9 @@ segmented and block paths), so the host always reads `:2` first.
   options.
 
 ## Host side (~/repos/can2mqtt)
-- `src/can2mqtt/eds/esphome.eds`: add `[3100]` record "Logs" with subs 0..6 ("Log Data" DOMAIN R, "Log Pending"
-  UINT32 R, "Log Level" UINT8 RW, "Log Dropped" UINT32 R, "Log Default Level" UINT8 R, "Log Timeout" UINT32 R),
+- `src/can2mqtt/eds/esphome.eds`: add `[3100]` record "Logs" with subs 0..7 ("Log Data" DOMAIN R, "Log Pending"
+  UINT32 R, "Log Level" UINT8 RW, "Log Dropped" UINT32 R, "Log Default Level" UINT8 R, "Log Timeout" UINT32 R,
+  "Log Block Size" UINT8 R),
   following the `[3000]` Firmware entries.
 - `src/main.py`: new `--remote-log-level` (AUTO/NONE/ERROR/WARN/INFO/CONFIG/DEBUG/VERBOSE/VERY_VERBOSE, default
   `AUTO`), passed through `config` to `start()`; `config.yaml` addon option `remote_log_level: str?`.
@@ -209,8 +220,8 @@ segmented and block paths), so the host always reads `:2` first.
   - explicit level: use it for every node that has 0x3100, ignoring `:5`.
 - `src/can2mqtt/can2mqtt.py`:
   - In `process_node()` (near the Firmware Flags probe at ~line 194), probe `node.sdo["Logs"]["Log Level"]`
-    in try/except (old firmware → no logs, debug message). If supported, read `:5` and `:6` (each in try/except:
-    missing → default level 0, timeout 30000 ms) and resolve the level per the mode above. If the resolved
+    in try/except (old firmware → no logs, debug message). If supported, read `:5`, `:6` and `:7` (each in try/except:
+    missing → default level 0, timeout 30000 ms, block size 3) and resolve the level per the mode above. If the resolved
     level is not 0, cancel any previous `node.log_task` and start
     `node.log_task = asyncio.create_task(log_reader(node, level, timeout_ms))`.
   - Intervals derived from the node timeout: keepalive `= min(10 s, timeout / 3)` (two lost writes still don't
@@ -221,8 +232,8 @@ segmented and block paths), so the host always reads `:2` first.
       default level);
     - every poll interval read Log Pending; if >0 read Log Data: `aget_data`/`aupload` (segmented/expedited) for small
       amounts, block upload for larger ones (> ~64 B) via `async with node.sdo.lock: await asyncio.to_thread(lambda:
-      LogUploadStream(node.sdo, 0x3100, 1, request_crc_support=False).readall())` (block size 3, see "Block size
-      for log uploads"; not `sdo.open(..., block_transfer=True)`, which always requests 64; same lock `aupload`
+      LogUploadStream(node.sdo, 0x3100, 1, block_size, request_crc_support=False).readall())` (block size from
+      `:7`, see "Block size for log uploads"; not `sdo.open(..., block_transfer=True)`, which always requests 64; same lock `aupload`
       uses, `sdo/client.py:145`). The node never does CRC (`0xC2`), so CRC isn't requested;
     - **drain loop**: after a Log Data read, re-read Log Pending and read again right away while it is > 0
       (bounded, e.g. max 16 reads, yielding with `await asyncio.sleep(0)` in between), so the bus speed, not the
@@ -267,14 +278,16 @@ segmented and block paths), so the host always reads `:2` first.
    one poll cycle, not spread over several seconds.
 6a. Zephyr (STM32 bxCAN) node with `sdo_block_transfer_size: 16`: log block uploads (block size 3) complete without
    `Will start retransmission` in can2mqtt's DEBUG log; CAN OTA still uses block size 16 and its usual speed.
-   `esphome config` with `remote_logs:` and `sdo_block_transfer_size: 2` fails validation.
+   With the `zephyr_can` software TX queue, `tx_buffer_size: 32` and `remote_logs: block_size: 23`: can2mqtt logs
+   block size 23 at subscribe, block uploads without retransmission while TPDOs are active.
 8. Run a CAN OTA with logging on: upload still completes; node reboots, can2mqtt re-subscribes.
 9. Node with old firmware (no 0x3100): can2mqtt starts normally, no log task.
 
 ## Appendix: protocol walkthrough
 
-Assumptions: node id `0x05` (client → node `0x605`, node → client `0x585`), log upload block size 3 (requested by
-can2mqtt; the node's `sdo_block_transfer_size` is larger and only used for OTA), `buffer_size` 2048, can2mqtt `--remote-log-level DEBUG`. Index 0x3100 is sent
+Assumptions: node id `0x05` (client → node `0x605`, node → client `0x585`), log upload block size 3 (the default `remote_logs:
+block_size:`, advertised in `:7` and requested by can2mqtt; the node's `sdo_block_transfer_size` is larger and only
+used for OTA), `buffer_size` 2048, can2mqtt `--remote-log-level DEBUG`. Index 0x3100 is sent
 little-endian as `00 31`; all multi-byte values are little-endian.
 
 The log callback gets each line with ANSI colors (`\x1b[0;36m` … `\x1b[0m`, +11 bytes); the node appends `\n`.

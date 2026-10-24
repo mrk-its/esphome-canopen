@@ -27,6 +27,7 @@ struct CanopenLogs {
   uint32_t last_poll_ms;
   uint8_t level;  // 0 = off, 1..7 = ESPHOME_LOG_LEVEL_ERROR..VERY_VERBOSE
   uint8_t default_level;
+  uint8_t block_size;  // SDO block size for log uploads, advertised to the host (0x3100:7)
 
   void setup();
   void on_log(uint8_t msg_level, const char *tag, const char *message, size_t len);

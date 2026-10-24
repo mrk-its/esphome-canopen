@@ -61,7 +61,8 @@ LOG_LEVEL_SEVERITY = [
     "VERBOSE",
     "VERY_VERBOSE",
 ]
-REMOTE_LOGS_MIN_BLOCK_SIZE = 3  # can2mqtt requests block size 3 for log uploads
+# SDO block size for log uploads without a software TX queue: the 3 TX mailboxes of bxCAN / FDCAN
+DEFAULT_LOG_BLOCK_SIZE = 3
 
 DEPENDENCIES = []
 
@@ -188,6 +189,11 @@ REMOTE_LOGS_SCHEMA = cv.Schema(
         cv.Optional("buffer_size", default=2048): cv.int_range(min=256, max=16384),
         cv.Optional("level", default="INFO"): cv.one_of(*LOG_LEVEL_SEVERITY, upper=True),
         cv.Optional("timeout", default="30s"): remote_logs_timeout,
+        # frames per SDO block of a log upload, advertised in 0x3100:7: the node sends a block back to back,
+        # so it must fit the TX queue
+        cv.Optional("block_size", default=DEFAULT_LOG_BLOCK_SIZE): cv.int_range(
+            min=1, max=127
+        ),
     }
 )
 
@@ -527,12 +533,13 @@ def validate_remote_logs(full_config, config_list):
                 f"'{CONF_REMOTE_LOGS}' requires the 'logger' component",
                 path=[CONF_REMOTE_LOGS],
             )
-        if config["sdo_block_transfer_size"] < REMOTE_LOGS_MIN_BLOCK_SIZE:
+        if remote_logs["block_size"] > config["sdo_block_transfer_size"]:
+            # upload blocks go through the SDO buffer, canopen-stack caps a larger request without telling
+            # the host
             raise cv.Invalid(
-                f"'{CONF_REMOTE_LOGS}' requires sdo_block_transfer_size >= "
-                f"{REMOTE_LOGS_MIN_BLOCK_SIZE} (log uploads use block size "
-                f"{REMOTE_LOGS_MIN_BLOCK_SIZE})",
-                path=["sdo_block_transfer_size"],
+                f"block_size ({remote_logs['block_size']}) can't be larger than "
+                f"sdo_block_transfer_size ({config['sdo_block_transfer_size']})",
+                path=[CONF_REMOTE_LOGS, "block_size"],
             )
         level = remote_logs["level"]
         logger_level = full_config["logger"].get("level", "DEBUG")
@@ -643,6 +650,7 @@ def to_code(config_list):
                     0 if timeout == "never" else timeout.total_milliseconds
                 )
             )
+            cg.add(canopen.set_log_block_size(remote_logs["block_size"]))
 
         entities = sorted(config.get(CONF_ENTITIES, []), key=lambda x: x["index"])
         assert len(entities) == len(

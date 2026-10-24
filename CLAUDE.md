@@ -49,8 +49,10 @@ OD layout for entities: see OBJECT_DICTIONARY.md.
   (the last block upload passes `SegNum * 7`, not the remaining size). Overflow drops the newest line, marker
   `[W][canopen.logs]: N messages dropped` in the stream.
 - No locking: log callbacks and SDO processing both run on the main loop. Nothing in `logs.cpp` may log.
-- can2mqtt requests block size 3 for log uploads (Zephyr CAN drivers have 3 TX mailboxes and no TX queue), hence
-  `sdo_block_transfer_size >= 3`.
+- Log upload block size: `remote_logs: block_size:` (default 3 = STM32 TX mailboxes only), advertised in `0x3100:7`,
+  requested by can2mqtt (3 if `:7` is missing). The node sends a whole block back to back, so it must fit the TX
+  queue (not detected from the canbus platform). It must be <= `sdo_block_transfer_size`, which is the SDO buffer:
+  download block size (OTA, RX side) and cap for upload blocks.
 
 ## Platform notes
 - Upstream ESPHome compatibility: the component must load on upstream ESPHome (ESP32/ESP8266 users) as well
@@ -70,6 +72,9 @@ OD layout for entities: see OBJECT_DICTIONARY.md.
     while the app uses the configured values: mismatched buffer sizes and struct layouts. Check with
     `compile_commands.json` that `co_ssdo.c` and `canopen.cpp` get the same `-DCO_*` flags.
   - `zephyr_can` RX queue defaults to 8 frames: set `rx_buffer_size` (max 64) to at least the SDO block size.
+  - `zephyr_can` software TX queue (`tx_buffer_size`, default 16; esphomeplatformzephyr branch
+    `feature/zephyr-can-tx-queue`): without it only the 3 TX mailboxes hold outgoing frames. Size
+    `remote_logs: block_size:` to fit it (leave room for 8 TPDOs + heartbeat).
 
 ## Testing
 - `pytest test/`: Python tests, plus `test/test_logs.py`, which builds `test/logs/logs_test.cpp` against

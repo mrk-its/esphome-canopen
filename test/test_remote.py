@@ -236,3 +236,36 @@ def test_remote_state_platform(raw_config):
     assert config["state"] == "value"
     assert config[canopen.CONF_REMOTE_STATE] == ["dimmer", "setpoint", "value"]
     assert config["_remote"]["kind"] == "value"
+
+
+# --- remote logs (__init__.py) ---
+
+
+def _logs_node(block_size=3, sdo_block_transfer_size=63, **remote_logs):
+    remote_logs = {"level": "INFO", "timeout": "never", "block_size": block_size, **remote_logs}
+    return {"sdo_block_transfer_size": sdo_block_transfer_size, canopen.CONF_REMOTE_LOGS: remote_logs}
+
+
+@pytest.mark.parametrize(
+    "block_size, sdo_block_transfer_size",
+    [(3, 63), (16, 63), (63, 63), (2, 2)],
+)
+def test_remote_logs_block_size_valid(block_size, sdo_block_transfer_size):
+    canopen.validate_remote_logs(
+        {"logger": {"level": "DEBUG"}}, [_logs_node(block_size, sdo_block_transfer_size)]
+    )
+
+
+def test_remote_logs_block_size_larger_than_sdo_buffer():
+    with pytest.raises(cv.Invalid, match="block_size .64. can't be larger than sdo_block_transfer_size .63."):
+        canopen.validate_remote_logs({"logger": {"level": "DEBUG"}}, [_logs_node(64, 63)])
+
+
+def test_remote_logs_requires_logger():
+    with pytest.raises(cv.Invalid, match="requires the 'logger' component"):
+        canopen.validate_remote_logs({}, [_logs_node()])
+
+
+def test_remote_logs_on_one_node_only():
+    with pytest.raises(cv.Invalid, match="one canopen node only"):
+        canopen.validate_remote_logs({"logger": {}}, [_logs_node(), _logs_node()])

@@ -14,7 +14,7 @@ The [can2mqtt](https://github.com/mrk-its/can2mqtt) project provides can2mqtt br
 * `on_pre_operational` (Optional, Automation): An automation to perform when node enters pre_operational state
 * `on_operational` (Optional, Automation): An automation to perform when node enters operational state
 * `on_hb_consumer_event` (Optional, Automation): An automation to perform when heartbeat clients are configured and heartbeat event occurs. `node_id` (uint8) variable is available in the automation.
-* `sdo_block_transfer_size` (Optional, int, 1..127, default=63): number of messages confirmed with single ACK for SDO block transfer mode
+* `sdo_block_transfer_size` (Optional, int, 1..127, default=63): number of messages confirmed with single ACK for SDO block transfer mode. This is the SDO buffer (7 bytes of RAM per message): the block size of SDO downloads (CAN OTA, should fit the canbus RX queue) and the largest upload block (`remote_logs: block_size`)
 * `pdo_od_writer` (Optional, bool, default=True): when enabled then `RPDO #3` is reserved for node to node communication (remote OD writes, see [OD writer](OBJECT_DICTIONARY.md#od-writer))
 * `hw_version` (Optional, string): value of Manufacturer Hardware Version (`0x1009`)
 * `sw_version` (Optional, string): currently ignored, `0x100A` always contains generated ESPHome version string (see [#30](https://github.com/mrk-its/esphome-canopen/issues/30))
@@ -189,8 +189,9 @@ canopen:
 * `buffer_size` (Optional, int, 256..16384, default=2048): RAM buffer for log lines (static, shows up in the build's RAM summary)
 * `level` (Optional, default=INFO): `NONE`, `ERROR`, `WARN`, `INFO`, `CONFIG`, `DEBUG`, `VERBOSE` or `VERY_VERBOSE`. The node buffers at this level from boot (so boot logs and `dump_config` are kept until can2mqtt reads them) and can2mqtt subscribes with it. With `NONE` the node waits until a host subscribes with an explicit level (`can2mqtt --remote-log-level DEBUG`). Levels more verbose than `logger: level:` are compiled out.
 * `timeout` (Optional, time 1s..1h or `never`, default=30s): the node turns remote logging off when no host polled for this long. Short: stops buffering soon after can2mqtt goes away, but a busy host (e.g. a long OTA to another node) turns it off sooner. Long: survives a can2mqtt restart (up to `buffer_size` of lines). `never`: the subscription never expires.
+* `block_size` (Optional, int, 1..127, default=3): frames per SDO block of a log upload (can2mqtt requests it). The node sends a block back to back, so it must fit the canbus TX queue next to frames that may already be waiting (up to 8 TPDOs and a heartbeat); frames that don't fit are lost and each loss costs an SDO timeout (2 s) and a retransmit. The default fits CAN controllers without a software queue (3 TX mailboxes). With `zephyr_can`'s `tx_buffer_size: 16` use about 7, with 32 about 23. At most `sdo_block_transfer_size`.
 
-Requires `logger:` and `sdo_block_transfer_size` >= 3. Can be set on one `canopen` node per firmware. Without
+Requires `logger:`. Can be set on one `canopen` node per firmware. Without
 `remote_logs:` the feature costs nothing (no code, no RAM).
 
 When logs are produced faster than they are read, the newest lines are dropped and the gap is marked in the stream

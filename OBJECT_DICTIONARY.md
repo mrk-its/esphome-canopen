@@ -214,6 +214,7 @@ sends unsolicited frames.
 |        | 0x04     | Log Dropped       | UINT32 | R      | lines dropped because the buffer was full, since boot |
 |        | 0x05     | Log Default Level | UINT8  | R      | `remote_logs: level:`, the level the node starts with at boot (0 = NONE) |
 |        | 0x06     | Log Timeout       | UINT32 | R      | `remote_logs: timeout:` in ms, 0 = never |
+|        | 0x07     | Log Block Size    | UINT8  | R      | SDO block size to request for Log Data block uploads, `remote_logs: block_size:` |
 
 - Log Level: the buffer is cleared only on a 0 → >0 transition; rewriting the current level (the keepalive) keeps it.
 - Keepalive: a Log Pending read, a Log Data upload or a Log Level write. Without one for Log Timeout ms the node sets
@@ -222,7 +223,8 @@ sends unsolicited frames.
 - Log Data: the size in the upload response is a snapshot of Log Pending at the start of the upload, exactly that
   many bytes are sent and consumed; lines logged during the transfer stay for the next one. Uploading while the
   buffer is empty aborts (size 0), so read Log Pending first. An aborted or timed-out upload loses the bytes already
-  sent. Block uploads must request a block size <= the node's `sdo_block_transfer_size` (the node caps it silently).
+  sent. Block uploads must request Log Block Size: the node sends a block back to back (it must fit its TX queue) and caps
+  larger requests at `sdo_block_transfer_size` silently.
 - Overflow: a line that doesn't fit is dropped whole (never blocks, never overwrites unread data). Once there is
   room again, the next line is preceded by `[W][canopen.logs]: <N> messages dropped`.
 

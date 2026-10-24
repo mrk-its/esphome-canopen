@@ -29,6 +29,7 @@ canopen:
   remote_logs:
     level: INFO
     timeout: 60s
+    block_size: 32  # fits the canbus tx_queue_len
   remote_nodes:
     dimmer: remote_node.yaml
   entities:

@@ -541,13 +541,14 @@ void CanopenComponent::setup() {
           static_cast<CanopenLogs *>(self)->on_log(level, tag, message, message_len);
         });
   }
-  od.add_update(CO_KEY(0x3100, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 6);
+  od.add_update(CO_KEY(0x3100, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 7);
   od.add_update(CO_KEY(0x3100, 1, CO_OBJ_____R_), LOGS_DATA, (CO_DATA) (&canopen_logs));
   od.add_update(CO_KEY(0x3100, 2, CO_OBJ_____R_), LOGS_PENDING, (CO_DATA) (&canopen_logs));
   od.add_update(CO_KEY(0x3100, 3, CO_OBJ_____RW), LOGS_LEVEL, (CO_DATA) (&canopen_logs));
   od.add_update(CO_KEY(0x3100, 4, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA) (&canopen_logs.dropped));
   od.add_update(CO_KEY(0x3100, 5, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) canopen_logs.default_level);
   od.add_update(CO_KEY(0x3100, 6, CO_OBJ_D___R_), CO_TUNSIGNED32, (CO_DATA) canopen_logs.timeout_ms);
+  od.add_update(CO_KEY(0x3100, 7, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) canopen_logs.block_size);
 #endif
 
   for (auto it = entities.begin(); it != entities.end(); it++) {

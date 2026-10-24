@@ -189,6 +189,7 @@ class CanopenComponent : public Component {
 #ifdef USE_CANOPEN_LOGS
   void set_log_default_level(uint8_t level) { canopen_logs.default_level = level; }
   void set_log_timeout(uint32_t timeout_ms) { canopen_logs.timeout_ms = timeout_ms; }
+  void set_log_block_size(uint8_t block_size) { canopen_logs.block_size = block_size; }
 #endif
 
   canbus::Canbus *canbus;
