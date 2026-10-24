@@ -72,6 +72,8 @@ OD layout for entities: see OBJECT_DICTIONARY.md.
   - `zephyr_can` RX queue defaults to 8 frames: set `rx_buffer_size` (max 64) to at least the SDO block size.
 
 ## Testing
+- `pytest test/`: Python tests, plus `test/test_logs.py`, which builds `test/logs/logs_test.cpp` against
+  `components/canopen/logs.cpp` with stub headers (`test/logs/stubs/`) and runs it (ASan/UBSan if available).
 - ESP32 build in Docker: `./docker_build.sh` (renders `test/config.yaml.template` with `envsubst`; note
   `framework` must be a mapping, e.g. `{type: esp-idf}`).
 - Config validation without building: `esphome config <yaml>`, against both upstream ESPHome and the
