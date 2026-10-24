@@ -3,6 +3,21 @@ name: "Test"
 on: [push, pull_request]
 
 jobs:
+  pytest:
+    name: pytest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        # test_remote.py validates against upstream ESPHome; test_logs.py needs a C++ compiler (runner's g++)
+        run: pip install esphome pytest
+      - name: Run tests
+        run: pytest -v test/
   build:
     name: ${{ matrix.board }} ${{ matrix.framework_opts }}
     runs-on: ubuntu-latest
