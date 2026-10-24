@@ -181,7 +181,9 @@ segmented and block paths), so the host always reads `:2` first.
   `remote_logs:` out.
 
 ### `canopen.h`
-- `#ifdef USE_CANOPEN_LOGS`: `CanopenLogs logs;` member + `set_log_default_level()`, `set_log_timeout()`.
+- `#ifdef USE_CANOPEN_LOGS`: `set_log_default_level()`, `set_log_timeout()`. The state is the global
+  `CanopenLogs canopen_logs` in `logs.cpp`, not a member: the component is heap-allocated (`cg.new_Pvariable`),
+  and a global keeps the ring buffer in `.bss`. Hence `remote_logs:` on one `canopen` node per firmware only.
 - Bump `APP_OBJ_N` only if needed (7 more objects incl. sub0; currently 512).
 
 ### Docs

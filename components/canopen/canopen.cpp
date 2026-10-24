@@ -5,6 +5,9 @@
 #include "esphome.h"
 #include "canopen.h"
 #include "fw.h"
+#ifdef USE_CANOPEN_LOGS
+#include "esphome/components/logger/logger.h"
+#endif
 
 // extern "C" {
 // void esp_log(const char *tag, const char *fmt, ...) {
@@ -530,6 +533,23 @@ void CanopenComponent::setup() {
   od.add_update(CO_KEY(0x3000, 5, CO_OBJ_D___R_), CO_TUNSIGNED32, flags);
 #endif
 
+#ifdef USE_CANOPEN_LOGS
+  canopen_logs.setup();
+  if (logger::global_logger != nullptr) {
+    logger::global_logger->add_log_callback(
+        &canopen_logs, [](void *self, uint8_t level, const char *tag, const char *message, size_t message_len) {
+          static_cast<CanopenLogs *>(self)->on_log(level, tag, message, message_len);
+        });
+  }
+  od.add_update(CO_KEY(0x3100, 0, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) 6);
+  od.add_update(CO_KEY(0x3100, 1, CO_OBJ_____R_), LOGS_DATA, (CO_DATA) (&canopen_logs));
+  od.add_update(CO_KEY(0x3100, 2, CO_OBJ_____R_), LOGS_PENDING, (CO_DATA) (&canopen_logs));
+  od.add_update(CO_KEY(0x3100, 3, CO_OBJ_____RW), LOGS_LEVEL, (CO_DATA) (&canopen_logs));
+  od.add_update(CO_KEY(0x3100, 4, CO_OBJ_____R_), CO_TUNSIGNED32, (CO_DATA) (&canopen_logs.dropped));
+  od.add_update(CO_KEY(0x3100, 5, CO_OBJ_D___R_), CO_TUNSIGNED8, (CO_DATA) canopen_logs.default_level);
+  od.add_update(CO_KEY(0x3100, 6, CO_OBJ_D___R_), CO_TUNSIGNED32, (CO_DATA) canopen_logs.timeout_ms);
+#endif
+
   for (auto it = entities.begin(); it != entities.end(); it++) {
     (*it)->setup(this);
   }
@@ -775,6 +795,12 @@ void CanopenComponent::loop() {
   dirty_tpdo_mask = 0;
 
   uint32_t now_ms = esphome::millis();
+
+#ifdef USE_CANOPEN_LOGS
+  if (canopen_logs.check_timeout(now_ms)) {
+    ESP_LOGI(TAG, "remote logging disabled (no poll for %lu ms)", (unsigned long) canopen_logs.timeout_ms);
+  }
+#endif
 
   if ((now_ms - status_time_ms) >= status_update_interval_ms) {
     if (get_can_status(status)) {

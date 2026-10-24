@@ -24,6 +24,8 @@ OD layout for entities: see OBJECT_DICTIONARY.md.
 - `driver_can.cpp`: glue between canopen-stack's CAN/timer/NVM driver interface and ESPHome `canbus`.
   Frames arrive via the canbus callback (`on_frame`) and are processed immediately (`CONodeProcess`).
 - `fw.cpp/.h`: OD object types for firmware upload (`FwImage*`, `FwCtrl*`).
+- `logs.cpp/.h`: remote logs (`remote_logs:` -> `USE_CANOPEN_LOGS`), OD 0x3100, global `canopen_logs` (static
+  ring buffer) fed by a logger callback registered in `CanopenComponent::setup()`.
 - `ota/`: the `ota: - platform: canopen` component (`CanopenOTAComponent`), wraps the platform's
   `esphome::ota::make_ota_backend()`; optional zlib (miniz) decompression.
 - canopen-stack itself is pulled in with `cg.add_library("canopenstack", None, "https://github.com/mrk-its/canopen-stack#test")`.
@@ -39,6 +41,16 @@ OD layout for entities: see OBJECT_DICTIONARY.md.
   `backend->end()` reboots immediately and the SDO block transfer must finish first.
 - The SDO block size the node announces is `sdo_block_transfer_size` (-> `CO_SDO_BUF_SEG`). The node
   decides it, not can2mqtt (canopen-asyncio follows the server's blksize).
+
+## Remote logs
+- Spec: `docs/can-logs-plan.md`. Host polls (Log Pending `0x3100:2`, then uploads Log Data `:1`), writes Log Level
+  `:3` as subscribe/keepalive; the node turns itself off after `timeout` without polls.
+- `LogDataSize` / `LogDataReset` snapshot `pending` into `xfer_remaining`; `LogDataRead` never consumes more than that
+  (the last block upload passes `SegNum * 7`, not the remaining size). Overflow drops the newest line, marker
+  `[W][canopen.logs]: N messages dropped` in the stream.
+- No locking: log callbacks and SDO processing both run on the main loop. Nothing in `logs.cpp` may log.
+- can2mqtt requests block size 3 for log uploads (Zephyr CAN drivers have 3 TX mailboxes and no TX queue), hence
+  `sdo_block_transfer_size >= 3`.
 
 ## Platform notes
 - Upstream ESPHome compatibility: the component must load on upstream ESPHome (ESP32/ESP8266 users) as well

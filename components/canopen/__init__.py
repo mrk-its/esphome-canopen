@@ -49,6 +49,20 @@ CONF_CANOPEN_ID = "canopen_id"
 CONF_REMOTE_STATE = "_canopen_remote_state"
 REMOTE_STATE_INDEX = 0x4000  # OD index of slot 0, see OBJECT_DICTIONARY.md
 
+CONF_REMOTE_LOGS = "remote_logs"
+# logger's level names, the index is the ESPHOME_LOG_LEVEL_* value (OD 0x3100:3 / :5)
+LOG_LEVEL_SEVERITY = [
+    "NONE",
+    "ERROR",
+    "WARN",
+    "INFO",
+    "CONFIG",
+    "DEBUG",
+    "VERBOSE",
+    "VERY_VERBOSE",
+]
+REMOTE_LOGS_MIN_BLOCK_SIZE = 3  # can2mqtt requests block size 3 for log uploads
+
 DEPENDENCIES = []
 
 CSDO_SCHEMA = cv.Schema(
@@ -160,6 +174,23 @@ TEMPLATE_ENTITY = cv.Schema(
     }
 )
 
+def remote_logs_timeout(value):
+    if isinstance(value, str) and value.lower() == "never":
+        return "never"
+    return cv.All(
+        cv.positive_time_period_milliseconds,
+        cv.Range(min=cv.TimePeriod(seconds=1), max=cv.TimePeriod(hours=1)),
+    )(value)
+
+
+REMOTE_LOGS_SCHEMA = cv.Schema(
+    {
+        cv.Optional("buffer_size", default=2048): cv.int_range(min=256, max=16384),
+        cv.Optional("level", default="INFO"): cv.one_of(*LOG_LEVEL_SEVERITY, upper=True),
+        cv.Optional("timeout", default="30s"): remote_logs_timeout,
+    }
+)
+
 HB_CLIENT_SCHEMA = cv.Schema(
     {
         cv.Required("node_id"): cv.All(cv.int_, cv.Range(min=0, max=127)),
@@ -209,6 +240,7 @@ CONFIG_SCHEMA = cv.ensure_list(
             cv.Optional("heartbeat_clients"): cv.ensure_list(HB_CLIENT_SCHEMA),
             cv.Optional("sw_version"): cv.string,
             cv.Optional("hw_version"): cv.string,
+            cv.Optional(CONF_REMOTE_LOGS): REMOTE_LOGS_SCHEMA,
         }
     ).extend(cv.COMPONENT_SCHEMA),
     lambda config: resolve_remote_rpdo(config),
@@ -484,8 +516,45 @@ def validate_remote_entities(full_config, config):
             )
 
 
+def validate_remote_logs(full_config, config_list):
+    with_logs = [config for config in config_list if CONF_REMOTE_LOGS in config]
+    if len(with_logs) > 1:
+        raise cv.Invalid(f"'{CONF_REMOTE_LOGS}' can be set on one canopen node only")
+    for config in with_logs:
+        remote_logs = config[CONF_REMOTE_LOGS]
+        if "logger" not in full_config:
+            raise cv.Invalid(
+                f"'{CONF_REMOTE_LOGS}' requires the 'logger' component",
+                path=[CONF_REMOTE_LOGS],
+            )
+        if config["sdo_block_transfer_size"] < REMOTE_LOGS_MIN_BLOCK_SIZE:
+            raise cv.Invalid(
+                f"'{CONF_REMOTE_LOGS}' requires sdo_block_transfer_size >= "
+                f"{REMOTE_LOGS_MIN_BLOCK_SIZE} (log uploads use block size "
+                f"{REMOTE_LOGS_MIN_BLOCK_SIZE})",
+                path=["sdo_block_transfer_size"],
+            )
+        level = remote_logs["level"]
+        logger_level = full_config["logger"].get("level", "DEBUG")
+        if LOG_LEVEL_SEVERITY.index(level) > LOG_LEVEL_SEVERITY.index(logger_level):
+            _LOGGER.warning(
+                "%s: level %s is more verbose than logger level %s, "
+                "those messages are compiled out",
+                CONF_REMOTE_LOGS,
+                level,
+                logger_level,
+            )
+        if remote_logs["timeout"] == "never" and level == "NONE":
+            _LOGGER.warning(
+                "%s: 'timeout: never' with 'level: NONE' never expires a host "
+                "subscription",
+                CONF_REMOTE_LOGS,
+            )
+
+
 def _final_validate(config_list):
     full_config = fv.full_config.get()
+    validate_remote_logs(full_config, config_list)
     for config in config_list:
         try:
             layout.tpdo_mapping(node_states(full_config, config))
@@ -552,6 +621,28 @@ def to_code(config_list):
             cg.add(canopen.od_set_string(0x100A, 0, cg.RawExpression(sw_version)))
 
         yield cg.register_component(canopen, config)
+
+        remote_logs = config.get(CONF_REMOTE_LOGS)
+        if remote_logs is not None:
+            try:
+                from esphome.components.logger import request_log_listener
+            except ImportError:  # older ESPHome: log listeners always enabled
+                pass
+            else:
+                request_log_listener()
+            cg.add_define("USE_CANOPEN_LOGS")
+            cg.add_define("CANOPEN_LOG_BUFFER_SIZE", remote_logs["buffer_size"])
+            timeout = remote_logs["timeout"]
+            cg.add(
+                canopen.set_log_default_level(
+                    LOG_LEVEL_SEVERITY.index(remote_logs["level"])
+                )
+            )
+            cg.add(
+                canopen.set_log_timeout(
+                    0 if timeout == "never" else timeout.total_milliseconds
+                )
+            )
 
         entities = sorted(config.get(CONF_ENTITIES, []), key=lambda x: x["index"])
         assert len(entities) == len(

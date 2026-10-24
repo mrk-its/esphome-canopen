@@ -19,6 +19,7 @@ The [can2mqtt](https://github.com/mrk-its/can2mqtt) project provides can2mqtt br
 * `hw_version` (Optional, string): value of Manufacturer Hardware Version (`0x1009`)
 * `sw_version` (Optional, string): currently ignored, `0x100A` always contains generated ESPHome version string (see [#30](https://github.com/mrk-its/esphome-canopen/issues/30))
 * `template_entities` (Optional, list of `template_entity` objects): custom OD entities not backed by ESPHome entity, see below
+* `remote_logs` (Optional): send the node's log output over CAN to can2mqtt, see [Remote logging over CAN](#remote-logging-over-can)
 * `remote_nodes` (Optional, mapping of name to YAML file): other nodes this node receives states from or sends commands to, by the ESPHome YAML file they are built from (path relative to this config). Their TPDO layout is computed from that file, so `rpdo`, `platform: canopen` entities and the `canopen.*` actions can refer to remote entities by id. See [Linking nodes](#linking-nodes)
 
 ### `entity` schema:
@@ -172,6 +173,29 @@ On `platform: zephyr` the update is written to MCUboot's secondary slot and swap
 * Upload the signed image: `.esphome/build/<node>/.west_build/zephyr/zephyr/zephyr.signed.bin`. Never upload `zephyr.bin` (unsigned); the node rejects it at the start of the transfer.
 * The new image boots in test mode. `safe_mode` confirms it after a good boot; if it's never confirmed, MCUboot rolls back to the previous image on the next reboot.
 * OTA compression is disabled on Zephyr (and on stm32), so can2mqtt sends the image uncompressed.
+
+## Remote logging over CAN
+Nodes without WiFi can send their ESPHome log output over CAN; can2mqtt polls it and prints it in its own log
+(as `node.<name>`):
+```
+logger:
+  logs:
+    canbus: INFO  # canbus logs every frame at DEBUG
+
+canopen:
+  remote_logs:
+    level: INFO
+```
+* `buffer_size` (Optional, int, 256..16384, default=2048): RAM buffer for log lines (static, shows up in the build's RAM summary)
+* `level` (Optional, default=INFO): `NONE`, `ERROR`, `WARN`, `INFO`, `CONFIG`, `DEBUG`, `VERBOSE` or `VERY_VERBOSE`. The node buffers at this level from boot (so boot logs and `dump_config` are kept until can2mqtt reads them) and can2mqtt subscribes with it. With `NONE` the node waits until a host subscribes with an explicit level (`can2mqtt --remote-log-level DEBUG`). Levels more verbose than `logger: level:` are compiled out.
+* `timeout` (Optional, time 1s..1h or `never`, default=30s): the node turns remote logging off when no host polled for this long. Short: stops buffering soon after can2mqtt goes away, but a busy host (e.g. a long OTA to another node) turns it off sooner. Long: survives a can2mqtt restart (up to `buffer_size` of lines). `never`: the subscription never expires.
+
+Requires `logger:` and `sdo_block_transfer_size` >= 3. Can be set on one `canopen` node per firmware. Without
+`remote_logs:` the feature costs nothing (no code, no RAM).
+
+When logs are produced faster than they are read, the newest lines are dropped and the gap is marked in the stream
+with `[W][canopen.logs]: N messages dropped`. A larger `buffer_size` absorbs bursts; for sustained load lower the
+level (or per-tag `logger: logs:` levels). The OD objects are described in [OBJECT_DICTIONARY.md](OBJECT_DICTIONARY.md#logs).
 
 # How to start
 ## Hardware requirements

@@ -3,6 +3,7 @@
 #include "entities.h"
 #include "driver_can.h"
 #include "od.h"
+#include "logs.h"
 #include "esphome/core/helpers.h"
 
 const int8_t ENTITY_TYPE_DISABLED = 0;
@@ -183,6 +184,11 @@ class CanopenComponent : public Component {
 #ifdef USE_CANOPEN_OTA
   CanopenOTAComponent *ota;
   void set_ota(CanopenOTAComponent *ota) { this->ota = ota; }
+#endif
+
+#ifdef USE_CANOPEN_LOGS
+  void set_log_default_level(uint8_t level) { canopen_logs.default_level = level; }
+  void set_log_timeout(uint32_t timeout_ms) { canopen_logs.timeout_ms = timeout_ms; }
 #endif
 
   canbus::Canbus *canbus;

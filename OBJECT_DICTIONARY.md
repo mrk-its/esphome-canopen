@@ -200,6 +200,32 @@ build time. The hash is readable in the OD:
 |--------|----------|------------------|--------|:------:|-|
 | 0x3002 | 0x01     | TPDO layout hash | UINT32 | R      | FNV-1a 32 of the TPDO mappings: for each TPDO 0..7 its entry count followed by its 0x1A00+n entries, as little-endian UINT32 |
 
+## Logs
+
+Present only with `remote_logs:` in the node config (see [Remote logging over CAN](README.md#remote-logging-over-can)).
+The node is a plain SDO server here: the host subscribes by writing a level and polls for log data, the node never
+sends unsolicited frames.
+
+| Index  | SubIndex | Object Name       | Type   | Access | Description |
+|--------|----------|-------------------|--------|:------:|-|
+| 0x3100 | 0x01     | Log Data          | DOMAIN | R      | buffered log lines (`\n`-terminated, with ESPHome's ANSI colors); an upload **consumes** what it returns |
+|        | 0x02     | Log Pending       | UINT32 | R      | bytes currently buffered; reading it counts as keepalive |
+|        | 0x03     | Log Level         | UINT8  | RW     | 0 = off, 1..7 = ERROR, WARN, INFO, CONFIG, DEBUG, VERBOSE, VERY_VERBOSE; a write subscribes and counts as keepalive |
+|        | 0x04     | Log Dropped       | UINT32 | R      | lines dropped because the buffer was full, since boot |
+|        | 0x05     | Log Default Level | UINT8  | R      | `remote_logs: level:`, the level the node starts with at boot (0 = NONE) |
+|        | 0x06     | Log Timeout       | UINT32 | R      | `remote_logs: timeout:` in ms, 0 = never |
+
+- Log Level: the buffer is cleared only on a 0 → >0 transition; rewriting the current level (the keepalive) keeps it.
+- Keepalive: a Log Pending read, a Log Data upload or a Log Level write. Without one for Log Timeout ms the node sets
+  Log Level to 0 and clears the buffer. After that it stays off until a host writes a level, the default level
+  applies at boot only.
+- Log Data: the size in the upload response is a snapshot of Log Pending at the start of the upload, exactly that
+  many bytes are sent and consumed; lines logged during the transfer stay for the next one. Uploading while the
+  buffer is empty aborts (size 0), so read Log Pending first. An aborted or timed-out upload loses the bytes already
+  sent. Block uploads must request a block size <= the node's `sdo_block_transfer_size` (the node caps it silently).
+- Overflow: a line that doesn't fit is dropped whole (never blocks, never overwrites unread data). Once there is
+  room again, the next line is preceded by `[W][canopen.logs]: <N> messages dropped`.
+
 ## Remote state slots
 
 Remote states a node reads (`platform: canopen` entities, toggle actions, see

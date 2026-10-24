@@ -26,6 +26,9 @@ canbus:
 
 canopen:
   node_id: 1
+  remote_logs:
+    level: INFO
+    timeout: 60s
   remote_nodes:
     dimmer: remote_node.yaml
   entities:
