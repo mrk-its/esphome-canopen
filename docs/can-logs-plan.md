@@ -7,9 +7,10 @@ ESPHome log output over CAN to can2mqtt, which prints it in its own log. Decisio
   block upload, `co_ssdo.c` `COSdoInitUploadBlock`/`COSdoUploadBlock`). No new COB-IDs.
 - **Host subscribes**: node buffers nothing until can2mqtt writes a log level; if nobody polls for `timeout`
   (default 30 s, configurable) it turns itself off again (similar to `esphome logs` subscribing via the API).
-- **Per-node default level**: the node YAML may declare a default level (`remote_logs: level:`). The node then
-  starts buffering at boot (so boot logs / `dump_config` are captured) and can2mqtt in `AUTO` mode subscribes
-  with that level. The node still never sends unsolicited frames.
+- **Per-node default level**: the node YAML declares a default level (`remote_logs: level:`, default `INFO`). The
+  node then starts buffering at boot (so boot logs / `dump_config` are captured) and can2mqtt in `AUTO` mode
+  subscribes with that level, so a bare `remote_logs: {}` means "send me logs". `level: NONE` makes the node wait
+  for an explicit host subscription (`--remote-log-level <level>`). The node still never sends unsolicited frames.
 - **Sink**: can2mqtt's own Python logging. Both repos are in scope.
 - **Overload**: when logs are produced faster than they are read, the node drops the **newest** whole lines
   (never blocks, never overwrites) and marks the gap in the stream (see "Overflow" below).
@@ -74,7 +75,7 @@ segmented and block paths), so the host always reads `:2` first.
   ```yaml
   remote_logs:
     buffer_size: 2048   # int, 256..16384
-    level: NONE         # NONE/ERROR/WARN/INFO/CONFIG/DEBUG/VERBOSE/VERY_VERBOSE (logger's level names)
+    level: INFO         # NONE/ERROR/WARN/INFO/CONFIG/DEBUG/VERBOSE/VERY_VERBOSE (logger's level names)
     timeout: 30s        # cv.positive_time_period_milliseconds, 1s..1h, or "never" (-> 0)
   ```
 - In `to_code()` when present: `cg.add_define("USE_CANOPEN_LOGS")`, `cg.add_define("CANOPEN_LOG_BUFFER_SIZE", n)`,
@@ -83,7 +84,8 @@ segmented and block paths), so the host always reads `:2` first.
   `USE_LOG_LISTENERS` is undefined and `add_log_callback` is a silent no-op (`logger.h:187-193`). Validate that
   `logger` is in the config (`cv.requires_component("logger")` or a final_validate check).
 - Validation: warn if `level` is more verbose than the logger's compile-time `logger: level:` (those messages are
-  compiled out and would never arrive). Warn if `timeout: never` is used with `level: NONE` (harmless but pointless:
+  compiled out and would never arrive; with the INFO default this also fires for a bare `remote_logs: {}` on a
+  `logger: level: WARN`/`ERROR` node, which is intended). Warn if `timeout: never` is used with `level: NONE` (harmless but pointless:
   nothing buffers until a host subscribes, and then the subscription never expires). Error if
   `sdo_block_transfer_size < 3` (see "Block size for log uploads").
 
@@ -253,8 +255,8 @@ segmented and block paths), so the host always reads `:2` first.
    (never turns off).
 4a. Boot-log capture: node with `level: INFO`, can2mqtt in `AUTO` → after a node reset, boot / `dump_config` lines
    appear in can2mqtt. Node with `level: INFO` and can2mqtt not running → "remote logging disabled" on serial ~30 s
-   after boot. `--remote-log-level NONE` → no subscription even for nodes with a default level; node with default
-   `NONE` and `AUTO` → no log task.
+   after boot. `--remote-log-level NONE` → no subscription even for nodes with a default level; node with `level: NONE` and
+   `AUTO` → no log task; node with a bare `remote_logs: {}` and `AUTO` → subscribed at INFO.
 5. Small `buffer_size` + log spam (e.g. `interval` lambda logging) → `N messages dropped` marker appears in the
    can2mqtt output at the gap, Log Dropped grows, can2mqtt warns, no crash, serial log unaffected.
 6. Last-partial-block case: log continuously while can2mqtt does block uploads of sizes that are not a multiple of
@@ -290,14 +292,14 @@ Probe whether the node supports logs (expedited upload of Log Level):
 ```
 Old firmware answers with an abort (`80 …`, object does not exist): can2mqtt logs at debug, no log task.
 
-Then the node's settings (both default here: level NONE, timeout 30 s):
+Then the node's settings (this node is configured with `level: NONE`; timeout is the default 30 s):
 ```
 605: 40 00 31 05 00 00 00 00     read Log Default Level
 585: 4F 00 31 05 00 00 00 00     0 (NONE; with AUTO this node would not be subscribed, DEBUG is explicit here)
 605: 40 00 31 06 00 00 00 00     read Log Timeout
 585: 43 00 31 06 30 75 00 00     30000 ms → keepalive 10 s, poll 1 s
 ```
-(With `level: INFO` in the node YAML the first read above would return `03`, the node would already be buffering
+(With `level: INFO` in the node YAML (the default) the first read above would return `03`, the node would already be buffering
 since boot, and the Level write below would not be a 0 → >0 transition, so the boot lines are kept.)
 
 Subscribe by writing level 5 (DEBUG):
