@@ -38,13 +38,13 @@ their logs over CAN.
 * [Remote logs](docs/remote-logs.md): read a node's log in can2mqtt, no serial cable needed
 * Heartbeat monitoring of other nodes (`heartbeat_clients`, `on_hb_consumer_event`)
 * Runs on upstream ESPHome (ESP32, ESP8266) and on STM32 with ESPHome on Zephyr (`platform: zephyr`, from the
-  esphomeplatformzephyr fork)
+  [esphomeplatformzephyr](https://github.com/esphomeplatformzephyr/esphome) fork)
 
 ## What you need
 
 * **Nodes**: an ESP32 board (it has a [built-in CAN controller](https://esphome.io/components/canbus/esp32/) and
   needs only an external 3.3 V CAN transceiver such as SN65HVD230), an ESP8266 with an
-  [MCP2515](https://esphome.io/components/canbus/mcp2515/) module, or an STM32 board on Zephyr.
+  [MCP2515](https://esphome.io/components/canbus/mcp2515/) module, or an STM32 board running ESPHome on Zephyr ([esphomeplatformzephyr](https://github.com/esphomeplatformzephyr/esphome)).
 * **CAN bus**: a twisted pair with a 120 Ω terminator at each end, and the same bit rate on every node.
 * **A can2mqtt host** on the bus: the [Home Assistant add-on](https://github.com/mrk-its/can2mqtt) or any Linux box
   with a [python-can](https://python-can.readthedocs.io/en/stable/interfaces.html) supported interface.
