@@ -1,309 +1,158 @@
-# ESPHome CANopen external component
+# ESPHome CANopen
 
-This project provides ESPHome external_component named `canopen` for easy conversion of ESPHome entities into CANopen nodes. It allows to [map selected entities](OBJECT_DICTIONARY.md) to CANopen object dictionary. It also allows to define TPDOs for sending entity state on change. Currently following entity types are supported: `sensor`, `number`, `binary_sensor`, `switch`, `cover`, `light` and `alarm_control_panel`. Entity metadata are also published in Object Dictionary enabling autodiscovery.
+An [ESPHome](https://esphome.io/) external component that turns an ESPHome device into a CANopen node. Lights,
+switches, sensors, covers and other entities are exposed on a CAN bus, and the
+[can2mqtt](https://github.com/mrk-its/can2mqtt) bridge brings them into Home Assistant. You get wired, reliable
+home automation nodes that need no WiFi. Nodes can also control each other directly, be updated over CAN, and send
+their logs over CAN.
 
-The [can2mqtt](https://github.com/mrk-its/can2mqtt) project provides can2mqtt bridge exposing ESPHome CANopen entities onto MQTT topics. It follows MQTT Discovery protocol, so entities appear automatically in HomeAssistant.
+## How it works
 
-## Configuration
-`canopen` platform recognizes following parameters:
-* `node_id` (Required, int): canopen node_id, in 0..127 range
-* `canbus_id` (Optional, id): id of `canbus` component to use, defaults to the only configured one
-* `entities` (Required, list of `entity` objects): list of ESPHome entities exposed via CANopen, see `entity` schema below
-* `heartbeat_interval` (Optional, time interval, default=5000ms): Heartbeat interval
-* `heartbeat_clients` (Optional, list of `heartbeat_client`): list of nodes to track heartbeat messages for, see below.
-* `on_pre_operational` (Optional, Automation): An automation to perform when node enters pre_operational state
-* `on_operational` (Optional, Automation): An automation to perform when node enters operational state
-* `on_hb_consumer_event` (Optional, Automation): An automation to perform when heartbeat clients are configured and heartbeat event occurs. `node_id` (uint8) variable is available in the automation.
-* `sdo_block_transfer_size` (Optional, int, 1..127, default=63): number of messages confirmed with single ACK for SDO block transfer mode. This is the SDO buffer (7 bytes of RAM per message): the block size of SDO downloads (CAN OTA, should fit the canbus RX queue) and the largest upload block (`remote_logs: block_size`)
-* `pdo_od_writer` (Optional, bool, default=True): when enabled then `RPDO #3` is reserved for node to node communication (remote OD writes, see [OD writer](OBJECT_DICTIONARY.md#od-writer))
-* `hw_version` (Optional, string): value of Manufacturer Hardware Version (`0x1009`)
-* `sw_version` (Optional, string): currently ignored, `0x100A` always contains generated ESPHome version string (see [#30](https://github.com/mrk-its/esphome-canopen/issues/30))
-* `template_entities` (Optional, list of `template_entity` objects): custom OD entities not backed by ESPHome entity, see below
-* `remote_logs` (Optional): send the node's log output over CAN to can2mqtt, see [Remote logging over CAN](#remote-logging-over-can)
-* `remote_nodes` (Optional, mapping of name to YAML file): other nodes this node receives states from or sends commands to, by the ESPHome YAML file they are built from (path relative to this config). Their TPDO layout is computed from that file, so `rpdo`, `platform: canopen` entities and the `canopen.*` actions can refer to remote entities by id. See [Linking nodes](#linking-nodes)
+```
+ ┌─────────────┐   ┌─────────────┐
+ │ ESPHome node│   │ ESPHome node│  ...   (this component)
+ └──────┬──────┘   └──────┬──────┘
+════════╧═════════════════╧═══════════ CAN bus
+                 │
+          ┌──────┴──────┐  MQTT   ┌────────────┐  MQTT discovery  ┌────────────────┐
+          │  can2mqtt   │────────▶│ MQTT broker│─────────────────▶│ Home Assistant │
+          └─────────────┘         └────────────┘                  └────────────────┘
+          Linux box / HA add-on
+```
 
-### `entity` schema:
-* `id` (Required, string): id of ESPHome entity
-* `index` (Required, int): index of entity, range 1..64. Together with `node_id` forms unique id of CAN-exposed entity, so it should be changed with a care. Indices must be unique.
-* `tpdo` (Optional, `TPDO` schema (see below)): when defined then state changes will be broadcasted via TPDO
-* `rpdo` (Optional, list of `RPDO` schema (see below)): when defined then received TPDO frames will be automatically mapped to OD entity command entries
-* `size` (Optional, int, `sensor` / `number` only): size of state on the wire: `4` (default, REAL32), `1` (scaled UINT8) or `2` (scaled UINT16). See [Sensor8 / Sensor16](OBJECT_DICTIONARY.md#sensor8--sensor16)
-* `min_value` (Optional, float, default=0): minimal value for scaled states (`size` 1 or 2)
-* `max_value` (Optional, float, default=254 for `size: 1`, 65534 for `size: 2`): maximal value for scaled states (`size` 1 or 2)
-* `caps` (Optional, list, `light` / `cover` only): capabilities of the entity, needed only for platforms whose capabilities the component can't derive from the config (the build fails with a hint). Light: `on_off`, `brightness`, `color_temperature`; cover: `position`, `tilt`. See [TPDO layout](OBJECT_DICTIONARY.md#tpdo-layout)
+* Every node has a `node_id`. Each exposed entity gets an `index` in the node's CANopen
+  [Object Dictionary](OBJECT_DICTIONARY.md), together with its metadata (name, type, unit, device class).
+* can2mqtt reads the metadata and creates the entities in Home Assistant automatically.
+* State changes are broadcast in TPDO frames. Commands from Home Assistant are written back to the node.
+* Nodes can listen to each other's TPDOs, so a wall switch can drive a light on another node without Home
+  Assistant or can2mqtt in the loop.
 
-### `TPDO` schema:
-Any of:
-- object with following properties:
-  * `number` (Required, integer): integer in 0..7 range (7 is typically reserved for node to node communication, unless `pdo_od_writer` is disabled, see above)
-  * `immediate` (Optional, bool, default=false): When true then TPDO is sent immediately on every state change. When false, changed TPDOs are marked dirty and sent once per component loop (several changes in one loop go out as one frame).
-- integer representing `number` defined above (equivalent to `{number: N}`, `immediate: false`).
+## Features
 
-### `RPDO` schema:
-Any of:
-- remote entity of a node from `remote_nodes`:
-  * `node` (Required, string): name of the node in `remote_nodes`
-  * `entity` (string) or `index` (int) (one of them Required): id or index of the remote entity (must be in the remote node's `canopen.entities`, with `tpdo`)
-  * `state` (Optional, string): remote entity state, defaults to the first one: `state` (light, switch, binary sensor, cover, alarm) or `value` (sensor, number). Others: light `brightness`, `color_temp`; cover `position`, `tilt`
-  * `cmd` (Optional, defaults to 0): entity command index the state is mapped to; its size must match the remote state's size
-- raw TPDO position:
-  * `node_id` (Required, integer): id of node sending mapped TPDO frame
-  * `tpdo` (Required, integer): TPDO number
-  * `offset` (Required, integer): byte offset inside TPDO frame, 0..7 range
-  * `cmd` (Optional, defaults to 0): entity command index (starting from 0) where received TPDO fragment is mapped to. One byte is mapped.
+* Entity types: `sensor`, `number`, `binary_sensor`, `switch`, `cover` (position / tilt), `light` (brightness /
+  color temperature) and `alarm_control_panel`
+* State broadcast in up to 8 TPDOs, with compact 1- or 2-byte encoding of sensor values
+* [Linking nodes](docs/linking-nodes.md): actions such as `canopen.light.toggle` and remote states as local
+  entities, with other nodes referred to by their YAML file and entity ids
+* [OTA over CAN](docs/ota.md): firmware updates from Home Assistant through can2mqtt
+* [Remote logs](docs/remote-logs.md): read a node's log in can2mqtt, no serial cable needed
+* Heartbeat monitoring of other nodes (`heartbeat_clients`, `on_hb_consumer_event`)
+* Runs on upstream ESPHome (ESP32, ESP8266) and on STM32 with ESPHome on Zephyr (`platform: zephyr`, from the
+  esphomeplatformzephyr fork)
 
-A node has at most 4 RPDOs (one per remote node TPDO), each with at most 8 mapping entries (gaps included).
+## What you need
 
-### `heartbeat_client` schema:
-* `node_id` (Required, int): tracked node id
-* `timeout` (Required, time interval): when exceeded `on_hb_consumer_event` automations will be triggered
+* **Nodes**: an ESP32 board (it has a [built-in CAN controller](https://esphome.io/components/canbus/esp32/) and
+  needs only an external 3.3 V CAN transceiver such as SN65HVD230), an ESP8266 with an
+  [MCP2515](https://esphome.io/components/canbus/mcp2515/) module, or an STM32 board on Zephyr.
+* **CAN bus**: a twisted pair with a 120 Ω terminator at each end, and the same bit rate on every node.
+* **A can2mqtt host** on the bus: the [Home Assistant add-on](https://github.com/mrk-its/can2mqtt) or any Linux box
+  with a [python-can](https://python-can.readthedocs.io/en/stable/interfaces.html) supported interface.
+  [esphome-canbus-usb-serial](https://github.com/mrk-its/esphome-canbus-usb-serial) turns an ESP32-S3/C3 into a
+  cheap USB-CAN adapter.
+* **An MQTT broker** connected to Home Assistant with discovery enabled.
 
-### `template_entity` schema:
-Template entities allow to define custom OD entries at given entity index, without ESPHome entity behind them.
-* `index` (Required, int): entity index (same meaning as in `entity`)
-* `tpdo` (Optional, int, default=-1): TPDO number states are mapped to
-* `metadata` (Optional): entity metadata
-  * `type` (Required, int): EntityTypeCode
-  * `name`, `device_class`, `unit`, `state_class` (Optional, string)
-* `states` (Optional, list): each item has `type` (Required, one of `uint8`, `uint16`, `uint32`, `int8`, `int16`, `int32`)
-* `commands` (Optional, list): each item has:
-  * `type` (Required, one of `uint8`, `uint16`, `uint32`)
-  * `handler` (Required, Automation): automation run when command is written, value is available as `x` variable
+## Quick start
 
-## Linking nodes
-A node can read states of another node's entities (from its TPDOs) and send commands to them. With
-`remote_nodes` the other node is referred to by the YAML file it's built from, and its entities by id:
-TPDO numbers, offsets, node ids and entity indices are taken from that file. E.g. a wall switch node
-controlling lights of a dimmer node:
+**1. Add the component to a node's YAML.** This example uses an ESP32 with a relay and a temperature sensor:
 
 ```yaml
-# dimmer3.yaml
-canopen:
-  node_id: 0x36
-  entities:
-    - id: light_mudroom
-      index: 3
-      tpdo: 1
-```
+esphome:
+  name: can-node-1
 
-```yaml
-# wall-switch.yaml
-canopen:
-  node_id: 0x62
-  remote_nodes:
-    dimmer3: dimmer3.yaml
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
 
-binary_sensor:
-  - platform: gpio
-    pin: ...
-    on_press:
-      - canopen.light.toggle: {node: dimmer3, entity: light_mudroom}
+external_components:
+  - source: github://mrk-its/esphome-canopen
 
-sensor:
-  - platform: canopen              # optional: remote state as a local entity
-    id: mudroom_brightness
-    node: dimmer3
-    entity: light_mudroom
-    state: brightness
-```
-
-Only the remote YAML's `canopen:` section and the configs of its exposed entities are read (after
-packages and substitutions); the remote node isn't built. Rebuild the linked nodes after changing the
-TPDO layout of a remote node (the build logs each node's [TPDO layout](OBJECT_DICTIONARY.md#tpdo-layout)).
-
-### Remote states
-Remote states a node needs (by `platform: canopen` entities and toggle actions) are mirrored in
-[remote state slots](OBJECT_DICTIONARY.md#remote-state-slots), one per remote state, filled by RPDOs from the
-remote node's TPDOs. They don't show up in Home Assistant. The RPDO limits apply (4 RPDOs, one per remote node
-TPDO, 8 mapping entries each, together with the `rpdo` entries of `entities`); a remote state can't be mapped by
-both a slot and an entity's `rpdo`.
-
-The remote state is only known after the remote node has sent its TPDO, e.g. after a reboot of this node a toggle
-may switch a light on even if it's already on, see [#32](https://github.com/mrk-its/esphome-canopen/issues/32).
-
-### `platform: canopen` entities
-`binary_sensor`, `sensor` and `text_sensor` showing a remote state:
-* `node` (Required, string): name of the node in `remote_nodes`
-* `entity` (Required, string): id of the remote entity (in the remote node's `canopen.entities`, with `tpdo`)
-* `state` (Optional, string): remote entity state, defaults to the first one: `state` (light, switch, binary sensor,
-  cover, alarm) or `value` (sensor, number). Others: light `brightness`, `color_temp`; cover `position`, `tilt`
-* all options of the entity type (`name`, `filters`, `on_value`, ...). Without `name` the entity is internal.
-
-| Platform | Remote states | Value |
-|---|---|---|
-| `binary_sensor` | light / switch / binary sensor `state` | |
-| `sensor` | any | `state`: 0 / 1; brightness, position, tilt: 0..1; `color_temp`: mireds; cover / alarm `state`: code (see [OBJECT_DICTIONARY.md](OBJECT_DICTIONARY.md)); sensor / number `value` |
-| `text_sensor` | light / switch / binary sensor `state`, cover `state`, alarm `state` | `on` / `off`; `open`, `opening`, `closed`, `closing`; `disarmed`, `armed_home`, ... |
-
-A `platform: canopen` entity can be listed in `canopen.entities` (without `rpdo`), e.g. to see the remote state
-through can2mqtt while debugging.
-
-### Actions
-All take `node` (name in `remote_nodes`) and `entity` (id) or `index` of the remote entity; the remote entity's type
-is checked against the action. Commands are sent with the [OD writer](OBJECT_DICTIONARY.md#od-writer). Toggles
-read the remote state from a remote state slot, so the remote entity needs `tpdo`.
-
-| Action | Remote entity | Options |
-|---|---|---|
-| `canopen.light.turn_on` | light, switch | `brightness` (percentage), `color_temperature`, both templatable |
-| `canopen.light.turn_off`, `canopen.light.toggle` | light, switch | |
-| `canopen.switch.turn_on`, `.turn_off`, `.toggle` | switch, light | |
-| `canopen.cover.open`, `.close`, `.stop` | cover | |
-| `canopen.cover.toggle` | cover | stops a moving cover, opens a closed one, otherwise closes |
-| `canopen.cover.control` | cover | `stop` (bool), `position`, `tilt` (percentage, templatable) |
-| `canopen.alarm_control_panel.disarm`, `.arm_away`, `.arm_home`, `.arm_night`, `.arm_vacation`, `.arm_custom_bypass` | alarm control panel | |
-| `canopen.number.set` | number | `value` (Required, templatable float), scaled as the remote number |
-
-`canopen.entity_cmd` writes a raw command of a remote entity:
-* `node` + `entity` / `index` (remote node from `remote_nodes`), or `node_id` + `index`
-* `cmd` (Optional, int, default=0): command index, see entity types in [OBJECT_DICTIONARY.md](OBJECT_DICTIONARY.md)
-* `value` (Required, templatable uint8): command value
-
-## OTA over CAN
-The `canopen` OTA platform allows to flash firmware over CAN bus:
-```
-ota:
-  - platform: canopen
-```
-
-### Zephyr (`platform: zephyr`) with MCUboot
-On `platform: zephyr` the update is written to MCUboot's secondary slot and swapped in on the next reboot:
-* MCUboot is required: set `advanced: bootloader: mcuboot` in the `zephyr:` block (with a partition layout that has `slot0_partition` / `slot1_partition`).
-* `swap_method:` (`scratch`, `move` or `offset`) can be set on the `canopen` OTA platform, same as on `platform: esphome`.
-* Upload the signed image: `.esphome/build/<node>/.west_build/zephyr/zephyr/zephyr.signed.bin`. Never upload `zephyr.bin` (unsigned); the node rejects it at the start of the transfer.
-* The new image boots in test mode. `safe_mode` confirms it after a good boot; if it's never confirmed, MCUboot rolls back to the previous image on the next reboot.
-* OTA compression is disabled on Zephyr (and on stm32), so can2mqtt sends the image uncompressed.
-
-## Remote logging over CAN
-Nodes without WiFi can send their ESPHome log output over CAN; can2mqtt polls it and prints it in its own log
-(as `node.<name>`):
-```
 logger:
   logs:
-    canbus: INFO  # canbus logs every frame at DEBUG
+    canbus: INFO      # canbus logs every frame at DEBUG
+
+canbus:
+  - platform: esp32_can
+    id: can_bus
+    rx_pin: GPIO22
+    tx_pin: GPIO23
+    can_id: 0
+    bit_rate: 125kbps
 
 canopen:
-  remote_logs:
-    level: INFO
+  node_id: 1          # unique on the bus, 1..127
+  entities:
+    - id: relay
+      index: 1        # stable id of the entity, 1..64
+      tpdo: 0         # broadcast state changes
+    - id: temperature
+      index: 2
+      tpdo: 0
+
+ota:
+  - platform: canopen # later updates over CAN
+
+switch:
+  - platform: gpio
+    id: relay
+    name: "Relay"
+    pin: GPIO2
+
+sensor:
+  - platform: internal_temperature
+    id: temperature
+    name: "Temperature"
 ```
-* `buffer_size` (Optional, int, 256..16384, default=2048): RAM buffer for log lines (static, shows up in the build's RAM summary)
-* `level` (Optional, default=INFO): `NONE`, `ERROR`, `WARN`, `INFO`, `CONFIG`, `DEBUG`, `VERBOSE` or `VERY_VERBOSE`. The node buffers at this level from boot (so boot logs and `dump_config` are kept until can2mqtt reads them) and can2mqtt subscribes with it. With `NONE` the node waits until a host subscribes with an explicit level (`can2mqtt --remote-log-level DEBUG`). Levels more verbose than `logger: level:` are compiled out.
-* `timeout` (Optional, time 1s..1h or `never`, default=30s): the node turns remote logging off when no host polled for this long. Short: stops buffering soon after can2mqtt goes away, but a busy host (e.g. a long OTA to another node) turns it off sooner. Long: survives a can2mqtt restart (up to `buffer_size` of lines). `never`: the subscription never expires.
-* `block_size` (Optional, int, 1..127, default=3): frames per SDO block of a log upload (can2mqtt requests it). The node sends a block back to back, so it must fit the canbus TX queue next to frames that may already be waiting (up to 8 TPDOs and a heartbeat); frames that don't fit are lost and each loss costs an SDO timeout (2 s) and a retransmit. The default fits CAN controllers without a software queue (3 TX mailboxes). With `zephyr_can`'s `tx_buffer_size: 16` use about 7, with 32 about 23. At most `sdo_block_transfer_size`.
 
-Requires `logger:`. Can be set on one `canopen` node per firmware. Without
-`remote_logs:` the feature costs nothing (no code, no RAM).
+WiFi, `api:` and `ota: platform: esphome` are optional. You can add them as on any ESPHome node, for example to
+keep the node in Home Assistant through the native API as well.
 
-When logs are produced faster than they are read, the newest lines are dropped and the gap is marked in the stream
-with `[W][canopen.logs]: N messages dropped`. A larger `buffer_size` absorbs bursts; for sustained load lower the
-level (or per-tag `logger: logs:` levels). The OD objects are described in [OBJECT_DICTIONARY.md](OBJECT_DICTIONARY.md#logs).
+**2. Flash it** the first time over USB: `esphome run can-node-1.yaml`.
 
-# How to start
-## Hardware requirements
- * any ESP8266/ESP32 board with CAN controller. ESP32 boards are preferred, as they have [integrated can controller](https://esphome.io/components/canbus.html#esp32-can-component) (but still cheap external CAN transceiver is needed). For ESP8266 external [MCP2515](https://esphome.io/components/canbus.html#mcp2515-component) CAN controller can be used.
-## Software requirements
- * [ESPHome](https://esphome.io/) installed
+**3. Run can2mqtt** connected to the same bus. Install the Home Assistant add-on, or run it standalone:
 
-## Configure ESPHome with `canopen` external_component
+```
+python3 -m venv venv
+venv/bin/pip install git+https://github.com/mrk-its/can2mqtt
+venv/bin/can2mqtt -i socketcan -c can0 -s <mqtt-broker-host>
+```
 
-  Example configuration for esp32dev board:
+**4. Done.** The entities show up in Home Assistant, under a device named after the node. Firmware updates can now
+go over CAN, see [OTA over CAN](docs/ota.md).
 
-  ```
-  esphome:
-    name: can-node-1
+A few rules:
+* `index` and `node_id` together identify the entity in Home Assistant. Don't renumber them after the node is in use.
+* TPDOs 0..6 are free to use; TPDO 7 is reserved for node-to-node commands (unless `pdo_od_writer: false`). Each
+  TPDO holds 8 bytes. The build fails if the states don't fit, and it logs the computed layout.
 
-  external_components:
-    - source: github://mrk-its/esphome-canopen
+More complete configurations are in [examples/](examples/).
 
-  # Enable logging
-  logger:
+## Documentation
 
-  # Enable Home Assistant API
-  api:
-    reboot_timeout: 0s
+| | |
+|---|---|
+| [Configuration](docs/configuration.md) | all `canopen:` options, entity / TPDO / RPDO / template entity schemas |
+| [Linking nodes](docs/linking-nodes.md) | `remote_nodes`, `canopen.*` actions, `platform: canopen` remote-state entities |
+| [OTA over CAN](docs/ota.md) | firmware updates through can2mqtt, Zephyr / MCUboot |
+| [Remote logs](docs/remote-logs.md) | node logs over CAN (`remote_logs:`) |
+| [Object Dictionary](OBJECT_DICTIONARY.md) | OD layout, entity types, TPDO layout, for integrators |
+| [Examples](examples/) | example node configurations |
+| [Changelog](CHANGELOG.md) | |
 
-  ota:
-    - platform: esphome
-    - platform: canopen
+## Troubleshooting
 
-  esp32:
-    board: esp32dev
-    framework:
-      type: esp-idf
+* **Nothing shows up in Home Assistant**: check that all nodes and the can2mqtt interface use the same bit rate,
+  that the bus is terminated, and that MQTT discovery is enabled. can2mqtt logs a `node_id: .., device name: ..`
+  line for every node it detects.
+* **Node gets slow or drops frames**: at `DEBUG` the `canbus` component logs every received frame. Over a serial
+  console that is slower than the bus, so set `logger: logs: canbus: INFO`.
+* **OTA over CAN is very slow (seconds per KB)**: frames of an SDO block are being lost, and every loss costs a
+  2 s timeout. Lower `sdo_block_transfer_size` (e.g. 16), or on `zephyr_can` raise `rx_buffer_size` to at least the
+  block size.
+* **`rx errors` on `zephyr_can`** point at the physical bus: stub length, termination, wiring.
 
-  wifi:
-    <<: !include {file: wifi.yaml}
+## Support
 
-  canbus:
-    - platform: esp32_can
-      id: can_bus
-      rx_pin: GPIO22
-      tx_pin: GPIO23
-      can_id: 0
-      bit_rate: 125kbps
-
-  canopen:
-    id: can_gate
-    canbus_id: can_bus
-    node_id: 1
-    entities:
-      - id: boot
-        index: 1
-        tpdo: 0
-      - id: blue_led
-        index: 2
-        tpdo: 0
-      - id: uptime_sensor
-        index: 3
-        tpdo: 0
-      - id: cover1
-        index: 4
-        tpdo: 1
-
-  sensor:
-    - platform: uptime
-      id: uptime_sensor
-      name: "Uptime 1"
-      update_interval: 5sec
-      internal: true
-
-  binary_sensor:
-    - platform: gpio
-      name: "Boot 1"
-      id: boot
-      internal: true
-      pin:
-        number: 0
-        inverted: true
-
-  switch:
-    - platform: gpio
-      name: "Led 1"
-      id: blue_led
-      internal: true
-      pin: 2
-
-  cover:
-    - platform: time_based
-      name: "Cover 1"
-      id: cover1
-      internal: true
-      device_class: shutter
-      has_built_in_endstop: true
-      open_action:
-        - logger.log: open_action
-      open_duration: 10s
-      close_action:
-        - logger.log: close_action
-      close_duration: 10s
-      stop_action:
-        - logger.log: stop_action
-
-  ```
-
-More examples can be found in [examples](examples/) directory.
-
-# Support
-## Community
-
-* [Discord Server](https://discord.gg/VXjUSnUWsd)
+* [Discord server](https://discord.gg/VXjUSnUWsd)
+* [GitHub issues](https://github.com/mrk-its/esphome-canopen/issues)

@@ -3,12 +3,10 @@ wifi:
   <<: !include {file: wifi.yaml}
 
 api:
-  password: ""
   reboot_timeout: 900s
 
 ota:
   - platform: esphome
-    password: ""
 
 external_components:
   - source: github://mrk-its/esphome-canbus-udp-multicast

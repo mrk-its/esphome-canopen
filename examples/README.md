@@ -1,5 +1,26 @@
 # Examples
 
-* `light.yaml` defines node with 2 lights, mapped to CANOpen entities. These lights broadcast their state / brightness using TPDO#0 messages. Lights are exposed as CANOpen entities and through ESP API
+| File | What it shows |
+|---|---|
+| `light.yaml` | node 7 with three lights (cwww, monochromatic, binary), all broadcasting their state in TPDO 0 |
+| `light-switch.yaml` | node 8 controlling the lights of `light.yaml` over CAN: `remote_nodes`, `platform: canopen` remote-state entities, `canopen.light.turn_on` / `turn_off` / `toggle` actions (see [Linking nodes](../docs/linking-nodes.md)) |
+| `light_cwww.yaml` | a single cold/warm white light |
+| `venetian_blinds.yaml` | a cover with tilt |
+| `misc.yaml` | sensor, binary sensor, switch, cover and light on one node, in two TPDOs |
+| `common.yaml` | shared settings included by all examples as a package (board, WiFi, API, canbus) |
 
-* `light-switch.yaml` acts as light controller and shows how to control entities on other CANOpen nodes. It tracks state of lights defined by `light` node using RPDO mapping: TPDO messages carring lights state are mapped to locally-defined entities. Light state is changed with `send_entity_cmd` call.
+## Building
+
+```
+cp wifi.yaml.template wifi.yaml   # and put your WiFi credentials in it
+esphome config light.yaml
+esphome run light.yaml
+```
+
+`common.yaml` targets an ESP32-C3 and uses the `canbus_udp_multicast` virtual CAN bus
+([esphome-canbus-udp-multicast](https://github.com/mrk-its/esphome-canbus-udp-multicast)). With it, nodes and
+can2mqtt talk over UDP multicast on your LAN, so no CAN hardware is needed for testing. For a real bus, switch to the
+commented-out `esp32_can` block and set the pins and bit rate.
+
+The examples load the component from `../components` (this repository). In your own configs use
+`source: github://mrk-its/esphome-canopen`.

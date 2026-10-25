@@ -202,7 +202,7 @@ build time. The hash is readable in the OD:
 
 ## Logs
 
-Present only with `remote_logs:` in the node config (see [Remote logging over CAN](README.md#remote-logging-over-can)).
+Present only with `remote_logs:` in the node config (see [Remote logging over CAN](docs/remote-logs.md)).
 The node is a plain SDO server here: the host subscribes by writing a level and polls for log data, the node never
 sends unsolicited frames.
 
@@ -231,7 +231,7 @@ sends unsolicited frames.
 ## Remote state slots
 
 Remote states a node reads (`platform: canopen` entities, toggle actions, see
-[Linking nodes](README.md#linking-nodes)) are received by RPDO into local objects outside the entity area, so
+[Linking nodes](docs/linking-nodes.md)) are received by RPDO into local objects outside the entity area, so
 can2mqtt doesn't see them:
 
 | Index      | SubIndex | Object Name         | Type                     | Access | Description |
