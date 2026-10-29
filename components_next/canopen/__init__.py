@@ -20,8 +20,10 @@ CONF_TIMEOUT = "timeout"
 CONF_ON_HB_CONSUMER_EVENT = "on_hb_consumer_event"
 CONF_CANOPENNODE_PATH = "canopennode_path"
 
-# CANopenNode fork checked out next to this repo
-DEFAULT_CANOPENNODE_PATH = Path(__file__).resolve().parents[3] / "CANopenNode"
+# CANopenNode upstream + library.json (branch esphome), pinned to a commit
+CANOPENNODE_SOURCE = (
+    "https://github.com/mrk-its/CANopenNode.git#f38ec8a6442a5a598d26f88c4e7c8a39b83d2cd5"
+)
 # directory name = IDF component name (a local IDF component is named after its directory)
 PORT_PATH = Path(__file__).resolve().parent / "canopennode_port"
 
@@ -56,15 +58,17 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ON_HB_CONSUMER_EVENT): automation.validate_automation(
             {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(HbConsumerEventTrigger)}
         ),
-        cv.Optional(
-            CONF_CANOPENNODE_PATH, str(DEFAULT_CANOPENNODE_PATH)
-        ): absolute_path,
+        # local CANopenNode checkout instead of CANOPENNODE_SOURCE (development)
+        cv.Optional(CONF_CANOPENNODE_PATH): absolute_path,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
 
 async def to_code(config):
-    cg.add_library("CANopenNode", None, f"file://{config[CONF_CANOPENNODE_PATH]}")
+    if CONF_CANOPENNODE_PATH in config:
+        cg.add_library("CANopenNode", None, f"file://{config[CONF_CANOPENNODE_PATH]}")
+    else:
+        cg.add_library("CANopenNode", None, CANOPENNODE_SOURCE)
     # CANopenNode's 301/CO_driver.h includes CO_driver_target.h, which lives in canopennode_port/. Project -I
     # flags don't reach converted libraries (only -D/-W do), so that directory is added as a package of its own:
     if CORE.is_esp32:

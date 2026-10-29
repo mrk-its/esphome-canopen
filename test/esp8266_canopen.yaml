@@ -1,7 +1,5 @@
 # ESP8266 (PlatformIO) build check for components_next/canopen (CANopenNode), with upstream ESPHome (dev venv):
-#   ~/repos/esphome-upstream-venv/bin/esphome -s canopennode_path ~/repos/CANopenNode compile test/esp8266_canopen.yaml
-substitutions:
-  canopennode_path: /CANopenNode
+#   ~/repos/esphome-upstream-venv/bin/esphome compile test/esp8266_canopen.yaml
 
 external_components:
   - source: ../components_next
@@ -29,7 +27,6 @@ canbus:
 canopen:
   canbus_id: can_bus
   node_id: 0x7d
-  canopennode_path: ${canopennode_path}
   heartbeat_interval: 1s
   heartbeat_clients:
     - node_id: 0x01

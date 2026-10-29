@@ -34,7 +34,7 @@ OTA, logs, persistence.
   `heartbeat_clients: [{node_id, timeout}]` (same as the old `HB_CLIENT_SCHEMA`),
   `on_hb_consumer_event` (trigger with `uint8 node_id`, fired on timeout, same as the old component),
   `sdo_block_transfer_size` (1..127, default 63, accepted now, becomes `-DCO_CONFIG_SDO_SRV_BLKSIZE`),
-  `canopennode_path` (default: `CANopenNode` next to this repo,
+  `canopennode_path` (now optional: the default is the fork from GitHub, see "Library source" in canopennode.md; was: `CANopenNode` next to this repo,
   `Path(__file__).resolve().parents[3] / "CANopenNode"`; must be absolute because the zephyr converter rejects
   relative `file://`).
 - `to_code`: `cg.add_library("CANopenNode", None, f"file://{path}")`, `cg.add_build_flag("-DCO_CONFIG_SDO_SRV_BLKSIZE=N")`,

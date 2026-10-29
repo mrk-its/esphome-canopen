@@ -30,7 +30,7 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
     asked.
 - **CANopenNode fork:**
   - local checkout `~/repos/CANopenNode` (origin `git@github.com:mrk-its/CANopenNode.git`);
-  - all on top of upstream master `9b8beed` (2026-07-10), **nothing pushed**:
+  - all on top of upstream master `9b8beed` (2026-07-10); `esphome` is pushed (2026-10-29), the others are local:
     - branch `esphome`, commit `f38ec8a` "Add library.json": packaging only, no stack changes. `"build": {"srcDir":
       ".", "includeDir": ".", "srcFilter": ["+<CANopen.c>", "+<301/*.c>"]}`. This is what the build uses, and the
       `library.json` could be proposed to CANopenNode upstream as is;
@@ -83,8 +83,10 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
   only the editor missing include paths.
 
 ## Decisions
-- **Library source:** the fork, pulled in with `cg.add_library("CANopenNode", None, "file://<absolute path>")`.
-  - The default path is `CANopenNode` next to this repo, overridable with a `canopennode_path:` option.
+- **Library source:** the fork from GitHub, `cg.add_library("CANopenNode", None, CANOPENNODE_SOURCE)` with
+  `https://github.com/mrk-its/CANopenNode.git#<commit>` (branch `esphome`, pinned to a commit so a push to the fork
+  doesn't change builds; bump it in `__init__.py`).
+  - `canopennode_path: <absolute path>` (optional) uses a local checkout instead (`file://`), for development.
   - The esphomeplatformzephyr library converter (`esphome/platformio/library.py`, Zephyr backend
     `esphome/components/zephyr/library.py`) works like this:
     - it takes registry, git, url or `file://` sources (`LocalSource`; **relative `file://` is rejected**);
@@ -94,7 +96,7 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
     - project `cg.add_build_flag()` flags reach the library through `ESPHOME_LIBRARY_COMPILE_OPTIONS`;
     - include dirs (`includeDir`, `srcDir`, the library's own `-I` flags) are exported globally; project `-I`
       flags don't reach libraries at all (hence the port header as its own header-only library).
-  - Push the fork and switch the default to its git URL in the last step.
+  - Done 2026-10-29: the default is the git URL (checked: Zephyr, ESP32 esp-idf, ESP8266 clone `f38ec8a` and build).
 - **Block size: `sdo_block_transfer_size` dropped for now (2026-10-29), add it back later.** It needs
   `CO_CONFIG_SDO_SRV_BLKSIZE` (the fork patch, option "D", branch `sdo-srv-blksize`, not in the `esphome` branch the
   build uses), which caps the block-download size the SDO server announces. Without it CANopenNode always announces
@@ -304,7 +306,8 @@ Each step is a commit on `feature/canopennode` (or its own `feature/...` branch)
      `cg.add_library("canopenstack")`) and the remote-state code (`remote.py`, `remote_entities.*`, the
      `platform: canopen` entity files);
    - update CLAUDE.md and `docs/`;
-   - push the CANopenNode fork and set the default library source to its git URL;
+   - check that `CANOPENNODE_SOURCE` points at the current fork commit (or CANopenNode upstream, if it took the
+     `library.json`);
    - ESP32 build (`docker_build.sh`) and a full run against can2mqtt.
 
 ## Upstream PRs
@@ -332,9 +335,8 @@ Before PR 1:
 - **Library source:** no `file://` path. Stock CANopenNode can't be used as is: it has no `library.json`, and the
   Zephyr and native ESP-IDF backends of ESPHome require a manifest (`esphome/platformio/library.py`, only the `host`
   backend accepts manifest-less libraries; plain PlatformIO builds would work). Done (2026-10-29): packaging-only
-  fork (branch `esphome`, upstream + `library.json`), port header as a header-only library in our component. Still
-  to do: push the fork (or get the `library.json` into CANopenNode upstream) and use a git URL instead of
-  `file://`. The port header reaches CANopenNode on ESP32, ESP8266 and Zephyr (see "Port header"). The block-size
+  fork (branch `esphome`, upstream + `library.json`, pushed), pulled from GitHub by commit; port header in our
+  component. Optional: propose the `library.json` to CANopenNode upstream so the fork can go. The port header reaches CANopenNode on ESP32, ESP8266 and Zephyr (see "Port header"). The block-size
   patch (branch `sdo-srv-blksize`) is needed only from step 3 on (drop it, or send it
   upstream).
 - **ESP32 / ESP8266 builds** (upstream CI: esp32-idf, esp32-ard, esp8266): all three compile with upstream `dev`

@@ -94,7 +94,9 @@ current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopenn
   but not in 2026.9.x).
 - `components_next` (CANopenNode) build checks with it: `test/esp32_canopen.yaml` (ESP32-C3, esp-idf; add
   `-s framework arduino` for Arduino) and `test/esp8266_canopen.yaml` (d1_mini + mcp2515), e.g.
-  `~/repos/esphome-upstream-venv/bin/esphome -s canopennode_path ~/repos/CANopenNode compile test/esp32_canopen.yaml`.
+  `~/repos/esphome-upstream-venv/bin/esphome compile test/esp32_canopen.yaml`. CANopenNode comes from GitHub
+  (`CANOPENNODE_SOURCE` in `components_next/canopen/__init__.py`, the fork's `esphome` branch pinned to a commit;
+  bump it after pushing the fork); `canopennode_path: <local checkout>` overrides it for development.
 - Old component ESP32 build in Docker: `./docker_build.sh` (renders `test/config.yaml.template` with `envsubst`;
   note `framework` must be a mapping, e.g. `{type: esp-idf}`). Docker leaves root-owned files in `.esphome/`.
 - Config validation without building: `esphome config <yaml>`, against both upstream ESPHome (the venv above) and
