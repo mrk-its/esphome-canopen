@@ -84,7 +84,9 @@ current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopenn
 
 ## Testing
 - `pytest test/`: Python tests, plus `test/test_logs.py`, which builds `test/logs/logs_test.cpp` against
-  `components/canopen/logs.cpp` with stub headers (`test/logs/stubs/`) and runs it (ASan/UBSan if available).
+  `components/canopen/logs.cpp` with stub headers (`test/logs/stubs/`) and runs it (ASan/UBSan if available), and
+  `test/test_od.py` (same for `components_next/canopen/od.cpp` against CANopenNode's `CO_ODinterface.c`; needs
+  `../CANopenNode` or `$CANOPENNODE_PATH`, skipped otherwise). pytest is in the esphomeplatformzephyr venv.
 - Upstream ESPHome (`dev` from GitHub) venv: `~/repos/esphome-upstream-venv` (update with
   `bin/pip install -U "esphome @ git+https://github.com/esphome/esphome@dev"`). Use it, not the esphomeplatformzephyr
   venv, to check upstream compatibility (the fork may carry APIs upstream doesn't have). Upstream PRs target `dev`,

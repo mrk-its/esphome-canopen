@@ -13,9 +13,9 @@ namespace canopen {
 
 class HbConsumerEventTrigger : public Trigger<uint8_t> {};
 
-class CanopenComponent : public Component {
+class CANopenComponent : public Component {
  public:
-  explicit CanopenComponent(uint8_t node_id) : node_id_(node_id) {}
+  explicit CANopenComponent(uint8_t node_id) : node_id_(node_id) {}
 
   void set_canbus(canbus::Canbus *canbus);
   void set_heartbeat_interval(uint32_t ms) { this->hb_producer_ms_ = ms; }

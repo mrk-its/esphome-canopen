@@ -26,14 +26,14 @@ static const char *nmt_state_str(CO_NMT_internalState_t state) {
   }
 }
 
-void CanopenComponent::set_canbus(canbus::Canbus *canbus) {
+void CANopenComponent::set_canbus(canbus::Canbus *canbus) {
   this->canbus_ = canbus;
   canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
     this->on_frame_(can_id, extended_id, rtr, data);
   });
 }
 
-void CanopenComponent::setup() {
+void CANopenComponent::setup() {
   auto &od = this->od_;
   od.add_var(0x1000, ODA_SDO_R, &this->dev_type_, sizeof(this->dev_type_));
   od.add_var(0x1001, ODA_SDO_R, &this->err_reg_, sizeof(this->err_reg_));
@@ -93,7 +93,7 @@ void CanopenComponent::setup() {
   ESP_LOGI(TAG, "CANopenNode initialized, node 0x%02x, heap %" PRIu32 " B", this->node_id_, heap);
 }
 
-void CanopenComponent::dump_config() {
+void CANopenComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "CANopen (CANopenNode):");
   ESP_LOGCONFIG(TAG, "  Node ID: 0x%02x", this->node_id_);
   ESP_LOGCONFIG(TAG, "  Heartbeat interval: %u ms", this->hb_producer_ms_);
@@ -101,7 +101,7 @@ void CanopenComponent::dump_config() {
     ESP_LOGCONFIG(TAG, "  Heartbeat client: node 0x%02x, timeout %u ms", (unsigned) (c >> 16), (unsigned) (c & 0xFFFF));
 }
 
-void CanopenComponent::on_frame_(uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
+void CANopenComponent::on_frame_(uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
   if (extended_id || this->co_ == nullptr || this->is_failed())
     return;
   CO_CANmodule_t *mod = this->co_->CANmodule;
@@ -117,9 +117,9 @@ void CanopenComponent::on_frame_(uint32_t can_id, bool extended_id, bool rtr, co
   this->process_();
 }
 
-void CanopenComponent::loop() { this->process_(); }
+void CANopenComponent::loop() { this->process_(); }
 
-void CanopenComponent::process_() {
+void CANopenComponent::process_() {
   if (this->co_ == nullptr || this->is_failed())
     return;
   uint32_t now = micros();
@@ -134,26 +134,26 @@ void CanopenComponent::process_() {
   }
 }
 
-void CanopenComponent::on_hb_started_(uint8_t node_id, uint8_t idx, void *object) {
+void CANopenComponent::on_hb_started_(uint8_t node_id, uint8_t idx, void *object) {
   ESP_LOGI(TAG, "node 0x%02x heartbeat started", node_id);
 }
 
-void CanopenComponent::on_hb_nmt_changed_(uint8_t node_id, uint8_t idx, CO_NMT_internalState_t state, void *object) {
+void CANopenComponent::on_hb_nmt_changed_(uint8_t node_id, uint8_t idx, CO_NMT_internalState_t state, void *object) {
   ESP_LOGI(TAG, "node 0x%02x NMT state: %s", node_id, nmt_state_str(state));
 }
 
-void CanopenComponent::on_hb_timeout_(uint8_t node_id, uint8_t idx, void *object) {
+void CANopenComponent::on_hb_timeout_(uint8_t node_id, uint8_t idx, void *object) {
   ESP_LOGW(TAG, "node 0x%02x heartbeat timeout", node_id);
-  auto *self = static_cast<CanopenComponent *>(object);
+  auto *self = static_cast<CANopenComponent *>(object);
   if (self->on_hb_cons_event_ != nullptr)
     self->on_hb_cons_event_->trigger(node_id);
 }
 
-void CanopenComponent::on_hb_remote_reset_(uint8_t node_id, uint8_t idx, void *object) {
+void CANopenComponent::on_hb_remote_reset_(uint8_t node_id, uint8_t idx, void *object) {
   ESP_LOGI(TAG, "node 0x%02x reset (boot-up)", node_id);
 }
 
-void CanopenComponent::on_nmt_changed_(CO_NMT_internalState_t state) {
+void CANopenComponent::on_nmt_changed_(CO_NMT_internalState_t state) {
   ESP_LOGI(TAG, "NMT state: %s", nmt_state_str(state));
 }
 

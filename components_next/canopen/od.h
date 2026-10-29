@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <initializer_list>
 #include <vector>
 
 #define OD_DEFINITION
@@ -14,9 +15,18 @@ namespace canopen {
 // OD_entry_t list by finalize(). The value storage is owned by the caller and must outlive the OD.
 class ObjectDictionary {
  public:
+  struct RecordSub {
+    uint8_t sub;
+    OD_attr_t attr;
+    void *data;
+    OD_size_t len;
+  };
+
   void add_var(uint16_t index, OD_attr_t attr, void *data, OD_size_t len);
   // ARRAY: sub0 = *count (read only), subs 1..n = elements of elem_len bytes at data
   void add_array(uint16_t index, OD_attr_t attr, uint8_t *count, void *data, OD_size_t elem_len, uint8_t n);
+  // RECORD: subs are looked up by subindex, so sub0 (highest subindex, uint8_t) is passed like the others
+  void add_record(uint16_t index, std::initializer_list<RecordSub> subs);
 
   // Builds the entry list. Entries can't be added after this.
   void finalize();
@@ -31,6 +41,7 @@ class ObjectDictionary {
   // deques keep the addresses of their elements stable
   std::deque<OD_obj_var_t> vars_;
   std::deque<OD_obj_array_t> arrays_;
+  std::deque<std::vector<OD_obj_record_t>> records_;
   std::vector<OD_entry_t> entries_;
   OD_t od_{0, nullptr};
   bool finalized_{false};

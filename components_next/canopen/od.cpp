@@ -30,6 +30,14 @@ void ObjectDictionary::add_array(uint16_t index, OD_attr_t attr, uint8_t *count,
   this->add_entry_(index, n + 1, ODT_ARR, &this->arrays_.back());
 }
 
+void ObjectDictionary::add_record(uint16_t index, std::initializer_list<RecordSub> subs) {
+  auto &record = this->records_.emplace_back();
+  record.reserve(subs.size());
+  for (const auto &s : subs)
+    record.push_back(OD_obj_record_t{s.data, s.sub, multi_byte(s.attr, s.len), s.len});
+  this->add_entry_(index, record.size(), ODT_REC, record.data());
+}
+
 void ObjectDictionary::finalize() {
   std::sort(this->entries_.begin(), this->entries_.end(),
             [](const OD_entry_t &a, const OD_entry_t &b) { return a.index < b.index; });

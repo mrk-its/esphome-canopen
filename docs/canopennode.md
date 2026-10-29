@@ -254,7 +254,7 @@ Things to watch:
 entity mapper    ESPHome entities <-> 0x2000+, remote slots 0x4000+, template_entities,
                  canopen.<domain>.<action>, OD writer, layout hash   (layout.py, remote.py unchanged)
 services         OTA (0x3000), remote logs (0x3100), device API (SDO client queue, NMT, HB, EMCY)
-node core        CanopenComponent: OD builder, NodeConfig (heartbeat, HB consumers, SDO clients, PDOs),
+node core        CANopenComponent: OD builder, NodeConfig (heartbeat, HB consumers, SDO clients, PDOs),
                  persistence (preferences), driver glue on ESPHome canbus
 CANopenNode      CANopen.c + 301/*  (fork: library.json only; port header in components_next/canopen/canopennode_port)
 ```
@@ -323,6 +323,10 @@ Estimates (2026-10-29; step 1 is 517 lines in `components_next/canopen`, the res
 | 4. `cia402` | the drive profile | 2b | ~500 |
 
 The SDO server and our own entities/OTA/logs (steps 3-8) are a later chain.
+
+PR 1 progress: done: the `CANopenComponent` rename (+ `CONF_CANOPEN_ID` in Python), `add_record()` (host test
+`test/test_od.py`). Next: raw heartbeat/EMCY triggers, frame listeners + `send_frame()`, `heartbeat_clients` on node
+monitoring.
 
 Before PR 1:
 - **Library source:** no `file://` path. Stock CANopenNode can't be used as is: it has no `library.json`, and the

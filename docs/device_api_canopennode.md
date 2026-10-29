@@ -94,12 +94,12 @@ any of them needs it.
   transfers in our one-at-a-time server).
 
 ### `od.h` / `od.cpp`
-- `add_record(index, subs)`: `RecordSub {uint8_t sub; OD_attr_t attr; void *data; OD_size_t len;}` → `ODT_REC` + an
+- (done, moved to PR 1) `add_record(index, subs)`: `RecordSub {uint8_t sub; OD_attr_t attr; void *data; OD_size_t len;}` → `ODT_REC` + an
   array of `OD_obj_record_t` (sub0 included, `subEntriesCount` = number of subs, `ODA_MB` for len ≥ 2), stored in a
   `std::deque<std::vector<OD_obj_record_t>>`. Used for 0x1280 here, 0x1018/0x1200 in step 3, PDO records in step 7.
 
 ### Names
-- C++ `CanopenComponent` → `CANopenComponent` (the ESPHome spelling, as in #21522); Python exports
+- (done, moved to PR 1) C++ `CanopenComponent` → `CANopenComponent` (the ESPHome spelling, as in #21522); Python exports
   `CANopenComponent`, `CANopenNode`, `CONF_CANOPEN_ID = "canopen_id"`, `CONF_NODE_ID` for profile components.
 
 ### `types.h`: public types (no CANopenNode headers)

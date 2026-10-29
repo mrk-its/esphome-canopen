@@ -11,6 +11,8 @@ DEPENDENCIES = ["canbus"]
 MULTI_CONF = True
 
 CONF_CANBUS_ID = "canbus_id"
+# for components that refer to a canopen node (cv.use_id(CANopenComponent))
+CONF_CANOPEN_ID = "canopen_id"
 CONF_NODE_ID = "node_id"
 CONF_HEARTBEAT_INTERVAL = "heartbeat_interval"
 CONF_HEARTBEAT_CLIENTS = "heartbeat_clients"
@@ -24,7 +26,7 @@ DEFAULT_CANOPENNODE_PATH = Path(__file__).resolve().parents[3] / "CANopenNode"
 PORT_PATH = Path(__file__).resolve().parent / "canopennode_port"
 
 ns = cg.esphome_ns.namespace("canopen")
-CanopenComponent = ns.class_("CanopenComponent", cg.Component)
+CANopenComponent = ns.class_("CANopenComponent", cg.Component)
 HbConsumerEventTrigger = ns.class_(
     "HbConsumerEventTrigger", automation.Trigger.template(cg.uint8)
 )
@@ -44,7 +46,7 @@ HB_CLIENT_SCHEMA = cv.Schema(
 
 CONFIG_SCHEMA = cv.Schema(
     {
-        cv.GenerateID(): cv.declare_id(CanopenComponent),
+        cv.GenerateID(): cv.declare_id(CANopenComponent),
         cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
         cv.Required(CONF_NODE_ID): cv.All(cv.int_, cv.Range(min=1, max=127)),
         cv.Optional(

@@ -1,5 +1,5 @@
-// CANopenNode driver functions (301/CO_driver.h) on top of ESPHome canbus. CANptr is the CanopenComponent.
-// Everything runs on the main loop: frames are received by CanopenComponent::on_frame_().
+// CANopenNode driver functions (301/CO_driver.h) on top of ESPHome canbus. CANptr is the CANopenComponent.
+// Everything runs on the main loop: frames are received by CANopenComponent::on_frame_().
 #include "canopen.h"
 
 #include <cstring>
@@ -8,7 +8,7 @@ namespace esphome {
 namespace canopen {
 
 static canbus::Canbus *get_canbus(CO_CANmodule_t *mod) {
-  return static_cast<CanopenComponent *>(mod->CANptr)->get_canbus();
+  return static_cast<CANopenComponent *>(mod->CANptr)->get_canbus();
 }
 
 static bool send_frame(CO_CANmodule_t *mod, CO_CANtx_t *buf) {
