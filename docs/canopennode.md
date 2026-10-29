@@ -21,6 +21,13 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
   - branch `feature/canopennode`, created from `main` at `8696ae8`; nothing committed on it yet;
   - untracked: `stm32l4_canopen.yaml` (the user's test config), `test/.gitignore`, `docs/minimal_canopennode.md`,
     this file.
+  - step 1 (`docs/minimal_canopennode.md`, NMT + heartbeat) is implemented in `components_next/canopen/` (not
+    committed). Tested on the nucleo: `CO_CANopenInit` OK, NMT operational, HB consumer sees node 0x01 (5 s
+    heartbeat) and fires `on_hb_consumer_event` on timeout, the bus stays error-active with 0 TX errors.
+  - `-DCO_*` build flags reach the app build of the library. The library is also compiled for the MCUboot image
+    (without the project flags), because esphomeplatformzephyr `build_zephyr.py` passes the global
+    `-DEXTRA_ZEPHYR_MODULES`; `--gc-sections` drops all of it from the bootloader binary. Fix in the fork: pass
+    `-D<app image>_EXTRA_ZEPHYR_MODULES` (image `zephyr`, the app dir name) so only the app gets the libraries.
   - CLAUDE.md workflow: new work goes on `feature/<name>` branches, never directly on `dev`/`main`. Commit only when
     asked.
 - **CANopenNode fork:**
