@@ -334,6 +334,13 @@ In `~/repos/esphome` (branches from `upstream/dev`, nothing pushed, no PRs opene
 - `canopen-1-node`: PR 1, one commit, cut from `components_next` by removing the later parts (raw events, frame
   listeners, `send_frame()`, `add_record()`, `add_on_node_event(node, cb)`, the port header's SDO/PDO/CRC/FIFO
   config). Later PR branches stack on it and add those parts back.
+- `canopen-2-frames`: PR 2 on top of `canopen-1-node` (one commit, +136 component lines, +245 with tests): raw
+  heartbeat/EMCY triggers, frame listeners, `send_frame()`, and a gtest unit test of the decoders
+  (`tests/components/canopen/frames_test.cpp`, run with `script/cpp_unit_test.py canopen`).
+  `tests/components/canopen/__init__.py` makes the unit test build work: the runner suppresses `to_code` and gives
+  MULTI_CONF components an empty list, so the override sets `multi_conf = False` and its `to_code` only calls
+  `add_canopennode_library()` (CANopenNode + port header, factored out of `to_code` in PR 1). `add_record()`,
+  `add_on_node_event(node, cb)` and the SDO/PDO port config wait for PR 3/4 (no user before).
   Checked: `script/ci-custom.py`, ruff, clang-format 23.1.3 and the pre-commit hooks pass;
   `tests/component_tests/canopen` (9 tests); `script/test_build_components.py -c canopen --isolate canopen` compiles
   esp32-idf, esp32-ard, esp8266-ard (mcp2515) and rp2040-ard (mcp2515) with no warnings; the trimmed component runs
