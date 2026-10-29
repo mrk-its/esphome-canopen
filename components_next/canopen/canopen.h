@@ -78,12 +78,12 @@ class CANopenComponent : public Component {
   ObjectDictionary od_;
 
   // OD storage
-  uint32_t dev_type_{0};               // 0x1000
-  uint8_t err_reg_{0};                 // 0x1001
-  uint32_t cob_emcy_{0x80};            // 0x1014, CANopenNode adds the node id
-  uint16_t hb_producer_ms_{5000};      // 0x1017
-  uint8_t hb_cons_count_{0};           // 0x1016:0
-  std::vector<uint32_t> hb_cons_;      // 0x1016:1.., (node_id << 16) | timeout_ms
+  uint32_t dev_type_{0};           // 0x1000
+  uint8_t err_reg_{0};             // 0x1001
+  uint32_t cob_emcy_{0x80};        // 0x1014, CANopenNode adds the node id
+  uint16_t hb_producer_ms_{5000};  // 0x1017
+  uint8_t hb_cons_count_{0};       // 0x1016:0
+  std::vector<uint32_t> hb_cons_;  // 0x1016:1.., (node_id << 16) | timeout_ms
 
   uint32_t last_us_{0};
   LazyCallbackManager<void(uint8_t, NodeEvent, NMTState)> node_event_callback_;

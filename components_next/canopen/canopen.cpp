@@ -9,7 +9,7 @@
 namespace esphome {
 namespace canopen {
 
-static const char *const TAG = "canopen";
+ESPHOME_LOG_TAG(TAG, "canopen");
 
 static const char *nmt_state_str(CO_NMT_internalState_t state) {
   switch (state) {
@@ -178,8 +178,9 @@ void CANopenComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "CANopen (CANopenNode):");
   ESP_LOGCONFIG(TAG, "  Node ID: 0x%02x", this->node_id_);
   ESP_LOGCONFIG(TAG, "  Heartbeat interval: %u ms", this->hb_producer_ms_);
-  for (uint32_t c : this->hb_cons_)
+  for (uint32_t c : this->hb_cons_) {
     ESP_LOGCONFIG(TAG, "  Heartbeat client: node 0x%02x, timeout %u ms", (unsigned) (c >> 16), (unsigned) (c & 0xFFFF));
+  }
 }
 
 void CANopenComponent::add_frame_listener(uint32_t can_id, uint32_t mask, FrameCallback callback, void *context) {
@@ -196,8 +197,8 @@ void CANopenComponent::check_frame_listener_(uint32_t can_id, uint32_t mask) {
     if (rx->CANrx_callback == nullptr || (rx->ident & 0x800))
       continue;
     if (((can_id ^ rx->ident) & mask & rx->mask & 0x7FF) == 0) {
-      ESP_LOGW(TAG, "frame listener 0x%03" PRIx32 "/0x%03" PRIx32 " overlaps CAN ID 0x%03x used by CANopenNode",
-               can_id, mask, rx->ident & 0x7FF);
+      ESP_LOGW(TAG, "frame listener 0x%03" PRIx32 "/0x%03" PRIx32 " overlaps CAN ID 0x%03x used by CANopenNode", can_id,
+               mask, rx->ident & 0x7FF);
     }
   }
 }
@@ -232,8 +233,7 @@ void CANopenComponent::on_frame_(uint32_t can_id, bool extended_id, bool rtr, co
     if (decode_heartbeat(msg.ident, msg.data, msg.DLC, node, state)) {
       this->heartbeat_callback_.call(node, state);
     } else if (decode_emcy(msg.ident, msg.data, msg.DLC, node, emcy)) {
-      ESP_LOGW(TAG, "node 0x%02x EMCY: error code 0x%04x, register 0x%02x", node, emcy.error_code,
-               emcy.error_register);
+      ESP_LOGW(TAG, "node 0x%02x EMCY: error code 0x%04x, register 0x%02x", node, emcy.error_code, emcy.error_register);
       this->emcy_callback_.call(node, emcy);
     }
   }

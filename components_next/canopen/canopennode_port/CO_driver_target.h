@@ -12,6 +12,7 @@
  * Every CO_CONFIG_* below is a default and can be overridden with a -D build flag.
  */
 
+#pragma once
 #ifndef CO_DRIVER_TARGET_H
 #define CO_DRIVER_TARGET_H
 
@@ -46,9 +47,9 @@ extern "C" {
 #define CO_CONFIG_EM (CO_CONFIG_EM_PRODUCER)
 #endif
 #ifndef CO_CONFIG_SDO_SRV
-#define CO_CONFIG_SDO_SRV                                                                                              \
-    (CO_CONFIG_SDO_SRV_SEGMENTED | CO_CONFIG_SDO_SRV_BLOCK | CO_CONFIG_GLOBAL_FLAG_CALLBACK_PRE                        \
-     | CO_CONFIG_GLOBAL_FLAG_TIMERNEXT | CO_CONFIG_GLOBAL_FLAG_OD_DYNAMIC)
+#define CO_CONFIG_SDO_SRV \
+  (CO_CONFIG_SDO_SRV_SEGMENTED | CO_CONFIG_SDO_SRV_BLOCK | CO_CONFIG_GLOBAL_FLAG_CALLBACK_PRE | \
+   CO_CONFIG_GLOBAL_FLAG_TIMERNEXT | CO_CONFIG_GLOBAL_FLAG_OD_DYNAMIC)
 #endif
 #ifndef CO_CONFIG_SDO_SRV_BUFFER_SIZE
 #define CO_CONFIG_SDO_SRV_BUFFER_SIZE 900
@@ -66,9 +67,9 @@ extern "C" {
 #define CO_CONFIG_SYNC (0)
 #endif
 #ifndef CO_CONFIG_PDO
-#define CO_CONFIG_PDO                                                                                                  \
-    (CO_CONFIG_RPDO_ENABLE | CO_CONFIG_TPDO_ENABLE | CO_CONFIG_RPDO_TIMERS_ENABLE | CO_CONFIG_TPDO_TIMERS_ENABLE       \
-     | CO_CONFIG_PDO_OD_IO_ACCESS | CO_CONFIG_GLOBAL_FLAG_OD_DYNAMIC)
+#define CO_CONFIG_PDO \
+  (CO_CONFIG_RPDO_ENABLE | CO_CONFIG_TPDO_ENABLE | CO_CONFIG_RPDO_TIMERS_ENABLE | CO_CONFIG_TPDO_TIMERS_ENABLE | \
+   CO_CONFIG_PDO_OD_IO_ACCESS | CO_CONFIG_GLOBAL_FLAG_OD_DYNAMIC)
 #endif
 #ifndef CO_CONFIG_STORAGE
 #define CO_CONFIG_STORAGE (0)
@@ -109,55 +110,55 @@ typedef double float64_t;
 
 /* Received CAN message, passed to CANrx_callback() */
 typedef struct {
-    uint32_t ident;
-    uint8_t DLC;
-    uint8_t data[8];
+  uint32_t ident;
+  uint8_t DLC;
+  uint8_t data[8];
 } CO_CANrxMsg_t;
 
-#define CO_CANrxMsg_readIdent(msg) ((uint16_t)(((CO_CANrxMsg_t*)(msg))->ident))
-#define CO_CANrxMsg_readDLC(msg)   ((uint8_t)(((CO_CANrxMsg_t*)(msg))->DLC))
-#define CO_CANrxMsg_readData(msg)  ((const uint8_t*)(((CO_CANrxMsg_t*)(msg))->data))
+#define CO_CANrxMsg_readIdent(msg) ((uint16_t) (((CO_CANrxMsg_t *) (msg))->ident))
+#define CO_CANrxMsg_readDLC(msg) ((uint8_t) (((CO_CANrxMsg_t *) (msg))->DLC))
+#define CO_CANrxMsg_readData(msg) ((const uint8_t *) (((CO_CANrxMsg_t *) (msg))->data))
 
 /* Received message object */
 typedef struct {
-    uint16_t ident; /* 11-bit identifier, bit 11 = RTR */
-    uint16_t mask;
-    void* object;
-    void (*CANrx_callback)(void* object, void* message);
+  uint16_t ident; /* 11-bit identifier, bit 11 = RTR */
+  uint16_t mask;
+  void *object;
+  void (*CANrx_callback)(void *object, void *message);
 } CO_CANrx_t;
 
 /* Transmit message object */
 typedef struct {
-    uint32_t ident;
-    uint8_t DLC;
-    uint8_t data[8];
-    volatile bool_t bufferFull;
-    volatile bool_t syncFlag;
+  uint32_t ident;
+  uint8_t DLC;
+  uint8_t data[8];
+  volatile bool_t bufferFull;
+  volatile bool_t syncFlag;
 } CO_CANtx_t;
 
 /* CAN module object */
 typedef struct {
-    void* CANptr; /* the ESPHome component owning this module */
-    CO_CANrx_t* rxArray;
-    uint16_t rxSize;
-    CO_CANtx_t* txArray;
-    uint16_t txSize;
-    uint16_t CANerrorStatus;
-    volatile bool_t CANnormal;
-    volatile bool_t useCANrxFilters;
-    volatile bool_t bufferInhibitFlag;
-    volatile bool_t firstCANtxMessage;
-    volatile uint16_t CANtxCount;
-    uint32_t errOld;
+  void *CANptr; /* the ESPHome component owning this module */
+  CO_CANrx_t *rxArray;
+  uint16_t rxSize;
+  CO_CANtx_t *txArray;
+  uint16_t txSize;
+  uint16_t CANerrorStatus;
+  volatile bool_t CANnormal;
+  volatile bool_t useCANrxFilters;
+  volatile bool_t bufferInhibitFlag;
+  volatile bool_t firstCANtxMessage;
+  volatile uint16_t CANtxCount;
+  uint32_t errOld;
 } CO_CANmodule_t;
 
 /* Data storage object for one entry (storage is not used, kept for completeness) */
 typedef struct {
-    void* addr;
-    size_t len;
-    uint8_t subIndexOD;
-    uint8_t attr;
-    void* addrNV;
+  void *addr;
+  size_t len;
+  uint8_t subIndexOD;
+  uint8_t attr;
+  void *addrNV;
 } CO_storage_entry_t;
 
 /* Single-threaded (ESPHome main loop): no locking */
@@ -170,16 +171,16 @@ typedef struct {
 
 #define CO_MemoryBarrier()
 #define CO_FLAG_READ(rxNew) ((rxNew) != NULL)
-#define CO_FLAG_SET(rxNew)                                                                                             \
-    {                                                                                                                  \
-        CO_MemoryBarrier();                                                                                            \
-        rxNew = (void*)1L;                                                                                             \
-    }
-#define CO_FLAG_CLEAR(rxNew)                                                                                           \
-    {                                                                                                                  \
-        CO_MemoryBarrier();                                                                                            \
-        rxNew = NULL;                                                                                                  \
-    }
+#define CO_FLAG_SET(rxNew) \
+  { \
+    CO_MemoryBarrier(); \
+    rxNew = (void *) 1L; \
+  }
+#define CO_FLAG_CLEAR(rxNew) \
+  { \
+    CO_MemoryBarrier(); \
+    rxNew = NULL; \
+  }
 
 #ifdef __cplusplus
 }

@@ -66,8 +66,8 @@ CO_ReturnError_t CO_CANrxBufferInit(CO_CANmodule_t *CANmodule, uint16_t index, u
   return CO_ERROR_NO;
 }
 
-CO_CANtx_t *CO_CANtxBufferInit(CO_CANmodule_t *CANmodule, uint16_t index, uint16_t ident, bool_t rtr,
-                               uint8_t noOfBytes, bool_t syncFlag) {
+CO_CANtx_t *CO_CANtxBufferInit(CO_CANmodule_t *CANmodule, uint16_t index, uint16_t ident, bool_t rtr, uint8_t noOfBytes,
+                               bool_t syncFlag) {
   if (CANmodule == nullptr || index >= CANmodule->txSize)
     return nullptr;
   CO_CANtx_t *tx = &CANmodule->txArray[index];

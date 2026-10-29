@@ -1,13 +1,15 @@
 from pathlib import Path
 
-import esphome.config_validation as cv
-import esphome.codegen as cg
 from esphome import automation
-from esphome.const import CONF_ID
-from esphome.core import CORE
+import esphome.codegen as cg
 from esphome.components.canbus import CanbusComponent
+import esphome.config_validation as cv
+from esphome.const import CONF_ID, CONF_TIMEOUT
+from esphome.core import CORE
 
+CODEOWNERS = ["@mrk-its"]
 DEPENDENCIES = ["canbus"]
+DOMAIN = "canopen"
 MULTI_CONF = True
 
 CONF_CANBUS_ID = "canbus_id"
@@ -16,16 +18,13 @@ CONF_CANOPEN_ID = "canopen_id"
 CONF_NODE_ID = "node_id"
 CONF_HEARTBEAT_INTERVAL = "heartbeat_interval"
 CONF_HEARTBEAT_CLIENTS = "heartbeat_clients"
-CONF_TIMEOUT = "timeout"
 CONF_ON_NODE_EVENT = "on_node_event"
 CONF_ON_HEARTBEAT = "on_heartbeat"
 CONF_ON_EMCY = "on_emcy"
 CONF_CANOPENNODE_PATH = "canopennode_path"
 
 # CANopenNode upstream + library.json (branch esphome), pinned to a commit
-CANOPENNODE_SOURCE = (
-    "https://github.com/mrk-its/CANopenNode.git#f38ec8a6442a5a598d26f88c4e7c8a39b83d2cd5"
-)
+CANOPENNODE_SOURCE = "https://github.com/mrk-its/CANopenNode.git#f38ec8a6442a5a598d26f88c4e7c8a39b83d2cd5"
 # directory name = IDF component name (a local IDF component is named after its directory)
 PORT_PATH = Path(__file__).resolve().parent / "canopennode_port"
 
@@ -49,7 +48,10 @@ CALLBACK_AUTOMATIONS = (
     automation.CallbackAutomation(
         CONF_ON_EMCY,
         "add_on_emcy_callback",
-        [(cg.uint8, "node_id"), (Emergency.operator("const").operator("ref"), "emergency")],
+        [
+            (cg.uint8, "node_id"),
+            (Emergency.operator("const").operator("ref"), "emergency"),
+        ],
     ),
 )
 
@@ -65,7 +67,9 @@ HB_CLIENT_SCHEMA = cv.Schema(
         # 0x1016 holds the timeout as uint16 ms
         cv.Required(CONF_TIMEOUT): cv.All(
             cv.positive_time_period_milliseconds,
-            cv.Range(min=cv.TimePeriod(milliseconds=1), max=cv.TimePeriod(milliseconds=65535)),
+            cv.Range(
+                min=cv.TimePeriod(milliseconds=1), max=cv.TimePeriod(milliseconds=65535)
+            ),
         ),
     }
 )
@@ -80,24 +84,27 @@ def validate_heartbeat_clients(config):
     return config
 
 
-CONFIG_SCHEMA = cv.All(cv.Schema(
-    {
-        cv.GenerateID(): cv.declare_id(CANopenComponent),
-        cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
-        cv.Required(CONF_NODE_ID): cv.All(cv.int_, cv.Range(min=1, max=127)),
-        cv.Optional(
-            CONF_HEARTBEAT_INTERVAL, "5000ms"
-        ): cv.positive_time_period_milliseconds,
-        cv.Optional(CONF_HEARTBEAT_CLIENTS, []): cv.ensure_list(HB_CLIENT_SCHEMA),
-        # events of the heartbeat_clients nodes (online, offline, NMT changed, reset)
-        cv.Optional(CONF_ON_NODE_EVENT): automation.validate_automation({}),
-        # every heartbeat / EMCY frame on the bus, any node
-        cv.Optional(CONF_ON_HEARTBEAT): automation.validate_automation({}),
-        cv.Optional(CONF_ON_EMCY): automation.validate_automation({}),
-        # local CANopenNode checkout instead of CANOPENNODE_SOURCE (development)
-        cv.Optional(CONF_CANOPENNODE_PATH): absolute_path,
-    }
-).extend(cv.COMPONENT_SCHEMA), validate_heartbeat_clients)
+CONFIG_SCHEMA = cv.All(
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.declare_id(CANopenComponent),
+            cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
+            cv.Required(CONF_NODE_ID): cv.All(cv.int_, cv.Range(min=1, max=127)),
+            cv.Optional(
+                CONF_HEARTBEAT_INTERVAL, "5000ms"
+            ): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_HEARTBEAT_CLIENTS, []): cv.ensure_list(HB_CLIENT_SCHEMA),
+            # events of the heartbeat_clients nodes (online, offline, NMT changed, reset)
+            cv.Optional(CONF_ON_NODE_EVENT): automation.validate_automation({}),
+            # every heartbeat / EMCY frame on the bus, any node
+            cv.Optional(CONF_ON_HEARTBEAT): automation.validate_automation({}),
+            cv.Optional(CONF_ON_EMCY): automation.validate_automation({}),
+            # local CANopenNode checkout instead of CANOPENNODE_SOURCE (development)
+            cv.Optional(CONF_CANOPENNODE_PATH): absolute_path,
+        }
+    ).extend(cv.COMPONENT_SCHEMA),
+    validate_heartbeat_clients,
+)
 
 
 async def to_code(config):

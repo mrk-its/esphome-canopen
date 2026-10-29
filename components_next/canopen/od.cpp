@@ -7,7 +7,7 @@
 namespace esphome {
 namespace canopen {
 
-static const char *const TAG = "canopen.od";
+ESPHOME_LOG_TAG(TAG, "canopen.od");
 
 static OD_attr_t multi_byte(OD_attr_t attr, OD_size_t len) { return len >= 2 ? attr | ODA_MB : attr; }
 
