@@ -320,7 +320,7 @@ Split (revised 2026-10-29: the first version of PR 1, ~1050 production lines, wa
 
 | PR | Content | Lines |
 |---|---|---|
-| 1. node + heartbeat monitoring | CANopenNode integration (library, port header trimmed to NMT / HB producer+consumer / EM, driver, runtime OD with VAR/ARRAY), NMT state machine, heartbeat producer, `heartbeat_clients` + `on_node_event`, `is_node_online()` / `get_node_state()` | 870 (measured, incl. comments) |
+| 1. node + heartbeat monitoring | CANopenNode integration (library, port header trimmed to NMT / HB producer+consumer / EM, driver, runtime OD with VAR/ARRAY), NMT state machine, heartbeat producer, `heartbeat_clients` + `on_node_event`, `is_node_online()` / `get_node_state()` | 845 (measured, incl. comments; tests 175) |
 | 2. raw frames and events | `on_heartbeat` / `on_emcy` (+ decoders, `Emergency`), `add_frame_listener()`, `send_frame()` | ~150 |
 | 3. SDO client + NMT master | `sdo_client.cpp`, `add_record()` (0x1280), `canopen.sdo_write`, `canopen.nmt`, optional parts | ~450 |
 | 4. profile API | `canopen_node.h`, `add_on_node_event(node, cb)`, `register_node()`, `SDOSequence`, `configure_rpdo/tpdo` | ~350 |
