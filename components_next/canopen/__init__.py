@@ -6,6 +6,7 @@ from esphome.components.canbus import CanbusComponent
 import esphome.config_validation as cv
 from esphome.const import CONF_ID, CONF_TIMEOUT
 from esphome.core import CORE
+from esphome.helpers import write_file_if_changed
 
 CODEOWNERS = ["@mrk-its"]
 DEPENDENCIES = ["canbus"]
@@ -25,8 +26,10 @@ CONF_CANOPENNODE_PATH = "canopennode_path"
 
 # CANopenNode upstream + library.json (branch esphome), pinned to a commit
 CANOPENNODE_SOURCE = "https://github.com/mrk-its/CANopenNode.git#f38ec8a6442a5a598d26f88c4e7c8a39b83d2cd5"
-# directory name = IDF component name (a local IDF component is named after its directory)
 PORT_PATH = Path(__file__).resolve().parent / "canopennode_port"
+PORT_HEADER = "CO_driver_target.h"
+# a local IDF component is named after its directory
+IDF_PORT_COMPONENT = "canopennode_port"
 
 ns = cg.esphome_ns.namespace("canopen")
 CANopenComponent = ns.class_("CANopenComponent", cg.Component)
@@ -61,16 +64,16 @@ def absolute_path(value):
     return str(Path(cv.string(value)).expanduser().resolve())
 
 
+# 0x1016 (consumer timeout) and 0x1017 (producer time) hold uint16 ms
+UINT16_MS = cv.All(
+    cv.positive_time_period_milliseconds,
+    cv.Range(min=cv.TimePeriod(milliseconds=1), max=cv.TimePeriod(milliseconds=65535)),
+)
+
 HB_CLIENT_SCHEMA = cv.Schema(
     {
         cv.Required(CONF_NODE_ID): cv.All(cv.int_, cv.Range(min=1, max=127)),
-        # 0x1016 holds the timeout as uint16 ms
-        cv.Required(CONF_TIMEOUT): cv.All(
-            cv.positive_time_period_milliseconds,
-            cv.Range(
-                min=cv.TimePeriod(milliseconds=1), max=cv.TimePeriod(milliseconds=65535)
-            ),
-        ),
+        cv.Required(CONF_TIMEOUT): UINT16_MS,
     }
 )
 
@@ -90,9 +93,7 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(CANopenComponent),
             cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
             cv.Required(CONF_NODE_ID): cv.All(cv.int_, cv.Range(min=1, max=127)),
-            cv.Optional(
-                CONF_HEARTBEAT_INTERVAL, "5000ms"
-            ): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_HEARTBEAT_INTERVAL, "5000ms"): UINT16_MS,
             cv.Optional(CONF_HEARTBEAT_CLIENTS, []): cv.ensure_list(HB_CLIENT_SCHEMA),
             # events of the heartbeat_clients nodes (online, offline, NMT changed, reset)
             cv.Optional(CONF_ON_NODE_EVENT): automation.validate_automation({}),
@@ -117,9 +118,19 @@ async def to_code(config):
     if CORE.is_esp32:
         # ESP-IDF: a converted library sees only the components it requires, which include every
         # project-managed IDF component
+        # project-managed IDF component. Generated in the build dir: CMakeLists.txt files are gitignored in esphome.
         from esphome.components.esp32 import add_idf_component
 
-        add_idf_component(name="canopennode_port", path=str(PORT_PATH))
+        idf_port = CORE.relative_build_path(IDF_PORT_COMPONENT)
+        idf_port.mkdir(parents=True, exist_ok=True)
+        write_file_if_changed(
+            idf_port / PORT_HEADER,
+            (PORT_PATH / PORT_HEADER).read_text(encoding="utf-8"),
+        )
+        write_file_if_changed(
+            idf_port / "CMakeLists.txt", 'idf_component_register(INCLUDE_DIRS ".")\n'
+        )
+        add_idf_component(name=IDF_PORT_COMPONENT, path=str(idf_port))
     else:
         # Zephyr (native build) exports every library's include dirs globally
         cg.add_library("CANopenNode-esphome-port", None, f"file://{PORT_PATH}")

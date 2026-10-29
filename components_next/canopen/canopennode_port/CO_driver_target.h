@@ -6,8 +6,8 @@
  * canbus abstraction. Everything runs on the ESPHome main loop, so the locks are empty.
  *
  * Lives in the component, not in the CANopenNode library. This directory is added by codegen as a
- * header-only package (library.json on Zephyr/PlatformIO, CMakeLists.txt as an IDF component on ESP32), so
- * CANopenNode's 301/CO_driver.h finds it.
+ * header-only package (library.json on Zephyr/PlatformIO; on ESP32 codegen copies it into a generated IDF component),
+ * so CANopenNode's 301/CO_driver.h finds it.
  *
  * Every CO_CONFIG_* below is a default and can be overridden with a -D build flag.
  */
