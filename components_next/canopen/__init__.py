@@ -18,6 +18,8 @@ CONF_HEARTBEAT_INTERVAL = "heartbeat_interval"
 CONF_HEARTBEAT_CLIENTS = "heartbeat_clients"
 CONF_TIMEOUT = "timeout"
 CONF_ON_HB_CONSUMER_EVENT = "on_hb_consumer_event"
+CONF_ON_HEARTBEAT = "on_heartbeat"
+CONF_ON_EMCY = "on_emcy"
 CONF_CANOPENNODE_PATH = "canopennode_path"
 
 # CANopenNode upstream + library.json (branch esphome), pinned to a commit
@@ -31,6 +33,21 @@ ns = cg.esphome_ns.namespace("canopen")
 CANopenComponent = ns.class_("CANopenComponent", cg.Component)
 HbConsumerEventTrigger = ns.class_(
     "HbConsumerEventTrigger", automation.Trigger.template(cg.uint8)
+)
+NMTState = ns.enum("NMTState", is_class=True)
+Emergency = ns.struct("Emergency")
+
+CALLBACK_AUTOMATIONS = (
+    automation.CallbackAutomation(
+        CONF_ON_HEARTBEAT,
+        "add_on_heartbeat_callback",
+        [(cg.uint8, "node_id"), (NMTState, "state")],
+    ),
+    automation.CallbackAutomation(
+        CONF_ON_EMCY,
+        "add_on_emcy_callback",
+        [(cg.uint8, "node_id"), (Emergency.operator("const").operator("ref"), "emergency")],
+    ),
 )
 
 
@@ -58,6 +75,9 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ON_HB_CONSUMER_EVENT): automation.validate_automation(
             {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(HbConsumerEventTrigger)}
         ),
+        # every heartbeat / EMCY frame on the bus, any node
+        cv.Optional(CONF_ON_HEARTBEAT): automation.validate_automation({}),
+        cv.Optional(CONF_ON_EMCY): automation.validate_automation({}),
         # local CANopenNode checkout instead of CANOPENNODE_SOURCE (development)
         cv.Optional(CONF_CANOPENNODE_PATH): absolute_path,
     }
@@ -101,3 +121,5 @@ async def to_code(config):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
         await automation.build_automation(trigger, [(cg.uint8, "node_id")], conf)
         cg.add(var.set_hb_consumer_event_trigger(trigger))
+
+    await automation.build_callback_automations(var, config, CALLBACK_AUTOMATIONS)

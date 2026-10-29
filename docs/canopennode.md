@@ -328,7 +328,10 @@ Estimates (2026-10-29; step 1 is 517 lines in `components_next/canopen`, the res
 The SDO server and our own entities/OTA/logs (steps 3-8) are a later chain.
 
 PR 1 progress: done: the `CANopenComponent` rename (+ `CONF_CANOPEN_ID` in Python), `add_record()` (host test
-`test/test_od.py`). Next: raw heartbeat/EMCY triggers, frame listeners + `send_frame()`, `heartbeat_clients` on node
+`test/test_od.py`), raw heartbeat/EMCY events (`types.h`: `NMTState`, `Emergency`, `decode_heartbeat()`/`decode_emcy()`,
+host test `test/test_frames.py`; `add_on_heartbeat_callback()`/`add_on_emcy_callback()`, YAML `on_heartbeat`
+(`node_id`, `state`) / `on_emcy` (`node_id`, `emergency`); heartbeats of 11 nodes seen on the nucleo, EMCY only
+host-tested: no node on the bus sends one). Next: frame listeners + `send_frame()`, `heartbeat_clients` on node
 monitoring.
 
 Before PR 1:

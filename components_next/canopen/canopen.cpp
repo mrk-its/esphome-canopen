@@ -26,6 +26,21 @@ static const char *nmt_state_str(CO_NMT_internalState_t state) {
   }
 }
 
+const char *nmt_state_to_string(NMTState state) {
+  switch (state) {
+    case NMTState::BOOTUP:
+      return "bootup";
+    case NMTState::STOPPED:
+      return "stopped";
+    case NMTState::OPERATIONAL:
+      return "operational";
+    case NMTState::PRE_OPERATIONAL:
+      return "pre-operational";
+    default:
+      return "unknown";
+  }
+}
+
 void CANopenComponent::set_canbus(canbus::Canbus *canbus) {
   this->canbus_ = canbus;
   canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
@@ -113,6 +128,18 @@ void CANopenComponent::on_frame_(uint32_t can_id, bool extended_id, bool rtr, co
     CO_CANrx_t *rx = &mod->rxArray[i];
     if (rx->CANrx_callback != nullptr && ((msg.ident ^ rx->ident) & rx->mask) == 0)
       rx->CANrx_callback(rx->object, &msg);
+  }
+  if (!rtr) {
+    uint8_t node;
+    NMTState state;
+    Emergency emcy;
+    if (decode_heartbeat(msg.ident, msg.data, msg.DLC, node, state)) {
+      this->heartbeat_callback_.call(node, state);
+    } else if (decode_emcy(msg.ident, msg.data, msg.DLC, node, emcy)) {
+      ESP_LOGW(TAG, "node 0x%02x EMCY: error code 0x%04x, register 0x%02x", node, emcy.error_code,
+               emcy.error_register);
+      this->emcy_callback_.call(node, emcy);
+    }
   }
   this->process_();
 }

@@ -4,9 +4,11 @@
 
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
+#include "esphome/core/helpers.h"
 #include "esphome/components/canbus/canbus.h"
 
 #include "od.h"
+#include "types.h"
 
 namespace esphome {
 namespace canopen {
@@ -23,6 +25,12 @@ class CANopenComponent : public Component {
     this->hb_cons_.push_back(((uint32_t) node_id << 16) | timeout_ms);
   }
   void set_hb_consumer_event_trigger(HbConsumerEventTrigger *trigger) { this->on_hb_cons_event_ = trigger; }
+
+  // every heartbeat / EMCY frame on the bus, from any node (our own frames aren't received)
+  template<typename F> void add_on_heartbeat_callback(F &&callback) {
+    this->heartbeat_callback_.add(std::forward<F>(callback));
+  }
+  template<typename F> void add_on_emcy_callback(F &&callback) { this->emcy_callback_.add(std::forward<F>(callback)); }
 
   void setup() override;
   void loop() override;
@@ -58,6 +66,8 @@ class CANopenComponent : public Component {
 
   uint32_t last_us_{0};
   HbConsumerEventTrigger *on_hb_cons_event_{nullptr};
+  LazyCallbackManager<void(uint8_t, NMTState)> heartbeat_callback_;
+  LazyCallbackManager<void(uint8_t, const Emergency &)> emcy_callback_;
 };
 
 }  // namespace canopen

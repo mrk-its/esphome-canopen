@@ -139,3 +139,11 @@ canopen:
     - logger.log:
         format: "heartbeat lost: node 0x%02x"
         args: [node_id]
+  on_heartbeat:
+    - logger.log:
+        format: "heartbeat: node 0x%02x %s"
+        args: [node_id, "esphome::canopen::nmt_state_to_string(state)"]
+  on_emcy:
+    - logger.log:
+        format: "EMCY: node 0x%02x code 0x%04x register 0x%02x"
+        args: [node_id, emergency.error_code, emergency.error_register]

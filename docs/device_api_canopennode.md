@@ -156,7 +156,7 @@ Node monitoring (CANopenNode HB consumer):
   `CO_HBconsumer_getState` / `CO_HBconsumer_getNmtState`.
 - `heartbeat_clients` + `on_hb_consumer_event` from step 1 are rebuilt on this (same YAML).
 
-Raw events (any node, no registration):
+Raw events (any node, no registration; done, moved to PR 1):
 - `add_on_heartbeat_callback(F)` with `(uint8_t node, NMTState)` for every heartbeat frame, and
   `add_on_emcy_callback(F)` with `(uint8_t node, const Emergency &)` for every EMCY frame (0x81..0xFF, 8 bytes),
   tapped in `on_frame_`. These are the YAML `on_heartbeat` / `on_emcy` triggers.
