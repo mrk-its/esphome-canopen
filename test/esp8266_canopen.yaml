@@ -1,0 +1,36 @@
+# ESP8266 (PlatformIO) build check for components_next/canopen (CANopenNode), with upstream ESPHome (dev venv):
+#   ~/repos/esphome-upstream-venv/bin/esphome -s canopennode_path ~/repos/CANopenNode compile test/esp8266_canopen.yaml
+substitutions:
+  canopennode_path: /CANopenNode
+
+external_components:
+  - source: ../components_next
+
+esphome:
+  name: esp8266-canopen
+
+esp8266:
+  board: d1_mini
+
+logger:
+
+spi:
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
+canbus:
+  - platform: mcp2515
+    id: can_bus
+    cs_pin: GPIO15
+    can_id: 0
+    bit_rate: 125kbps
+
+canopen:
+  canbus_id: can_bus
+  node_id: 0x7d
+  canopennode_path: ${canopennode_path}
+  heartbeat_interval: 1s
+  heartbeat_clients:
+    - node_id: 0x01
+      timeout: 7s

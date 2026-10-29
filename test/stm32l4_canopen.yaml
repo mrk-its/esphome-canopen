@@ -131,9 +131,6 @@ canopen:
   id: can_gate
   canbus_id: can_bus
   node_id: 0x7f
-  # SDO block size the node announces: smaller blocks mean less to retransmit after
-  # a lost frame during CAN OTA, larger ones fewer ack round trips
-  sdo_block_transfer_size: 63
   heartbeat_interval: 1s
   heartbeat_clients:
     - node_id: 0x01

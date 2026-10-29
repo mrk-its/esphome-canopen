@@ -13,6 +13,7 @@ static canbus::Canbus *get_canbus(CO_CANmodule_t *mod) {
 
 static bool send_frame(CO_CANmodule_t *mod, CO_CANtx_t *buf) {
   bool rtr = buf->ident & 0x800;
+  // the (data, len) overload is in ESPHome dev since after 2026.9 (not in 2026.9.x releases)
   return get_canbus(mod)->send_data(buf->ident & 0x7FF, false, rtr, buf->data, buf->DLC) == canbus::ERROR_OK;
 }
 

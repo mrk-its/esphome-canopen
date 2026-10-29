@@ -4,6 +4,7 @@ import esphome.config_validation as cv
 import esphome.codegen as cg
 from esphome import automation
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
+from esphome.core import CORE
 from esphome.components.canbus import CanbusComponent
 
 DEPENDENCIES = ["canbus"]
@@ -15,11 +16,12 @@ CONF_HEARTBEAT_INTERVAL = "heartbeat_interval"
 CONF_HEARTBEAT_CLIENTS = "heartbeat_clients"
 CONF_TIMEOUT = "timeout"
 CONF_ON_HB_CONSUMER_EVENT = "on_hb_consumer_event"
-CONF_SDO_BLOCK_TRANSFER_SIZE = "sdo_block_transfer_size"
 CONF_CANOPENNODE_PATH = "canopennode_path"
 
 # CANopenNode fork checked out next to this repo
 DEFAULT_CANOPENNODE_PATH = Path(__file__).resolve().parents[3] / "CANopenNode"
+# directory name = IDF component name (a local IDF component is named after its directory)
+PORT_PATH = Path(__file__).resolve().parent / "canopennode_port"
 
 ns = cg.esphome_ns.namespace("canopen")
 CanopenComponent = ns.class_("CanopenComponent", cg.Component)
@@ -52,9 +54,6 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ON_HB_CONSUMER_EVENT): automation.validate_automation(
             {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(HbConsumerEventTrigger)}
         ),
-        cv.Optional(CONF_SDO_BLOCK_TRANSFER_SIZE, 63): cv.All(
-            cv.int_, cv.Range(min=1, max=127)
-        ),
         cv.Optional(
             CONF_CANOPENNODE_PATH, str(DEFAULT_CANOPENNODE_PATH)
         ): absolute_path,
@@ -64,9 +63,20 @@ CONFIG_SCHEMA = cv.Schema(
 
 async def to_code(config):
     cg.add_library("CANopenNode", None, f"file://{config[CONF_CANOPENNODE_PATH]}")
-    cg.add_build_flag(
-        f"-DCO_CONFIG_SDO_SRV_BLKSIZE={config[CONF_SDO_BLOCK_TRANSFER_SIZE]}"
-    )
+    # CANopenNode's 301/CO_driver.h includes CO_driver_target.h, which lives in canopennode_port/. Project -I
+    # flags don't reach converted libraries (only -D/-W do), so that directory is added as a package of its own:
+    if CORE.is_esp32:
+        # ESP-IDF: a converted library sees only the components it requires, which include every
+        # project-managed IDF component
+        from esphome.components.esp32 import add_idf_component
+
+        add_idf_component(name="canopennode_port", path=str(PORT_PATH))
+    else:
+        # Zephyr (native build) exports every library's include dirs globally
+        cg.add_library("CANopenNode-esphome-port", None, f"file://{PORT_PATH}")
+        # PlatformIO (ESP8266, ...) passes project build flags to libraries, but its LDF doesn't link the
+        # library above to CANopenNode
+        cg.add_build_flag(f"-I{PORT_PATH}")
 
     var = cg.new_Pvariable(config[CONF_ID], config[CONF_NODE_ID])
     await cg.register_component(var, config)

@@ -1,0 +1,12 @@
+{
+  "name": "CANopenNode-esphome-port",
+  "version": "0.1.0",
+  "description": "CO_driver_target.h for CANopenNode (types, locks, default configuration); the driver functions are in the canopen component.",
+  "license": "Apache-2.0",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {
+    "includeDir": ".",
+    "srcFilter": ["-<*>"]
+  }
+}
