@@ -329,40 +329,8 @@ Split (revised 2026-10-29: the first version of PR 1, ~1050 production lines, wa
 
 The SDO server and our own entities/OTA/logs (steps 3-8) are a later chain.
 
-How the branches are made: `components_next/canopen` stays the full development tree (tested on hardware here).
-In `~/repos/esphome` (branches from `upstream/dev`; `canopen-1-node` and `canopen-2-frames` pushed to `origin`
-= mrk-its/esphome, no PRs opened):
-- (the `canopen` reference branch with the full component is deleted, 2026-10-29: `components_next` is the full
-  tree, each PR branch is cut from it)
-- `canopen-1-node`: PR 1, one commit, cut from `components_next` by removing the later parts (raw events, frame
-  listeners, `send_frame()`, `add_record()`, `add_on_node_event(node, cb)`, the port header's SDO/PDO/CRC/FIFO
-  config). Later PR branches stack on it and add those parts back.
-- `canopen-2-frames`: PR 2 on top of `canopen-1-node` (one commit, +136 component lines, +245 with tests): raw
-  heartbeat/EMCY triggers, frame listeners, `send_frame()`, and a gtest unit test of the decoders
-  (`tests/components/canopen/frames_test.cpp`, run with `script/cpp_unit_test.py canopen`).
-  `tests/components/canopen/__init__.py` makes the unit test build work: the runner suppresses `to_code` and gives
-  MULTI_CONF components an empty list, so the override sets `multi_conf = False` and its `to_code` only calls
-  `add_canopennode_library()` (CANopenNode + port header, factored out of `to_code` in PR 1). `add_record()`,
-  `add_on_node_event(node, cb)` and the SDO/PDO port config wait for PR 3/4 (no user before).
-- `canopen-3-sdo`: PR 3 on top of PR 2 (one commit, +631 component lines, +107 tests): SDO client
-  (`sdo_client.cpp`, `automation.h`), NMT master, `canopen.sdo_write` / `canopen.nmt`, `response_timeout`,
-  `add_record()`. Tests: action codegen and value/size validation in `tests/component_tests/canopen`, the actions in
-  `tests/components/canopen/common.yaml`, gtest `sdo_reply_test.cpp` (`SDOReply::as<T>()`). Hardware: `test/sdo_test.h`
-  against node 0x61 (24/24 pass, see device_api_canopennode.md). Not pushed.
-- Docs: `~/repos/esphome-docs` (fork of `esphome/esphome.io`), branch `canopen` from upstream `next`, pushed to
-  `mrk-its/esphome-docs`, no PR yet (to be opened with esphome PR 1; #7889 from the #21522 author adds the same
-  `src/content/docs/components/canopen.mdx`). One page `components/canopen.mdx` covering PRs 1-3 + an index entry;
-  `node script/lint.mjs` passes, the Astro build wasn't run (repo pins Node 24, `npm ci` fails on Node 25).
-  Checked: `script/ci-custom.py`, ruff, clang-format 23.1.3 and the pre-commit hooks pass;
-  `tests/component_tests/canopen` (9 tests); `script/test_build_components.py -c canopen --isolate canopen` compiles
-  esp32-idf, esp32-ard, esp8266-ard (mcp2515) and rp2040-ard (mcp2515) with no warnings; the trimmed component runs
-  on the nucleo (node 0x01 online/NMT changed). Also in the PR: `script/ci-custom.py` exempts `CO_driver_target.h`
-  from the namespace and `#define` lints (a C header, as `ota_esphome_inflate.h` / `esp_now_hosted_rpc.h`), and
-  `CODEOWNERS`.
-- Running upstream scripts: `PATH=~/repos/esphome-upstream-venv/bin:$PATH PYTHONPATH=~/repos/esphome`, so the
-  repo's `esphome` is used (the venv has `requirements_test.txt` and `clang-format==23.1.3`).
-- The esphome repo gitignores `CMakeLists.txt`, so the ESP32 IDF port component is generated in the build dir by
-  codegen (header copy + `CMakeLists.txt`).
+Branches, tests and results of PRs 1-3: [upstream_prs_1-3.md](upstream_prs_1-3.md). Each branch is cut from
+`components_next/canopen` (the full, hardware-tested tree) in `~/repos/esphome`; later branches stack on it.
 
 Before PR 1:
 - **Library source:** no `file://` path. Stock CANopenNode can't be used as is: it has no `library.json`, and the

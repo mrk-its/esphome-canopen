@@ -272,23 +272,8 @@ Raw frames (PDOs of other devices, later the host OD writer; done, moved to PR 1
 5. `pytest test/` for the old component (needs pytest installed; old component untouched).
 
 ## Status (2026-10-29)
-SDO client + NMT master implemented in `components_next` and as PR 3 (`canopen-3-sdo`). Hardware test
-`test/sdo_test.h` against node 0x61 (`stm32-can-node-1`, old canopen-stack component) and our own node: 24/24 pass
-(typed / buffer reads, size mismatch, abort, timeout, remote write checked in the heartbeat period, local transfers,
-queue limit, one callback per request, cancel queued / in flight, NMT pre-operational / start checked in the
-heartbeats, both actions).
-
-Lessons from the test runs:
-- **canopen-stack 0x1017 bug:** the old component stores 0x1017 as a direct value (`CO_OBJ_D___RW`), and
-  canopen-stack's heartbeat type reports size 0 when the value is 0 (`COTNmtHbProdSize` checks `obj->Data != 0`), so
-  after writing 0 every 0x1017 read/write aborts with 0x08000020 until a reboot (an NMT reset doesn't restore it).
-  Its 0x1017 reads also abort (0x06040043) at some values. Don't write 0x1017 = 0 to old nodes; the test measures the
-  heartbeat period from the frames instead of reading 0x1017.
-- **Cancel in flight:** CANopenNode sends the abort frame only if the client's TX buffer is free; otherwise the server
-  stays in the transfer and rejects the next request (0x05040001). `abort_sdo_()` sends the abort frame itself in that
-  case, and the next request to the node waits 50 ms.
-- Not covered yet: block transfers (reads were short; no block write > 32 bytes to a writable domain), `RESET_NODE`
-  (resets whatever runs on the node; tested once, works).
+Implemented in `components_next` and as PR 3 (`canopen-3-sdo`); hardware results (24/24), lessons and what isn't
+covered: [upstream_prs_1-3.md](upstream_prs_1-3.md).
 
 ## Open points
 - Node 0x01 in the tests: the write to its 0x1017 and the NMT commands (PRE_OPERATIONAL, START, RESET_NODE) change
