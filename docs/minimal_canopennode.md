@@ -8,7 +8,7 @@ of ESPHome `canbus`. It uses the local CANopenNode fork (`~/repos/CANopenNode`, 
 - consume heartbeats of configured nodes (`heartbeat_clients`) through CANopenNode's HB consumer.
 
 This proves the hard parts: the library pulled in through the converter, the driver glue, the OD built at runtime
-(`CO_MULTIPLE_OD`), and `CO_process` timing. It builds for `stm32l4_canopen.yaml` (Zephyr, nucleo_l476rg)
+(`CO_MULTIPLE_OD`), and `CO_process` timing. It builds for `test/stm32l4_canopen.yaml` (Zephyr, nucleo_l476rg)
 with the esphomeplatformzephyr venv. The old component stays untouched in `components/canopen`.
 
 Branch: `feature/canopennode` (already created from `main`).
@@ -23,7 +23,7 @@ Out of scope for this step: SDO server (`CNT_SDO_SRV = 0`), SDO client, PDOs (no
 OTA, logs, persistence.
 
 ## New tree: `components_next/canopen/`
-(`stm32l4_canopen.yaml` gets `external_components: - source: ./components_next`)
+(`test/stm32l4_canopen.yaml` gets `external_components: - source: ../components_next`)
 
 ### `__init__.py`
 - `DEPENDENCIES = ["canbus"]`, `MULTI_CONF = True`, namespace `canopen`, class `CanopenComponent`.
@@ -92,7 +92,7 @@ OTA, logs, persistence.
 - `set_canbus()` registers `add_callback` with the `(can_id, extended, rtr, data)` lambda. The send/callback API
   is the fork's `canbus.h` (`send_data(id, ext, rtr, const uint8_t *, len)`).
 
-## `stm32l4_canopen.yaml` (user's untracked file in the repo root)
+## `test/stm32l4_canopen.yaml`
 What it has now:
 - `esphome: name: stm32l4-blinking-led`, `zephyr: variant STM32L4, board nucleo_l476rg`, MCUboot overlays;
 - `canbus: platform zephyr_can, id can_bus, 125kbps, rx_buffer_size 64, tx_buffer_size 32, PA11/PA12`, with an
@@ -100,7 +100,7 @@ What it has now:
 - `canopen: {id: can_gate, canbus_id: can_bus, node_id: 0x7f, sdo_block_transfer_size: 63}`.
 
 Changes:
-- Point `external_components` to `./components_next`.
+- Point `external_components` to `../components_next`.
 - Add `heartbeat_interval: 1s` and an example `heartbeat_clients: - node_id: 0x01, timeout: 3s` (to adjust to
   a real node on the bus).
 - Drop `logger: logs: canopen-hb` if it's no longer needed. The rest stays (the 0x700 `on_frame` LED blink is a
@@ -109,9 +109,9 @@ Changes:
 ## Verification
 1. Host check of the driver/port: compile `driver_can.cpp`/`od.cpp` is covered by the real build. The library
    already host-compiled cleanly with the port config.
-2. Config: `../esphomeplatformzephyr/venv/bin/esphome config stm32l4_canopen.yaml`.
-3. Build: `../esphomeplatformzephyr/venv/bin/esphome compile stm32l4_canopen.yaml`. Then check in
-   `.esphome/build/stm32l4-blinking-led/.west_build/compile_commands.json` that `CO_NMT_Heartbeat.c` and
+2. Config: `../esphomeplatformzephyr/venv/bin/esphome config test/stm32l4_canopen.yaml`.
+3. Build: `../esphomeplatformzephyr/venv/bin/esphome compile test/stm32l4_canopen.yaml`. Then check in
+   `test/.esphome/build/stm32l4-blinking-led/.west_build/zephyr/compile_commands.json` that `CO_NMT_Heartbeat.c` and
    `canopen.cpp` get the same `-DCO_CONFIG_SDO_SRV_BLKSIZE` (PR #196 path) and include `port/esphome`.
 4. On hardware (if the nucleo is attached; `esphome upload` / `logs` uses openocd + UART):
    - boot log shows `CO_CANopenInit` OK and NMT operational;

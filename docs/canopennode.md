@@ -18,11 +18,9 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
 
 ## Current state (handoff)
 - **esphome-canopen:**
-  - branch `feature/canopennode`, created from `main` at `8696ae8`; nothing committed on it yet;
-  - untracked: `stm32l4_canopen.yaml` (the user's test config), `test/.gitignore`, `docs/minimal_canopennode.md`,
-    this file.
-  - step 1 (`docs/minimal_canopennode.md`, NMT + heartbeat) is implemented in `components_next/canopen/` (not
-    committed). Tested on the nucleo: `CO_CANopenInit` OK, NMT operational, HB consumer sees node 0x01 (5 s
+  - branch `feature/canopennode`, created from `main` at `8696ae8`;
+  - test config: `test/stm32l4_canopen.yaml`.
+  - step 1 (`docs/minimal_canopennode.md`, NMT + heartbeat) is implemented in `components_next/canopen/`. Tested on the nucleo: `CO_CANopenInit` OK, NMT operational, HB consumer sees node 0x01 (5 s
     heartbeat) and fires `on_hb_consumer_event` on timeout, the bus stays error-active with 0 TX errors.
   - `-DCO_*` build flags reach the app build of the library. The library is also compiled for the MCUboot image
     (without the project flags), because esphomeplatformzephyr `build_zephyr.py` passes the global
@@ -102,7 +100,7 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
 - **Development tree:** `components_next/canopen` (the YAML key stays `canopen:`). It replaces `components/canopen`
   once it matches it feature for feature. Until then the old component and its tests (`pytest test/`) are not
   touched.
-- **Test target:** `stm32l4_canopen.yaml` (Zephyr, nucleo_l476rg, MCUboot), built with
+- **Test target:** `test/stm32l4_canopen.yaml` (Zephyr, nucleo_l476rg, MCUboot), built with
   `../esphomeplatformzephyr/venv/bin/esphome` (version 2026.11.0-dev). ESP32 builds with `./docker_build.sh`
   (image `esphome/esphome`) once the library is reachable from the container: mount `~/repos/CANopenNode` and
   set `canopennode_path`.
@@ -239,7 +237,7 @@ CANopenNode      CANopen.c + 301/*  (fork, port/esphome)
 
 ## Steps
 Each step is a commit on `feature/canopennode` (or its own `feature/...` branch) and builds for
-`stm32l4_canopen.yaml`.
+`test/stm32l4_canopen.yaml`.
 
 1. **Minimal node:** NMT, heartbeat producer, heartbeat consumer for `heartbeat_clients`, `on_hb_consumer_event`.
    This proves the library pull-in, the driver, the runtime OD and the process timing. See
@@ -287,7 +285,7 @@ Each step is a commit on `feature/canopennode` (or its own `feature/...` branch)
    - ESP32 build (`docker_build.sh`) and a full run against can2mqtt.
 
 ## Verification for each step
-- `../esphomeplatformzephyr/venv/bin/esphome config stm32l4_canopen.yaml`, then `compile`.
+- `../esphomeplatformzephyr/venv/bin/esphome config test/stm32l4_canopen.yaml`, then `compile`.
 - Check that CANopenNode sources and our `.cpp` get the same `-DCO_CONFIG_*` flags. The build dir is
   `.esphome/build/<esphome name>/`; look in `compile_commands.json` under the west build. If they differ, the struct
   layouts and buffer sizes differ between the stack and the app.
