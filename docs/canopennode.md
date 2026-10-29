@@ -323,8 +323,9 @@ Split (revised 2026-10-29: the first version of PR 1, ~1050 production lines, wa
 | 1. node + heartbeat monitoring | CANopenNode integration (library, port header trimmed to NMT / HB producer+consumer / EM, driver, runtime OD with VAR/ARRAY), NMT state machine, heartbeat producer, `heartbeat_clients` + `on_node_event`, `is_node_online()` / `get_node_state()` | 845 (measured, incl. comments; tests 175) |
 | 2. raw frames and events | `on_heartbeat` / `on_emcy` (+ decoders, `Emergency`), `add_frame_listener()`, `send_frame()` | ~150 |
 | 3. SDO client + NMT master | `sdo_client.cpp`, `add_record()` (0x1280), `canopen.sdo_write`, `canopen.nmt`, optional parts | ~450 |
-| 4. profile API | `canopen_node.h`, `add_on_node_event(node, cb)`, `register_node()`, `SDOSequence`, `configure_rpdo/tpdo` (plan: [cia402.md](cia402.md), "PR 4") | ~350 |
-| 5. `cia402` | the drive profile | ~500 |
+| 4. profile API | `canopen_node.h` (`CANopenNode` base class, hooks, forwarders), `add_on_node_event(node, cb)`, `register_node()` (plan: [cia402.md](cia402.md), "PR 4") | ~150 |
+| 5. `cia402`, SDO | direct port of #21533 onto the hub (ideally by its author) | ~450 |
+| 6. PDO process data | `add_pdo_listener()` / `send_pdo()`, `SDOSequence`, `configure_rpdo/tpdo`; `cia402` `process_data: pdo` | ~450 |
 
 The SDO server and our own entities/OTA/logs (steps 3-8) are a later chain.
 
