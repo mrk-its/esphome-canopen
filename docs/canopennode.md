@@ -316,28 +316,34 @@ lines of production code, without tests/docs). All PRs target `dev`, so a chaine
 until the parent is merged (as #21533 does with #21522): the chain is reviewed serially, so the first PR should go
 out early and the next ones are prepared here meanwhile.
 
-Estimates (2026-10-29; step 1 is 517 lines in `components_next/canopen`, the rest is guessed from the plans):
+Split (revised 2026-10-29: the first version of PR 1, ~1050 production lines, was too big for a first PR):
 
-| PR | Content | From steps | Lines |
-|---|---|---|---|
-| 1. `canopen` core | step 1 (NMT, heartbeat producer/consumer, driver, runtime OD), `add_record()`, the `CANopenComponent` rename, raw heartbeat/EMCY triggers, frame listeners + `send_frame()` | 1, part of 2 | ~650 |
-| 2. SDO client + NMT master | `sdo_client.cpp` (one channel, queue, `cancel_sdo`, local transfers), `canopen.sdo_write`, `canopen.nmt`, optional parts (`CO_CONFIG_*` flags) | 2 | ~450 |
-| 3. Profile API | `types.h` / `canopen_node.h`, node events, `canopen.register_node()`, `SDOSequence`, `configure_rpdo/tpdo` | 2, 2b | ~350 |
-| 4. `cia402` | the drive profile | 2b | ~500 |
+| PR | Content | Lines |
+|---|---|---|
+| 1. node + heartbeat monitoring | CANopenNode integration (library, port header trimmed to NMT / HB producer+consumer / EM, driver, runtime OD with VAR/ARRAY), NMT state machine, heartbeat producer, `heartbeat_clients` + `on_node_event`, `is_node_online()` / `get_node_state()` | 870 (measured, incl. comments) |
+| 2. raw frames and events | `on_heartbeat` / `on_emcy` (+ decoders, `Emergency`), `add_frame_listener()`, `send_frame()` | ~150 |
+| 3. SDO client + NMT master | `sdo_client.cpp`, `add_record()` (0x1280), `canopen.sdo_write`, `canopen.nmt`, optional parts | ~450 |
+| 4. profile API | `canopen_node.h`, `add_on_node_event(node, cb)`, `register_node()`, `SDOSequence`, `configure_rpdo/tpdo` | ~350 |
+| 5. `cia402` | the drive profile | ~500 |
 
 The SDO server and our own entities/OTA/logs (steps 3-8) are a later chain.
 
-PR 1 progress: done: the `CANopenComponent` rename (+ `CONF_CANOPEN_ID` in Python), `add_record()` (host test
-`test/test_od.py`), raw heartbeat/EMCY events (`types.h`: `NMTState`, `Emergency`, `decode_heartbeat()`/`decode_emcy()`,
-host test `test/test_frames.py`; `add_on_heartbeat_callback()`/`add_on_emcy_callback()`, YAML `on_heartbeat`
-(`node_id`, `state`) / `on_emcy` (`node_id`, `emergency`); heartbeats of 11 nodes seen on the nucleo, EMCY only
-host-tested: no node on the bus sends one), frame listeners + `send_frame()` (simple version without a TX queue;
-the TX ring for later is described in [device_api_canopennode.md](device_api_canopennode.md), "Raw frames"), node
-monitoring (`monitor_node()`, `NodeEvent`, `add_on_node_event[_callback]()`, `get_node_state()`/`is_node_online()`;
-YAML `on_node_event` replaces `on_hb_consumer_event`; checked on the nucleo: duplicate `heartbeat_clients` entry
-merged, ONLINE/NMT_CHANGED for node 0x01; OFFLINE/RESET not checked on hardware, needs node 0x01 unplugged /
-restarted). The code items of PR 1 are done; left: upstream boilerplate (tests/components, Python tests,
-CODEOWNERS, esphome.io docs) and #21522.
+How the branches are made: `components_next/canopen` stays the full development tree (tested on hardware here).
+In `~/repos/esphome` (branches from `upstream/dev`, nothing pushed, no PRs opened):
+- `canopen`: the full `components_next` state as one commit (reference);
+- `canopen-1-node`: PR 1, one commit, cut from `components_next` by removing the later parts (raw events, frame
+  listeners, `send_frame()`, `add_record()`, `add_on_node_event(node, cb)`, the port header's SDO/PDO/CRC/FIFO
+  config). Later PR branches stack on it and add those parts back.
+  Checked: `script/ci-custom.py`, ruff, clang-format 23.1.3 and the pre-commit hooks pass;
+  `tests/component_tests/canopen` (9 tests); `script/test_build_components.py -c canopen --isolate canopen` compiles
+  esp32-idf, esp32-ard, esp8266-ard (mcp2515) and rp2040-ard (mcp2515) with no warnings; the trimmed component runs
+  on the nucleo (node 0x01 online/NMT changed). Also in the PR: `script/ci-custom.py` exempts `CO_driver_target.h`
+  from the namespace and `#define` lints (a C header, as `ota_esphome_inflate.h` / `esp_now_hosted_rpc.h`), and
+  `CODEOWNERS`.
+- Running upstream scripts: `PATH=~/repos/esphome-upstream-venv/bin:$PATH PYTHONPATH=~/repos/esphome`, so the
+  repo's `esphome` is used (the venv has `requirements_test.txt` and `clang-format==23.1.3`).
+- The esphome repo gitignores `CMakeLists.txt`, so the ESP32 IDF port component is generated in the build dir by
+  codegen (header copy + `CMakeLists.txt`).
 
 Before PR 1:
 - **Library source:** no `file://` path. Stock CANopenNode can't be used as is: it has no `library.json`, and the
