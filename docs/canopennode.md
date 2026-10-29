@@ -341,6 +341,11 @@ In `~/repos/esphome` (branches from `upstream/dev`, nothing pushed, no PRs opene
   MULTI_CONF components an empty list, so the override sets `multi_conf = False` and its `to_code` only calls
   `add_canopennode_library()` (CANopenNode + port header, factored out of `to_code` in PR 1). `add_record()`,
   `add_on_node_event(node, cb)` and the SDO/PDO port config wait for PR 3/4 (no user before).
+- `canopen-3-sdo`: PR 3 on top of PR 2 (one commit, +631 component lines, +107 tests): SDO client
+  (`sdo_client.cpp`, `automation.h`), NMT master, `canopen.sdo_write` / `canopen.nmt`, `response_timeout`,
+  `add_record()`. Tests: action codegen and value/size validation in `tests/component_tests/canopen`, the actions in
+  `tests/components/canopen/common.yaml`, gtest `sdo_reply_test.cpp` (`SDOReply::as<T>()`). Hardware: `test/sdo_test.h`
+  against node 0x61 (24/24 pass, see device_api_canopennode.md). Not pushed.
   Checked: `script/ci-custom.py`, ruff, clang-format 23.1.3 and the pre-commit hooks pass;
   `tests/component_tests/canopen` (9 tests); `script/test_build_components.py -c canopen --isolate canopen` compiles
   esp32-idf, esp32-ard, esp8266-ard (mcp2515) and rp2040-ard (mcp2515) with no warnings; the trimmed component runs

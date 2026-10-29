@@ -260,7 +260,8 @@ async def sdo_write_to_code(config, action_id, template_arg, args):
         cg.add(setter(await cg.templatable(config[key], args, type_)))
     value = config[CONF_VALUE]
     if isinstance(value, int):
-        value &= 0xFFFFFFFF
+        # negative values as two's complement in `size` bytes
+        value &= (1 << (8 * config[CONF_SIZE])) - 1
     cg.add(var.set_value(await cg.templatable(value, args, cg.uint32)))
     cg.add(var.set_size(config[CONF_SIZE]))
     for conf in config.get(CONF_ON_SUCCESS, []):

@@ -245,7 +245,7 @@ void CANopenComponent::abort_sdo_() {
     this->canbus_->send_data(0x600 + r.node_id, false, false, frame, sizeof(frame));
   }
   ESP_LOGD(TAG, "node 0x%02x, 0x%04x:%u: cancelled (client abort %s)", r.node_id, r.index, r.sub,
-           ret == CO_SDO_RT_endedWithClientAbort ? "sent" : "sent directly");
+           ret == CO_SDO_RT_endedWithClientAbort ? LOG_STR_LITERAL("sent") : LOG_STR_LITERAL("sent directly"));
   CO_SDOclientClose(cli);
   this->sdo_abort_node_ = r.node_id;
   this->sdo_abort_ms_ = millis();
