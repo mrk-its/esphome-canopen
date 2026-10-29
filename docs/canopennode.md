@@ -348,6 +348,10 @@ In `~/repos/esphome` (branches from `upstream/dev`; `canopen-1-node` and `canope
   `add_record()`. Tests: action codegen and value/size validation in `tests/component_tests/canopen`, the actions in
   `tests/components/canopen/common.yaml`, gtest `sdo_reply_test.cpp` (`SDOReply::as<T>()`). Hardware: `test/sdo_test.h`
   against node 0x61 (24/24 pass, see device_api_canopennode.md). Not pushed.
+- Docs: `~/repos/esphome-docs` (fork of `esphome/esphome.io`), branch `canopen` from upstream `next`, pushed to
+  `mrk-its/esphome-docs`, no PR yet (to be opened with esphome PR 1; #7889 from the #21522 author adds the same
+  `src/content/docs/components/canopen.mdx`). One page `components/canopen.mdx` covering PRs 1-3 + an index entry;
+  `node script/lint.mjs` passes, the Astro build wasn't run (repo pins Node 24, `npm ci` fails on Node 25).
   Checked: `script/ci-custom.py`, ruff, clang-format 23.1.3 and the pre-commit hooks pass;
   `tests/component_tests/canopen` (9 tests); `script/test_build_components.py -c canopen --isolate canopen` compiles
   esp32-idf, esp32-ard, esp8266-ard (mcp2515) and rp2040-ard (mcp2515) with no warnings; the trimmed component runs
