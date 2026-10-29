@@ -108,16 +108,16 @@ CONFIG_SCHEMA = cv.All(
 )
 
 
-async def to_code(config):
-    if CONF_CANOPENNODE_PATH in config:
-        cg.add_library("CANopenNode", None, f"file://{config[CONF_CANOPENNODE_PATH]}")
+def add_canopennode_library(path: str | None = None) -> None:
+    """Add the CANopenNode library and its target header (also used by the C++ unit tests)."""
+    if path is not None:
+        cg.add_library("CANopenNode", None, f"file://{path}")
     else:
         cg.add_library("CANopenNode", None, CANOPENNODE_SOURCE)
     # CANopenNode's 301/CO_driver.h includes CO_driver_target.h, which lives in canopennode_port/. Project -I
     # flags don't reach converted libraries (only -D/-W do), so that directory is added as a package of its own:
     if CORE.is_esp32:
         # ESP-IDF: a converted library sees only the components it requires, which include every
-        # project-managed IDF component
         # project-managed IDF component. Generated in the build dir: CMakeLists.txt files are gitignored in esphome.
         from esphome.components.esp32 import add_idf_component
 
@@ -134,9 +134,13 @@ async def to_code(config):
     else:
         # Zephyr (native build) exports every library's include dirs globally
         cg.add_library("CANopenNode-esphome-port", None, f"file://{PORT_PATH}")
-        # PlatformIO (ESP8266, ...) passes project build flags to libraries, but its LDF doesn't link the
+        # PlatformIO (ESP8266, host, ...) passes project build flags to libraries, but its LDF doesn't link the
         # library above to CANopenNode
         cg.add_build_flag(f"-I{PORT_PATH}")
+
+
+async def to_code(config):
+    add_canopennode_library(config.get(CONF_CANOPENNODE_PATH))
 
     var = cg.new_Pvariable(config[CONF_ID], config[CONF_NODE_ID])
     await cg.register_component(var, config)
