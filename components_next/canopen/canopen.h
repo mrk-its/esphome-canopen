@@ -32,6 +32,13 @@ class CANopenComponent : public Component {
   }
   template<typename F> void add_on_emcy_callback(F &&callback) { this->emcy_callback_.add(std::forward<F>(callback)); }
 
+  // Raw frames the OD doesn't describe (e.g. other devices' PDOs). The callback gets every standard-ID data frame
+  // with (can_id ^ id) & mask == 0, after CANopenNode has seen it. Can be called before or after setup().
+  void add_frame_listener(uint32_t can_id, uint32_t mask, FrameCallback callback, void *context);
+  // Sends a standard-ID data frame now. Returns false if the canbus platform refuses it (e.g. TX buffers full); it
+  // isn't queued or retried, unlike CANopenNode's own frames.
+  bool send_frame(uint32_t can_id, const uint8_t *data, uint8_t len);
+
   void setup() override;
   void loop() override;
   void dump_config() override;
@@ -43,6 +50,7 @@ class CANopenComponent : public Component {
  protected:
   void on_frame_(uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data);
   void process_();
+  void check_frame_listener_(uint32_t can_id, uint32_t mask);
 
   static void on_hb_started_(uint8_t node_id, uint8_t idx, void *object);
   static void on_hb_nmt_changed_(uint8_t node_id, uint8_t idx, CO_NMT_internalState_t state, void *object);
@@ -66,6 +74,13 @@ class CANopenComponent : public Component {
 
   uint32_t last_us_{0};
   HbConsumerEventTrigger *on_hb_cons_event_{nullptr};
+  struct FrameListener {
+    uint32_t can_id;
+    uint32_t mask;
+    FrameCallback callback;
+    void *context;
+  };
+  std::vector<FrameListener> frame_listeners_;
   LazyCallbackManager<void(uint8_t, NMTState)> heartbeat_callback_;
   LazyCallbackManager<void(uint8_t, const Emergency &)> emcy_callback_;
 };

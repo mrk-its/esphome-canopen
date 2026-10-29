@@ -6,6 +6,14 @@ external_components:
 
 esphome:
   name: stm32l4-blinking-led
+  on_boot:
+    - lambda: |-
+        // TPDO1 of every node (0x181..0x1ff)
+        id(can_gate).add_frame_listener(0x180, 0x780, +[](void *, uint32_t can_id, const uint8_t *data, uint8_t len) {
+          ESP_LOGI("test", "rx 0x%03x, %u bytes, first 0x%02x", (unsigned) can_id, len, len ? data[0] : 0);
+        }, nullptr);
+        // overlaps the heartbeat consumer for node 0x01: setup() logs a warning
+        id(can_gate).add_frame_listener(0x700, 0x780, +[](void *, uint32_t, const uint8_t *, uint8_t) {}, nullptr);
 
 zephyr:
   variant: STM32L4
@@ -147,3 +155,12 @@ canopen:
     - logger.log:
         format: "EMCY: node 0x%02x code 0x%04x register 0x%02x"
         args: [node_id, emergency.error_code, emergency.error_register]
+
+interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          // no receiver on 0x37f: the frame must still be acked (TX errors stay 0)
+          static uint8_t n = 0;
+          uint8_t data[1] = {n++};
+          ESP_LOGI("test", "send_frame 0x37f: %s", id(can_gate).send_frame(0x37F, data, 1) ? "ok" : "refused");

@@ -20,6 +20,9 @@ enum class NMTState : uint8_t {
 
 const char *nmt_state_to_string(NMTState state);
 
+// raw CAN frame listener (see CANopenComponent::add_frame_listener()); data is valid only during the call
+using FrameCallback = void (*)(void *context, uint32_t can_id, const uint8_t *data, uint8_t len);
+
 // EMCY frame (CiA 301): error code, error register (0x1001), manufacturer-specific bytes
 struct Emergency {
   uint16_t error_code;

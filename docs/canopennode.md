@@ -331,8 +331,9 @@ PR 1 progress: done: the `CANopenComponent` rename (+ `CONF_CANOPEN_ID` in Pytho
 `test/test_od.py`), raw heartbeat/EMCY events (`types.h`: `NMTState`, `Emergency`, `decode_heartbeat()`/`decode_emcy()`,
 host test `test/test_frames.py`; `add_on_heartbeat_callback()`/`add_on_emcy_callback()`, YAML `on_heartbeat`
 (`node_id`, `state`) / `on_emcy` (`node_id`, `emergency`); heartbeats of 11 nodes seen on the nucleo, EMCY only
-host-tested: no node on the bus sends one). Next: frame listeners + `send_frame()`, `heartbeat_clients` on node
-monitoring.
+host-tested: no node on the bus sends one), frame listeners + `send_frame()` (simple version without a TX queue;
+the TX ring for later is described in [device_api_canopennode.md](device_api_canopennode.md), "Raw frames"). Next:
+`heartbeat_clients` on node monitoring.
 
 Before PR 1:
 - **Library source:** no `file://` path. Stock CANopenNode can't be used as is: it has no `library.json`, and the

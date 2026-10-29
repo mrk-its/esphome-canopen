@@ -38,8 +38,8 @@ The API must fit these without changes:
   through the OD IO, so the step 4 `OdHandler` extensions fire exactly as for a remote SDO write.
 - **Entity mapper (steps 7/8):**
   - our TPDOs are CANopenNode `CO_TPDO` objects (OD-backed); the raw `send_frame()` here is for frames the OD
-    doesn't describe (another device's RPDO, e.g. a drive's controlword). Both go out through the same driver TX
-    queue (`CO_CANmodule_process`), so ordering and retries are the same;
+    doesn't describe (another device's RPDO, e.g. a drive's controlword). CANopenNode's frames are retried by
+    `CO_CANmodule_process`; `send_frame()` isn't (see "Raw frames", TX ring for later);
   - the host OD writer (COB-ID `0x500 + node`) is a frame listener of this step's kind (`add_frame_listener`), not
     special code in `on_frame_`;
   - **several `canopen:` nodes on one bus** keep working (the old component supports it): no "one hub per bus"
@@ -161,15 +161,23 @@ Raw events (any node, no registration; done, moved to PR 1):
   `add_on_emcy_callback(F)` with `(uint8_t node, const Emergency &)` for every EMCY frame (0x81..0xFF, 8 bytes),
   tapped in `on_frame_`. These are the YAML `on_heartbeat` / `on_emcy` triggers.
 
-Raw frames (PDOs of other devices, later the host OD writer):
-- `bool add_frame_listener(uint32_t can_id, uint32_t mask, FrameCallback cb, void *ctx)`: registered before or after
-  setup; `on_frame_` calls every matching listener **and** the CANopenNode RX buffers (a frame can be both). Keep a
-  small vector; logs a warning when it overlaps an ID the stack itself consumes (NMT 0, SDO server
-  `0x600 + node_id`, monitored heartbeats), since that's almost always a config mistake.
-- `bool send_frame(uint32_t can_id, const uint8_t *data, uint8_t len)`: queued in the driver next to the CANopenNode
-  TX buffers (a small ring in `driver_can.cpp`, drained by `CO_CANmodule_process`), so it never drops a frame
-  because the mailboxes are busy. No NMT-state check here; the profile decides (CiA 301: PDOs only in
-  OPERATIONAL, see `get_nmt_state()`).
+Raw frames (PDOs of other devices, later the host OD writer; done, moved to PR 1):
+- `void add_frame_listener(uint32_t can_id, uint32_t mask, FrameCallback cb, void *ctx)`: registered before or after
+  setup; `on_frame_` calls every matching listener (standard-ID data frames, not RTR) after the CANopenNode RX
+  buffers (a frame can go to both). A small vector; logs a warning when it overlaps an ID CANopenNode receives
+  itself (checked against its RX buffers at setup, or at registration after setup), since that's almost always a
+  config mistake.
+- `bool send_frame(uint32_t can_id, const uint8_t *data, uint8_t len)`: sends at once with `canbus::send_data()`;
+  returns false if the platform refuses the frame (TX buffers full), and the caller decides whether to retry. No
+  queue (decision 2026-10-29, keeps PR 1 small): `zephyr_can` (`tx_buffer_size`) and `esp32_can` (`tx_queue_len`)
+  queue in software anyway; it matters on `mcp2515` (3 hardware buffers) or `zephyr_can` without the queue. No
+  NMT-state check here; the profile decides (CiA 301: PDOs only in OPERATIONAL, see `get_nmt_state()`).
+- **Later: TX ring for `send_frame()`.** If a user (`cia402` on mcp2515, the host OD writer) needs frames that
+  aren't dropped when the controller is busy: a fixed ring in `driver_can.cpp` (e.g. 8 × `{id, len, data[8]}`).
+  `send_frame()` sends at once only when nothing is pending (no CANopenNode `bufferFull` slot, empty ring), else
+  appends (false only when the ring is full); `CO_CANmodule_process()` drains the CANopenNode slots first, then the
+  ring, stopping at the first refusal. That also fixes the ordering gap of the simple version, where a raw frame
+  can overtake a CANopenNode frame waiting for its retry.
 
 ### SDO client implementation (`sdo_client.cpp`)
 - Channel: `CNT_SDO_CLI = 1`, `ENTRY_H1280` = 0x1280; OD 0x1280 RECORD:
@@ -243,7 +251,9 @@ Raw frames (PDOs of other devices, later the host OD writer):
      START → 5; `RESET_NODE` → RESET then ONLINE; (unplug) → OFFLINE;
    - frame listener on node 0x01's TPDO COB-IDs (its entities, `0x181`...) → frames with data;
    - `send_frame()` on an unused ID (e.g. `0x37F`): no receiver on the bus, so check that it leaves the TX queue
-     and that the bus stays error-active with 0 TX errors (frames are acked); fill the queue to check retries;
+     and that the bus stays error-active with 0 TX errors (frames are acked). Done 2026-10-29 for PR 1 (see
+     `test/stm32l4_canopen.yaml`: TPDO1 listener caught node 0x32's `0x1b2`; overlap warning for 0x701; `send_frame`
+     every 5 s ok, 0 TX errors);
 3. CiA 402 feasibility: sketch the port of #21533's `cia402` onto this API in the scratchpad (not committed), at
    least `setup()` (PDO mapping of statusword/position into the drive's TPDOs, controlword into its RPDO via
    `configure_tpdo`/`configure_rpdo`, written in the sketch on top of `write_sdo`), the state machine on
