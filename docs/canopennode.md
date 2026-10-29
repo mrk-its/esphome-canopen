@@ -30,20 +30,43 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
     asked.
 - **CANopenNode fork:**
   - local checkout `~/repos/CANopenNode` (origin `git@github.com:mrk-its/CANopenNode.git`);
-  - branch `esphome`, commit `dce5a01` "Add ESPHome port, configurable SDO server block size", on top of upstream
-    master `9b8beed` (2026-07-10);
-  - **not pushed.**
+  - all on top of upstream master `9b8beed` (2026-07-10), **nothing pushed**:
+    - branch `esphome`, commit `f38ec8a` "Add library.json": packaging only, no stack changes. `"build": {"srcDir":
+      ".", "includeDir": ".", "srcFilter": ["+<CANopen.c>", "+<301/*.c>"]}`. This is what the build uses, and the
+      `library.json` could be proposed to CANopenNode upstream as is;
+    - branch `sdo-srv-blksize`, commit `d1d354a`: the `CO_CONFIG_SDO_SRV_BLKSIZE` patch alone (below), needed from
+      step 3 on (or not at all, see "Block size");
+    - branch `esphome-old-dce5a01`: the old all-in-one commit (library.json + port header + block-size patch), kept
+      for reference.
+- **Port header** `components_next/canopen/canopennode_port/CO_driver_target.h` (moved out of the fork, 2026-10-29).
+  Project `-I` flags don't reach converted libraries on the native backends (only `-D`/`-W` do,
+  `get_project_compile_flags()` in `esphome/framework_helpers.py`), so codegen adds the directory as a header-only
+  package, one way per backend:
+  - **ESP32 (ESP-IDF and Arduino, both native IDF builds):** `add_idf_component(name="canopennode_port",
+    path=...)` (`canopennode_port/CMakeLists.txt`: `idf_component_register(INCLUDE_DIRS ".")`). A converted library
+    only sees the components it REQUIRES, which include every project-managed component
+    (`ESPHOME_PROJECT_MANAGED_COMPONENTS`). A local IDF component is named after its directory, hence the
+    directory name;
+  - **Zephyr (native west build):** a header-only local library (`canopennode_port/library.json`,
+    `"CANopenNode-esphome-port"`, `includeDir: "."`, no sources); Zephyr exports every library's include dirs
+    globally;
+  - **PlatformIO (ESP8266, ...):** `-I<dir>` as a project build flag (PlatformIO passes build flags to libraries; its
+    LDF doesn't link the library above to CANopenNode). Added together with the library for every non-ESP32
+    target.
 
-  The commit contains:
-  - `library.json`: `"build": {"srcDir": ".", "includeDir": "port/esphome", "srcFilter": ["+<CANopen.c>",
-    "+<301/*.c>"], "flags": ["-Iport/esphome"]}`;
-  - `port/esphome/CO_driver_target.h`, made of:
+  Checked (2026-10-29): Zephyr (esphomeplatformzephyr venv, 2026.11.0-dev) builds and runs on the nucleo (NMT
+  operational, node 0x01 heartbeat seen, bus error-active with 0 TX errors); upstream ESPHome 2026.9.1 in Docker
+  builds `test/esp32_canopen.yaml` (ESP32-C3, esp-idf: RAM 52.7 KB, flash 227 KB; `-s framework arduino`: 52.4 KB /
+  243 KB) and `test/esp8266_canopen.yaml` (d1_mini + mcp2515: 30.2 KB / 292 KB) with a vector-based `send_data()`;
+  upstream `dev` (`95973f0`) in the venv builds all three with the `(data, len)` one (52.2 KB / 228 KB, 52.0 KB /
+  244 KB, 29.3 KB / 287 KB). Not run on ESP32/ESP8266 hardware.
+  The header contains:
     - `CO_MULTIPLE_OD`;
     - default config, each value in `#ifndef` so it can be overridden with `-D`:
       - NMT with `CALLBACK_CHANGE | MASTER`;
       - HB consumer with `ENABLE | CALLBACK_MULTI | QUERY_FUNCT`;
       - EM `PRODUCER`;
-      - SDO server segmented + block with buffer 900 and `CO_CONFIG_SDO_SRV_BLKSIZE` 127;
+      - SDO server segmented + block with buffer 900;
       - SDO client enabled + segmented + block with buffer 1000;
       - PDO RPDO/TPDO, timers and `OD_IO_ACCESS`;
       - CRC16 and FIFO (`ALT_READ`, `CRC16_CCITT`);
@@ -51,11 +74,11 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
     - the types `CO_CANrxMsg_t {uint32_t ident; uint8_t DLC; uint8_t data[8];}` + `CO_CANrxMsg_read*` macros,
       `CO_CANrx_t`, `CO_CANtx_t`, `CO_CANmodule_t` (`CANptr` = the ESPHome component), `CO_storage_entry_t`;
     - no-op `CO_LOCK_*`;
-  - `301/CO_SDOserver.h/.c`: new `CO_CONFIG_SDO_SRV_BLKSIZE` (1..127, default 127, checked with `#error`) replaces
+- **Block-size patch** (branch `sdo-srv-blksize`), `301/CO_SDOserver.h/.c`: new `CO_CONFIG_SDO_SRV_BLKSIZE` (1..127, default 127, checked with `#error`) replaces
     the hard-coded 127 cap in the block-download initiate and sub-block responses. The ≥ 900 buffer requirement is
     unchanged.
 
-  Verified: `CANopen.c` and all `301/*.c` compile with gcc on the host (`-I. -Iport/esphome`) for BLKSIZE 127 and 16
+  Verified (with the old layout): `CANopen.c` and all `301/*.c` compile with gcc on the host for BLKSIZE 127 and 16
   with no warnings (`-Wall -Wextra`). BLKSIZE 200 is rejected. clangd "file not found" diagnostics in the fork are
   only the editor missing include paths.
 
@@ -69,10 +92,15 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
       host builds);
     - it turns each library into a Zephyr module wired in through `EXTRA_ZEPHYR_MODULES`;
     - project `cg.add_build_flag()` flags reach the library through `ESPHOME_LIBRARY_COMPILE_OPTIONS`;
-    - include dirs (`includeDir`, `srcDir`, `-I` flags) are exported globally.
+    - include dirs (`includeDir`, `srcDir`, the library's own `-I` flags) are exported globally; project `-I`
+      flags don't reach libraries at all (hence the port header as its own header-only library).
   - Push the fork and switch the default to its git URL in the last step.
-- **Block size:** `CO_CONFIG_SDO_SRV_BLKSIZE` (the fork patch, option "D") caps the block-download size the SDO
-  server announces. Without it CANopenNode always announces 127.
+- **Block size: `sdo_block_transfer_size` dropped for now (2026-10-29), add it back later.** It needs
+  `CO_CONFIG_SDO_SRV_BLKSIZE` (the fork patch, option "D", branch `sdo-srv-blksize`, not in the `esphome` branch the
+  build uses), which caps the block-download size the SDO server announces. Without it CANopenNode always announces
+  127. To add it back: get the patch into CANopenNode upstream (or merge `sdo-srv-blksize` into `esphome`), then
+  restore the option (1..127, default 63) → `-DCO_CONFIG_SDO_SRV_BLKSIZE`. Needed at the latest for CAN OTA
+  (step 6), likely already for block download in step 3:
   - We need the node to choose (`sdo_block_transfer_size`): `zephyr_can` keeps at most 64 RX frames, and the
     esp_usb_serial bridge got only about 16 frames per burst through.
   - can2mqtt follows the size the server announces.
@@ -101,9 +129,9 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
   once it matches it feature for feature. Until then the old component and its tests (`pytest test/`) are not
   touched.
 - **Test target:** `test/stm32l4_canopen.yaml` (Zephyr, nucleo_l476rg, MCUboot), built with
-  `../esphomeplatformzephyr/venv/bin/esphome` (version 2026.11.0-dev). ESP32 builds with `./docker_build.sh`
-  (image `esphome/esphome`) once the library is reachable from the container: mount `~/repos/CANopenNode` and
-  set `canopennode_path`.
+  `../esphomeplatformzephyr/venv/bin/esphome` (version 2026.11.0-dev). Upstream build checks with the upstream `dev`
+  venv `~/repos/esphome-upstream-venv` (see CLAUDE.md "Testing"): `test/esp32_canopen.yaml` (`-s framework
+  arduino` for Arduino) and `test/esp8266_canopen.yaml`.
 
 ## CANopenNode facts the code depends on (checked in the source)
 - **Init order:**
@@ -198,7 +226,7 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
 | `CONmtSetMode`, `on_pre_operational` / `on_operational` triggers | `CO_NMT_sendInternalCommand`, `CO_NMT_initCallbackChanged` |
 | `CO_THB_PROD` (0x1017), `CO_THB_CONS` (0x1016), `CONmtHbConsEvent` → `on_hb_consumer_event` | the same OD entries, HB consumer callbacks |
 | `COCSdo*` via `csdo_recv` / `csdo_send_*` (expedited + segmented, size must be known, no context pointer) | `CO_SDOclient*` (all transfer types, polled) |
-| SDO server with `-DCO_SDO_BUF_SEG = sdo_block_transfer_size` | `-DCO_CONFIG_SDO_SRV_BLKSIZE = sdo_block_transfer_size` (buffer stays 900) |
+| SDO server with `-DCO_SDO_BUF_SEG = sdo_block_transfer_size` | `-DCO_CONFIG_SDO_SRV_BLKSIZE = sdo_block_transfer_size` (buffer stays 900); option dropped for now, see "Block size" |
 | `AppEmcyTbl` | `CO_EM` (0x1001, 0x1014) |
 
 Things to watch:
@@ -228,7 +256,7 @@ entity mapper    ESPHome entities <-> 0x2000+, remote slots 0x4000+, template_en
 services         OTA (0x3000), remote logs (0x3100), device API (SDO client queue, NMT, HB, EMCY)
 node core        CanopenComponent: OD builder, NodeConfig (heartbeat, HB consumers, SDO clients, PDOs),
                  persistence (preferences), driver glue on ESPHome canbus
-CANopenNode      CANopen.c + 301/*  (fork, port/esphome)
+CANopenNode      CANopen.c + 301/*  (fork: library.json only; port header in components_next/canopen/canopennode_port)
 ```
 - Only the node core (`canopen.cpp`, `od.cpp`, `driver_can.cpp`) includes CANopenNode headers.
 - Mapper and services use a neutral API: `OdType`, `OdHandler` with read/write on an offset stream, and
@@ -242,47 +270,79 @@ Each step is a commit on `feature/canopennode` (or its own `feature/...` branch)
 1. **Minimal node:** NMT, heartbeat producer, heartbeat consumer for `heartbeat_clients`, `on_hb_consumer_event`.
    This proves the library pull-in, the driver, the runtime OD and the process timing. See
    [minimal_canopennode.md](minimal_canopennode.md).
-2. **SDO server and identity:**
-   - 0x1000, 0x1008 (`App.get_name()`), 0x1009/0x100A (hw/sw version, as in the old `to_code`), 0x1018
-     (vendor `0xa59a08f5`, product `0x6bdfa1d9`, revision 1, serial 0, from the old `canopen.cpp`), 0x1200
-     (`CNT_SDO_SRV = 1`);
-   - check with can2mqtt / canopen-asyncio: string upload, segmented and block transfers, the announced block size.
-3. **OD builder: RECORD entries and `OdHandler` extensions** (dispatch per subindex). `0x1010`/`0x1011`
-   store/restore ("save" = `0x65766173`, "load" = `0x64616F6C`) with preferences.
-4. **Remote logs (`0x3100`):**
+2. **Device API** for profile components (CiA 402 first; functionality of esphome/esphome#21522/#21533, own API):
+   SDO client on `CO_SDOclient` (typed/buffer reads and writes, one result path, `cancel_sdo`,
+   one channel, local transfers), NMT master, node monitoring on the HB consumer (online/offline/NMT/reset
+   events), raw heartbeat/EMCY events, raw frame listeners/send (PDOs of other devices), the `CANopenNode` base
+   class, `add_record()`. See [device_api_canopennode.md](device_api_canopennode.md).
+   - **2b. `cia402`** on the device API (port of esphome/esphome#21533): process data by PDO (drive TPDOs/RPDO
+     remapped over SDO at configuration), SDO only for configuration; plus `SDOSequence` and
+     `configure_rpdo`/`configure_tpdo` in `canopen` (own upstream PR). See [cia402.md](cia402.md).
+3. **SDO server and identity:** 0x1008/0x1009/0x100A, 0x1018, 0x1200 (`CNT_SDO_SRV = 1`); checked with can2mqtt.
+   See [sdo_server_canopennode.md](sdo_server_canopennode.md).
+4. **OD extensions (`OdHandler`, dispatch per subindex)** and `0x1010`/`0x1011` store/restore ("save" =
+   `0x65766173`, "load" = `0x64616F6C`) with preferences.
+5. **Remote logs (`0x3100`):**
    - port the handlers;
    - separate `CanopenLogs` from the OD glue;
    - update `test/test_logs.py` / `test/logs/logs_test.cpp`;
    - check against can2mqtt: block upload with `remote_logs: block_size`, which must be ≤ `sdo_block_transfer_size`.
-5. **OTA (`0x3000`, `ota: - platform: canopen`):** domain write handler; check MD5, the deferred end, and the speed
+6. **OTA (`0x3000`, `ota: - platform: canopen`):** domain write handler; check MD5, the deferred end, and the speed
    for block sizes 16 / 32 / 63 on zephyr_can and ESP32.
-6. **Entities and TPDOs:**
+7. **Entities and TPDOs:**
    - port `entities.cpp` to the neutral API;
    - TPDOs 0x1800/0x1A00 from the mapper, dirty mask / immediate;
    - layout hash `0x3002:1` (FNV-1a over the 0x1A00..0x1A07 mappings, must match `layout_hash()` in `layout.py`);
    - `test/test_layout.py` unchanged.
-7. **RPDOs and remote state slots:**
-   - 0x1400/0x1600 from `rpdo_plan()`, dummy entries, `0x4000+n` slots;
-   - `platform: canopen` entities, `canopen.<domain>.<action>`;
-   - the OD writer: COB-ID `0x500 + node` (RPDO4 default), data `[node, sub, idx_lo, idx_hi, value...]`, parsed in
-     `on_frame` and written through the OD IO so handlers fire;
-   - the loopback between local instances.
-8. **Device API for other CANopen devices:**
-   - `SdoClient` in the core: a queue per server node; channels = `CO_SDOclient` objects (`sdo_clients: N` →
-     `CNT_SDO_CLI`, 0x1280+n), retargeted with `CO_SDOclient_setup`, polled in `loop()`; requests to our own node
-     served locally;
-   - `canopen.sdo_read` / `sdo_write` actions, an SDO-polled sensor;
-   - NMT master, EMCY consumer;
-   - the old `csdo:` maps onto pinned channels;
-   - API and YAML compatible with esphome/esphome#21522 where that's reasonable (`read_sdo`/`write_sdo` with a
-     callback, `send_nmt`, heartbeat/EMCY callbacks, sensor `node_id`/`index`/`subindex`/`value_type`).
+8. **Commands from the host:** the OD writer (COB-ID `0x500 + node`, data `[node, sub, idx_lo, idx_hi, value...]`,
+   written through the OD IO so handlers fire), loopback between local instances. The old remote states (RPDO
+   slots `0x4000+n`, `platform: canopen` entities reading other nodes, `canopen.<domain>.<action>`) are **dropped**
+   from the new component (decision 2026-10-29).
 9. **Switch over:**
    - `components_next/canopen` replaces `components/canopen`;
    - remove the canopen-stack code (`co_cmd`, `co_storage`, the old `driver_can`/`od`, the `CO_*` build flags,
-     `cg.add_library("canopenstack")`);
+     `cg.add_library("canopenstack")`) and the remote-state code (`remote.py`, `remote_entities.*`, the
+     `platform: canopen` entity files);
    - update CLAUDE.md and `docs/`;
    - push the CANopenNode fork and set the default library source to its git URL;
    - ESP32 build (`docker_build.sh`) and a full run against can2mqtt.
+
+## Upstream PRs
+Steps are our work order; upstream ESPHome PRs are cut differently. ESPHome prefers small PRs (review limit ~1000
+lines of production code, without tests/docs). All PRs target `dev`, so a chained PR carries its parent's commits
+until the parent is merged (as #21533 does with #21522): the chain is reviewed serially, so the first PR should go
+out early and the next ones are prepared here meanwhile.
+
+Estimates (2026-10-29; step 1 is 517 lines in `components_next/canopen`, the rest is guessed from the plans):
+
+| PR | Content | From steps | Lines |
+|---|---|---|---|
+| 1. `canopen` core | step 1 (NMT, heartbeat producer/consumer, driver, runtime OD), `add_record()`, the `CANopenComponent` rename, raw heartbeat/EMCY triggers, frame listeners + `send_frame()` | 1, part of 2 | ~650 |
+| 2. SDO client + NMT master | `sdo_client.cpp` (one channel, queue, `cancel_sdo`, local transfers), `canopen.sdo_write`, `canopen.nmt`, optional parts (`CO_CONFIG_*` flags) | 2 | ~450 |
+| 3. Profile API | `types.h` / `canopen_node.h`, node events, `canopen.register_node()`, `SDOSequence`, `configure_rpdo/tpdo` | 2, 2b | ~350 |
+| 4. `cia402` | the drive profile | 2b | ~500 |
+
+The SDO server and our own entities/OTA/logs (steps 3-8) are a later chain.
+
+Before PR 1:
+- **Library source:** no `file://` path. Stock CANopenNode can't be used as is: it has no `library.json`, and the
+  Zephyr and native ESP-IDF backends of ESPHome require a manifest (`esphome/platformio/library.py`, only the `host`
+  backend accepts manifest-less libraries; plain PlatformIO builds would work). Done (2026-10-29): packaging-only
+  fork (branch `esphome`, upstream + `library.json`), port header as a header-only library in our component. Still
+  to do: push the fork (or get the `library.json` into CANopenNode upstream) and use a git URL instead of
+  `file://`. The port header reaches CANopenNode on ESP32, ESP8266 and Zephyr (see "Port header"). The block-size
+  patch (branch `sdo-srv-blksize`) is needed only from step 3 on (drop it, or send it
+  upstream).
+- **ESP32 / ESP8266 builds** (upstream CI: esp32-idf, esp32-ard, esp8266): all three compile with upstream `dev`
+  (`test/esp32_canopen.yaml`, `test/esp8266_canopen.yaml`). `driver_can.cpp` uses `send_data(..., data, len)`,
+  which is in `dev` but not in the 2026.9.x releases, so `components_next` needs ESPHome newer than 2026.9 (fine for
+  PRs against `dev`; matters only if it ships as an external component before the next release). Still to do: run
+  on real ESP32 hardware.
+- **API churn first:** the rename and `heartbeat_clients` rebuilt on node monitoring go into PR 1, so PR 2 doesn't
+  rewrite code under review.
+- **Upstream boilerplate:** `tests/components/canopen/*.yaml`, Python tests, CODEOWNERS, esphome.io docs.
+- **#21522** (another author's open `canopen` hub, base of #21533): talk to its author / comment there before
+  opening a competing component (open question below).
 
 ## Verification for each step
 - `../esphomeplatformzephyr/venv/bin/esphome config test/stm32l4_canopen.yaml`, then `compile`.
@@ -301,3 +361,5 @@ Each step is a commit on `feature/canopennode` (or its own `feature/...` branch)
 - RAM on STM32: the SDO server buffer needs ≥ 900 bytes with block transfer enabled, and the SDO client FIFO is
   1000 bytes by default. Size both from YAML.
 - EDS export for third-party masters (generated from the runtime OD), later.
+- How to handle esphome/esphome#21522 (and #21533 on top of it): coordinate with its author, propose this
+  component as its replacement, or build on it?

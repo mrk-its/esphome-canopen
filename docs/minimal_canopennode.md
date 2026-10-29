@@ -2,7 +2,9 @@
 
 ## Context
 We're replacing canopen-stack with CANopenNode. The first step is a minimal, separate `canopen` component on top
-of ESPHome `canbus`. It uses the local CANopenNode fork (`~/repos/CANopenNode`, branch `esphome`, commit `dce5a01`:
+of ESPHome `canbus`. (Layout since 2026-10-29: the fork is packaging only and the port header lives in
+`components_next/canopen/canopennode_port/`, and `sdo_block_transfer_size` is dropped for now; see "Current state" and "Block
+size" in [canopennode.md](canopennode.md).) It uses the local CANopenNode fork (`~/repos/CANopenNode`, branch `esphome`, commit `dce5a01`:
 `library.json`, `port/esphome/CO_driver_target.h`, `CO_CONFIG_SDO_SRV_BLKSIZE`) and only does NMT + heartbeat:
 - produce heartbeats (0x700+node_id);
 - consume heartbeats of configured nodes (`heartbeat_clients`) through CANopenNode's HB consumer.

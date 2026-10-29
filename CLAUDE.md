@@ -6,7 +6,8 @@ OD layout for entities: see OBJECT_DICTIONARY.md.
 User docs: README.md is the overview / quick start only; the option reference lives in `docs/configuration.md`,
 `docs/linking-nodes.md`, `docs/ota.md`, `docs/remote-logs.md`. Document new options there.
 Port to CANopenNode (replacing canopen-stack), in progress: plan and handoff state in `docs/canopennode.md`,
-current step in `docs/minimal_canopennode.md`.
+current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopennode.md`, done; step 3:
+`docs/sdo_server_canopennode.md`).
 
 ## Workflow
 - Always do new features and fixes on a `feature/<short-name>` branch (created from the current branch,
@@ -84,10 +85,18 @@ current step in `docs/minimal_canopennode.md`.
 ## Testing
 - `pytest test/`: Python tests, plus `test/test_logs.py`, which builds `test/logs/logs_test.cpp` against
   `components/canopen/logs.cpp` with stub headers (`test/logs/stubs/`) and runs it (ASan/UBSan if available).
-- ESP32 build in Docker: `./docker_build.sh` (renders `test/config.yaml.template` with `envsubst`; note
-  `framework` must be a mapping, e.g. `{type: esp-idf}`).
-- Config validation without building: `esphome config <yaml>`, against both upstream ESPHome and the
-  esphomeplatformzephyr venv, when touching Python schema code.
+- Upstream ESPHome (`dev` from GitHub) venv: `~/repos/esphome-upstream-venv` (update with
+  `bin/pip install -U "esphome @ git+https://github.com/esphome/esphome@dev"`). Use it, not the esphomeplatformzephyr
+  venv, to check upstream compatibility (the fork may carry APIs upstream doesn't have). Upstream PRs target `dev`,
+  so `components_next` may use APIs newer than the last release (e.g. `canbus::send_data(..., data, len)`, in `dev`
+  but not in 2026.9.x).
+- `components_next` (CANopenNode) build checks with it: `test/esp32_canopen.yaml` (ESP32-C3, esp-idf; add
+  `-s framework arduino` for Arduino) and `test/esp8266_canopen.yaml` (d1_mini + mcp2515), e.g.
+  `~/repos/esphome-upstream-venv/bin/esphome -s canopennode_path ~/repos/CANopenNode compile test/esp32_canopen.yaml`.
+- Old component ESP32 build in Docker: `./docker_build.sh` (renders `test/config.yaml.template` with `envsubst`;
+  note `framework` must be a mapping, e.g. `{type: esp-idf}`). Docker leaves root-owned files in `.esphome/`.
+- Config validation without building: `esphome config <yaml>`, against both upstream ESPHome (the venv above) and
+  the esphomeplatformzephyr venv, when touching Python schema code.
 - Zephyr hardware example: `zephyr-examples/stm32l4/stm32l4_blinking_led.yaml` (nucleo_l476rg, MCUboot,
   `ota: - platform: canopen`, `external_components: source: ../../esphome-canopen/components`).
 
