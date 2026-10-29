@@ -328,7 +328,8 @@ Split (revised 2026-10-29: the first version of PR 1, ~1050 production lines, wa
 
 The SDO server and our own entities/OTA/logs (steps 3-8) are a later chain.
 
-How the branches are made: `components_next/canopen` stays the full development tree (tested on hardware here).
+In `~/repos/esphome` (branches from `upstream/dev`; `canopen-1-node` and `canopen-2-frames` pushed to `origin`
+= mrk-its/esphome, no PRs opened):
 In `~/repos/esphome` (branches from `upstream/dev`, nothing pushed, no PRs opened):
 - (the `canopen` reference branch with the full component is deleted, 2026-10-29: `components_next` is the full
   tree, each PR branch is cut from it)
