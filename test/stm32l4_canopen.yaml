@@ -6,6 +6,9 @@ external_components:
 
 esphome:
   name: stm32l4-blinking-led
+  # SDO client / NMT master hardware test (node 0x61 and our own node), see the file
+  includes:
+    - sdo_test.h
   on_boot:
     - lambda: |-
         // TPDO1 of every node (0x181..0x1ff)
@@ -14,6 +17,10 @@ esphome:
         }, nullptr);
         // overlaps the heartbeat consumer for node 0x01: setup() logs a warning
         id(can_gate).add_frame_listener(0x700, 0x780, +[](void *, uint32_t, const uint8_t *, uint8_t) {}, nullptr);
+    - delay: 5s
+    - lambda: sdo_test::start(id(can_gate), 0x7f);
+    - delay: 75s
+    - script.execute: canopen_actions
 
 zephyr:
   variant: STM32L4
@@ -98,6 +105,32 @@ output:
     id: led_output
 
 script:
+  # canopen.sdo_write / canopen.nmt (they also compile the SDO client and NMT master in)
+  - id: canopen_actions
+    then:
+      - canopen.sdo_write:
+          node_id: 0x7f
+          index: 0x1017
+          value: 1000
+          size: 2
+          on_success:
+            - logger.log: "sdo_write action: success"
+          on_error:
+            - logger.log:
+                format: "sdo_write action: %s, abort 0x%08x"
+                args: ["esphome::canopen::sdo_result_to_string(result)", "(unsigned) abort_code"]
+      - canopen.sdo_write:
+          node_id: 0x61
+          index: 0x5FFF
+          value: 1
+          size: 1
+          on_error:
+            - logger.log:
+                format: "sdo_write action to 0x5FFF: %s, abort 0x%08x (expected abort 0x06020000)"
+                args: ["esphome::canopen::sdo_result_to_string(result)", "(unsigned) abort_code"]
+      - canopen.nmt:
+          node_id: 0x61
+          command: start
   - id: frame_blink
     mode: restart
     then:
@@ -146,6 +179,9 @@ canopen:
     # duplicate on purpose: merged into one 0x1016 entry with the shorter timeout (7 s)
     - node_id: 0x01
       timeout: 10s
+    # SDO / NMT test node (sdo_test.h)
+    - node_id: 0x61
+      timeout: 15s
   on_node_event:
     - logger.log:
         format: "node event: node 0x%02x %s, %s"
@@ -154,9 +190,13 @@ canopen:
           - "esphome::canopen::node_event_to_string(event)"
           - "esphome::canopen::nmt_state_to_string(state)"
   on_heartbeat:
-    - logger.log:
-        format: "heartbeat: node 0x%02x %s"
-        args: [node_id, "esphome::canopen::nmt_state_to_string(state)"]
+    - if:
+        condition:
+          lambda: return node_id == 0x61;
+        then:
+          - logger.log:
+              format: "heartbeat: node 0x%02x %s"
+              args: [node_id, "esphome::canopen::nmt_state_to_string(state)"]
   on_emcy:
     - logger.log:
         format: "EMCY: node 0x%02x code 0x%04x register 0x%02x"

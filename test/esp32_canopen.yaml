@@ -43,3 +43,19 @@ canopen:
   on_emcy:
     - lambda: |-
         ESP_LOGW("test", "EMCY node 0x%02x code 0x%04x", node_id, emergency.error_code);
+
+interval:
+  - interval: 60s
+    then:
+      - canopen.sdo_write:
+          node_id: 0x01
+          index: 0x1017
+          value: 5000
+          size: 2
+          on_error:
+            - logger.log:
+                format: "sdo_write: %s"
+                args: ["esphome::canopen::sdo_result_to_string(result)"]
+      - canopen.nmt:
+          node_id: 0x01
+          command: start

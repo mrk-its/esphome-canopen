@@ -122,6 +122,12 @@ void CANopenComponent::setup() {
     this->hb_cons_count_ = n_cons;
     od.add_array(0x1016, ODA_SDO_RW, &this->hb_cons_count_, this->hb_cons_.data(), sizeof(uint32_t), n_cons);
   }
+#ifdef USE_CANOPEN_SDO_CLIENT
+  od.add_record(0x1280, {{0, ODA_SDO_R, &this->sdo_cli_highest_sub_, 1},
+                         {1, ODA_SDO_RW, &this->sdo_cli_cob_tx_, 4},
+                         {2, ODA_SDO_RW, &this->sdo_cli_cob_rx_, 4},
+                         {3, ODA_SDO_RW, &this->sdo_cli_node_, 1}});
+#endif
   od.finalize();
 
   auto &cfg = this->config_;
@@ -134,6 +140,10 @@ void CANopenComponent::setup() {
   cfg.CNT_HB_CONS = n_cons ? 1 : 0;
   cfg.CNT_ARR_1016 = n_cons;
   cfg.ENTRY_H1016 = od.find(0x1016);
+#ifdef USE_CANOPEN_SDO_CLIENT
+  cfg.CNT_SDO_CLI = 1;
+  cfg.ENTRY_H1280 = od.find(0x1280);
+#endif
 
   uint32_t heap = 0;
   this->co_ = CO_new(&cfg, &heap);
@@ -178,6 +188,9 @@ void CANopenComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "CANopen (CANopenNode):");
   ESP_LOGCONFIG(TAG, "  Node ID: 0x%02x", this->node_id_);
   ESP_LOGCONFIG(TAG, "  Heartbeat interval: %u ms", this->hb_producer_ms_);
+#ifdef USE_CANOPEN_SDO_CLIENT
+  ESP_LOGCONFIG(TAG, "  SDO client: response timeout %u ms", this->response_timeout_ms_);
+#endif
   for (uint32_t c : this->hb_cons_) {
     ESP_LOGCONFIG(TAG, "  Heartbeat client: node 0x%02x, timeout %u ms", (unsigned) (c >> 16), (unsigned) (c & 0xFFFF));
   }
@@ -255,7 +268,19 @@ void CANopenComponent::process_() {
   } else if (reset == CO_RESET_COMM) {
     ESP_LOGW(TAG, "NMT reset communication (not implemented)");
   }
+#ifdef USE_CANOPEN_SDO_CLIENT
+  this->process_sdo_(dt);
+#endif
 }
+
+#ifdef USE_CANOPEN_NMT_MASTER
+bool CANopenComponent::send_nmt(uint8_t node_id, NMTCommand command) {
+  if (this->co_ == nullptr || this->is_failed() || node_id > 127)
+    return false;
+  ESP_LOGD(TAG, "NMT command %u to node 0x%02x", (unsigned) command, node_id);
+  return CO_NMT_sendCommand(this->co_->NMT, static_cast<CO_NMT_command_t>(command), node_id) == CO_ERROR_NO;
+}
+#endif
 
 void CANopenComponent::node_event_(uint8_t node_id, NodeEvent event, NMTState state) {
   if (event == NodeEvent::OFFLINE) {

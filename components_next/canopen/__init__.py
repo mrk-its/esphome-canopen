@@ -4,7 +4,16 @@ from esphome import automation
 import esphome.codegen as cg
 from esphome.components.canbus import CanbusComponent
 import esphome.config_validation as cv
-from esphome.const import CONF_ID, CONF_TIMEOUT
+from esphome.const import (
+    CONF_COMMAND,
+    CONF_ID,
+    CONF_INDEX,
+    CONF_ON_ERROR,
+    CONF_ON_SUCCESS,
+    CONF_SIZE,
+    CONF_TIMEOUT,
+    CONF_VALUE,
+)
 from esphome.core import CORE
 from esphome.helpers import write_file_if_changed
 
@@ -23,6 +32,8 @@ CONF_ON_NODE_EVENT = "on_node_event"
 CONF_ON_HEARTBEAT = "on_heartbeat"
 CONF_ON_EMCY = "on_emcy"
 CONF_CANOPENNODE_PATH = "canopennode_path"
+CONF_RESPONSE_TIMEOUT = "response_timeout"
+CONF_SUBINDEX = "subindex"
 
 # CANopenNode upstream + library.json (branch esphome), pinned to a commit
 CANOPENNODE_SOURCE = "https://github.com/mrk-its/CANopenNode.git#f38ec8a6442a5a598d26f88c4e7c8a39b83d2cd5"
@@ -36,6 +47,50 @@ CANopenComponent = ns.class_("CANopenComponent", cg.Component)
 NMTState = ns.enum("NMTState", is_class=True)
 NodeEvent = ns.enum("NodeEvent", is_class=True)
 Emergency = ns.struct("Emergency")
+SDOResult = ns.enum("SDOResult", is_class=True)
+NMTCommand = ns.enum("NMTCommand", is_class=True)
+SDOWriteAction = ns.class_("SDOWriteAction", automation.Action)
+NMTAction = ns.class_("NMTAction", automation.Action)
+
+NMT_COMMANDS = {
+    "start": NMTCommand.START,
+    "stop": NMTCommand.STOP,
+    "pre_operational": NMTCommand.PRE_OPERATIONAL,
+    "reset_node": NMTCommand.RESET_NODE,
+    "reset_communication": NMTCommand.RESET_COMMUNICATION,
+}
+
+KEY_CANOPEN = "canopen"
+
+
+def _enable_once(key: str) -> bool:
+    enabled = CORE.data.setdefault(KEY_CANOPEN, set())
+    if key in enabled:
+        return False
+    enabled.add(key)
+    return True
+
+
+def enable_sdo_client() -> None:
+    """Compile the SDO client (read_sdo(), write_sdo(), ...): for actions and components that use it."""
+    if not _enable_once("sdo_client"):
+        return
+    cg.add_define("USE_CANOPEN_SDO_CLIENT")
+    # enable | segmented | block | local (requests to our own node id use our OD); the client needs the fifo
+    # (enable | alt read | crc16 ccitt) and crc16
+    cg.add_build_flag("-DCO_CONFIG_SDO_CLI=0x0F")
+    cg.add_build_flag("-DCO_CONFIG_FIFO=0x07")
+    cg.add_build_flag("-DCO_CONFIG_CRC16=0x01")
+
+
+def enable_nmt_master() -> None:
+    """Compile the NMT master (send_nmt()): for actions and components that use it."""
+    if not _enable_once("nmt_master"):
+        return
+    cg.add_define("USE_CANOPEN_NMT_MASTER")
+    # callback change | master
+    cg.add_build_flag("-DCO_CONFIG_NMT=0x03")
+
 
 CALLBACK_AUTOMATIONS = (
     automation.CallbackAutomation(
@@ -101,6 +156,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_ON_HEARTBEAT): automation.validate_automation({}),
             cv.Optional(CONF_ON_EMCY): automation.validate_automation({}),
             # local CANopenNode checkout instead of CANOPENNODE_SOURCE (development)
+            cv.Optional(CONF_RESPONSE_TIMEOUT, "500ms"): UINT16_MS,
             cv.Optional(CONF_CANOPENNODE_PATH): absolute_path,
         }
     ).extend(cv.COMPONENT_SCHEMA),
@@ -148,6 +204,7 @@ async def to_code(config):
     canbus = await cg.get_variable(config[CONF_CANBUS_ID])
     cg.add(var.set_canbus(canbus))
     cg.add(var.set_heartbeat_interval(config[CONF_HEARTBEAT_INTERVAL]))
+    cg.add(var.set_response_timeout(config[CONF_RESPONSE_TIMEOUT]))
     for client in config[CONF_HEARTBEAT_CLIENTS]:
         cg.add(
             var.monitor_node(
@@ -156,3 +213,82 @@ async def to_code(config):
         )
 
     await automation.build_callback_automations(var, config, CALLBACK_AUTOMATIONS)
+
+
+def validate_sdo_value(config):
+    value = config[CONF_VALUE]
+    if isinstance(value, int):
+        bits = 8 * config[CONF_SIZE]
+        if not -(1 << (bits - 1)) <= value < (1 << bits):
+            raise cv.Invalid(
+                f"value {value} doesn't fit in {config[CONF_SIZE]} byte(s)"
+            )
+    return config
+
+
+SDO_WRITE_SCHEMA = cv.All(
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.use_id(CANopenComponent),
+            cv.Required(CONF_NODE_ID): cv.templatable(cv.int_range(min=1, max=127)),
+            cv.Required(CONF_INDEX): cv.templatable(cv.hex_uint16_t),
+            cv.Optional(CONF_SUBINDEX, default=0): cv.templatable(cv.hex_uint8_t),
+            cv.Required(CONF_VALUE): cv.templatable(
+                cv.int_range(min=-(1 << 31), max=(1 << 32) - 1)
+            ),
+            cv.Optional(CONF_SIZE, default=4): cv.one_of(1, 2, 4, int=True),
+            cv.Optional(CONF_ON_SUCCESS): automation.validate_automation({}),
+            cv.Optional(CONF_ON_ERROR): automation.validate_automation({}),
+        }
+    ),
+    validate_sdo_value,
+)
+
+
+@automation.register_action(
+    "canopen.sdo_write", SDOWriteAction, SDO_WRITE_SCHEMA, synchronous=True
+)
+async def sdo_write_to_code(config, action_id, template_arg, args):
+    enable_sdo_client()
+    var = cg.new_Pvariable(action_id, template_arg)
+    await cg.register_parented(var, config[CONF_ID])
+    for key, setter, type_ in (
+        (CONF_NODE_ID, var.set_node_id, cg.uint8),
+        (CONF_INDEX, var.set_index, cg.uint16),
+        (CONF_SUBINDEX, var.set_subindex, cg.uint8),
+    ):
+        cg.add(setter(await cg.templatable(config[key], args, type_)))
+    value = config[CONF_VALUE]
+    if isinstance(value, int):
+        value &= 0xFFFFFFFF
+    cg.add(var.set_value(await cg.templatable(value, args, cg.uint32)))
+    cg.add(var.set_size(config[CONF_SIZE]))
+    for conf in config.get(CONF_ON_SUCCESS, []):
+        await automation.build_automation(var.get_success_trigger(), [], conf)
+    for conf in config.get(CONF_ON_ERROR, []):
+        await automation.build_automation(
+            var.get_error_trigger(),
+            [(SDOResult, "result"), (cg.uint32, "abort_code")],
+            conf,
+        )
+    return var
+
+
+NMT_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(): cv.use_id(CANopenComponent),
+        # 0 = all nodes
+        cv.Required(CONF_NODE_ID): cv.templatable(cv.int_range(min=0, max=127)),
+        cv.Required(CONF_COMMAND): cv.enum(NMT_COMMANDS, lower=True),
+    }
+)
+
+
+@automation.register_action("canopen.nmt", NMTAction, NMT_SCHEMA, synchronous=True)
+async def nmt_to_code(config, action_id, template_arg, args):
+    enable_nmt_master()
+    var = cg.new_Pvariable(action_id, template_arg)
+    await cg.register_parented(var, config[CONF_ID])
+    cg.add(var.set_node_id(await cg.templatable(config[CONF_NODE_ID], args, cg.uint8)))
+    cg.add(var.set_command(config[CONF_COMMAND]))
+    return var
