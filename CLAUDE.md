@@ -5,6 +5,8 @@ ESPHome external component exposing ESPHome entities over CANopen, plus CAN OTA.
 OD layout for entities: see OBJECT_DICTIONARY.md.
 User docs: README.md is the overview / quick start only; the option reference lives in `docs/configuration.md`,
 `docs/linking-nodes.md`, `docs/ota.md`, `docs/remote-logs.md`. Document new options there.
+Port to CANopenNode (replacing canopen-stack), in progress: plan and handoff state in `docs/canopennode.md`,
+current step in `docs/minimal_canopennode.md`.
 
 ## Workflow
 - Always do new features and fixes on a `feature/<short-name>` branch (created from the current branch,
