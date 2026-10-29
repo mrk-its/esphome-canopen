@@ -41,6 +41,69 @@ const char *nmt_state_to_string(NMTState state) {
   }
 }
 
+const char *node_event_to_string(NodeEvent event) {
+  switch (event) {
+    case NodeEvent::ONLINE:
+      return "online";
+    case NodeEvent::OFFLINE:
+      return "offline";
+    case NodeEvent::NMT_CHANGED:
+      return "NMT changed";
+    case NodeEvent::RESET:
+      return "reset";
+    default:
+      return "unknown";
+  }
+}
+
+static NMTState to_nmt_state(CO_NMT_internalState_t state) {
+  switch (state) {
+    case CO_NMT_INITIALIZING:
+      return NMTState::BOOTUP;
+    case CO_NMT_STOPPED:
+      return NMTState::STOPPED;
+    case CO_NMT_OPERATIONAL:
+      return NMTState::OPERATIONAL;
+    case CO_NMT_PRE_OPERATIONAL:
+      return NMTState::PRE_OPERATIONAL;
+    default:
+      return NMTState::UNKNOWN;
+  }
+}
+
+void CANopenComponent::monitor_node(uint8_t node_id, uint16_t timeout_ms) {
+  if (this->co_ != nullptr) {
+    ESP_LOGE(TAG, "monitor_node(0x%02x) after setup, ignored", node_id);
+    return;
+  }
+  // CANopenNode rejects a node id that is in 0x1016 twice
+  for (uint32_t &c : this->hb_cons_) {
+    if ((c >> 16) == node_id) {
+      if (timeout_ms < (c & 0xFFFF))
+        c = ((uint32_t) node_id << 16) | timeout_ms;
+      return;
+    }
+  }
+  this->hb_cons_.push_back(((uint32_t) node_id << 16) | timeout_ms);
+}
+
+NMTState CANopenComponent::get_node_state(uint8_t node_id) {
+  if (this->co_ == nullptr || this->hb_cons_.empty())
+    return NMTState::UNKNOWN;
+  int8_t idx = CO_HBconsumer_getIdxByNodeId(this->co_->HBcons, node_id);
+  CO_NMT_internalState_t state;
+  if (idx < 0 || CO_HBconsumer_getNmtState(this->co_->HBcons, idx, &state) != 0)
+    return NMTState::UNKNOWN;
+  return to_nmt_state(state);
+}
+
+bool CANopenComponent::is_node_online(uint8_t node_id) {
+  if (this->co_ == nullptr || this->hb_cons_.empty())
+    return false;
+  int8_t idx = CO_HBconsumer_getIdxByNodeId(this->co_->HBcons, node_id);
+  return idx >= 0 && CO_HBconsumer_getState(this->co_->HBcons, idx) == CO_HBconsumer_ACTIVE;
+}
+
 void CANopenComponent::set_canbus(canbus::Canbus *canbus) {
   this->canbus_ = canbus;
   canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
@@ -194,23 +257,34 @@ void CANopenComponent::process_() {
   }
 }
 
+void CANopenComponent::node_event_(uint8_t node_id, NodeEvent event, NMTState state) {
+  if (event == NodeEvent::OFFLINE) {
+    ESP_LOGW(TAG, "node 0x%02x offline (heartbeat timeout)", node_id);
+  } else {
+    ESP_LOGI(TAG, "node 0x%02x %s, NMT state: %s", node_id, node_event_to_string(event), nmt_state_to_string(state));
+  }
+  this->node_event_callback_.call(node_id, event, state);
+}
+
+// CANopenNode heartbeat consumer callbacks (called from CO_process())
 void CANopenComponent::on_hb_started_(uint8_t node_id, uint8_t idx, void *object) {
-  ESP_LOGI(TAG, "node 0x%02x heartbeat started", node_id);
+  auto *self = static_cast<CANopenComponent *>(object);
+  // the heartbeat's state is already stored, but CO_HBconsumer_getNmtState() only returns it once HBstate is ACTIVE,
+  // which CANopenNode sets after this callback
+  CO_NMT_internalState_t state = self->co_->HBcons->monitoredNodes[idx].NMTstate;
+  self->node_event_(node_id, NodeEvent::ONLINE, to_nmt_state(state));
 }
 
 void CANopenComponent::on_hb_nmt_changed_(uint8_t node_id, uint8_t idx, CO_NMT_internalState_t state, void *object) {
-  ESP_LOGI(TAG, "node 0x%02x NMT state: %s", node_id, nmt_state_str(state));
+  static_cast<CANopenComponent *>(object)->node_event_(node_id, NodeEvent::NMT_CHANGED, to_nmt_state(state));
 }
 
 void CANopenComponent::on_hb_timeout_(uint8_t node_id, uint8_t idx, void *object) {
-  ESP_LOGW(TAG, "node 0x%02x heartbeat timeout", node_id);
-  auto *self = static_cast<CANopenComponent *>(object);
-  if (self->on_hb_cons_event_ != nullptr)
-    self->on_hb_cons_event_->trigger(node_id);
+  static_cast<CANopenComponent *>(object)->node_event_(node_id, NodeEvent::OFFLINE, NMTState::UNKNOWN);
 }
 
 void CANopenComponent::on_hb_remote_reset_(uint8_t node_id, uint8_t idx, void *object) {
-  ESP_LOGI(TAG, "node 0x%02x reset (boot-up)", node_id);
+  static_cast<CANopenComponent *>(object)->node_event_(node_id, NodeEvent::RESET, NMTState::BOOTUP);
 }
 
 void CANopenComponent::on_nmt_changed_(CO_NMT_internalState_t state) {

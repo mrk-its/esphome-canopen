@@ -32,10 +32,10 @@ canopen:
   heartbeat_clients:
     - node_id: 0x01
       timeout: 7s
-  on_hb_consumer_event:
-    - logger.log:
-        format: "hb consumer event, node 0x%02x"
-        args: [node_id]
+  on_node_event:
+    - lambda: |-
+        if (event == esphome::canopen::NodeEvent::OFFLINE)
+          ESP_LOGW("test", "node 0x%02x offline", node_id);
   on_heartbeat:
     - logger.log:
         format: "heartbeat: node 0x%02x %s"

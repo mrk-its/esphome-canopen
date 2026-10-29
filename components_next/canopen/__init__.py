@@ -3,7 +3,7 @@ from pathlib import Path
 import esphome.config_validation as cv
 import esphome.codegen as cg
 from esphome import automation
-from esphome.const import CONF_ID, CONF_TRIGGER_ID
+from esphome.const import CONF_ID
 from esphome.core import CORE
 from esphome.components.canbus import CanbusComponent
 
@@ -17,7 +17,7 @@ CONF_NODE_ID = "node_id"
 CONF_HEARTBEAT_INTERVAL = "heartbeat_interval"
 CONF_HEARTBEAT_CLIENTS = "heartbeat_clients"
 CONF_TIMEOUT = "timeout"
-CONF_ON_HB_CONSUMER_EVENT = "on_hb_consumer_event"
+CONF_ON_NODE_EVENT = "on_node_event"
 CONF_ON_HEARTBEAT = "on_heartbeat"
 CONF_ON_EMCY = "on_emcy"
 CONF_CANOPENNODE_PATH = "canopennode_path"
@@ -31,13 +31,16 @@ PORT_PATH = Path(__file__).resolve().parent / "canopennode_port"
 
 ns = cg.esphome_ns.namespace("canopen")
 CANopenComponent = ns.class_("CANopenComponent", cg.Component)
-HbConsumerEventTrigger = ns.class_(
-    "HbConsumerEventTrigger", automation.Trigger.template(cg.uint8)
-)
 NMTState = ns.enum("NMTState", is_class=True)
+NodeEvent = ns.enum("NodeEvent", is_class=True)
 Emergency = ns.struct("Emergency")
 
 CALLBACK_AUTOMATIONS = (
+    automation.CallbackAutomation(
+        CONF_ON_NODE_EVENT,
+        "add_on_node_event_callback",
+        [(cg.uint8, "node_id"), (NodeEvent, "event"), (NMTState, "state")],
+    ),
     automation.CallbackAutomation(
         CONF_ON_HEARTBEAT,
         "add_on_heartbeat_callback",
@@ -59,11 +62,25 @@ def absolute_path(value):
 HB_CLIENT_SCHEMA = cv.Schema(
     {
         cv.Required(CONF_NODE_ID): cv.All(cv.int_, cv.Range(min=1, max=127)),
-        cv.Required(CONF_TIMEOUT): cv.positive_time_period_milliseconds,
+        # 0x1016 holds the timeout as uint16 ms
+        cv.Required(CONF_TIMEOUT): cv.All(
+            cv.positive_time_period_milliseconds,
+            cv.Range(min=cv.TimePeriod(milliseconds=1), max=cv.TimePeriod(milliseconds=65535)),
+        ),
     }
 )
 
-CONFIG_SCHEMA = cv.Schema(
+
+def validate_heartbeat_clients(config):
+    for client in config[CONF_HEARTBEAT_CLIENTS]:
+        if client[CONF_NODE_ID] == config[CONF_NODE_ID]:
+            raise cv.Invalid(
+                f"heartbeat_clients: node_id {client[CONF_NODE_ID]} is this node's own id"
+            )
+    return config
+
+
+CONFIG_SCHEMA = cv.All(cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(CANopenComponent),
         cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
@@ -72,16 +89,15 @@ CONFIG_SCHEMA = cv.Schema(
             CONF_HEARTBEAT_INTERVAL, "5000ms"
         ): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_HEARTBEAT_CLIENTS, []): cv.ensure_list(HB_CLIENT_SCHEMA),
-        cv.Optional(CONF_ON_HB_CONSUMER_EVENT): automation.validate_automation(
-            {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(HbConsumerEventTrigger)}
-        ),
+        # events of the heartbeat_clients nodes (online, offline, NMT changed, reset)
+        cv.Optional(CONF_ON_NODE_EVENT): automation.validate_automation({}),
         # every heartbeat / EMCY frame on the bus, any node
         cv.Optional(CONF_ON_HEARTBEAT): automation.validate_automation({}),
         cv.Optional(CONF_ON_EMCY): automation.validate_automation({}),
         # local CANopenNode checkout instead of CANOPENNODE_SOURCE (development)
         cv.Optional(CONF_CANOPENNODE_PATH): absolute_path,
     }
-).extend(cv.COMPONENT_SCHEMA)
+).extend(cv.COMPONENT_SCHEMA), validate_heartbeat_clients)
 
 
 async def to_code(config):
@@ -112,14 +128,9 @@ async def to_code(config):
     cg.add(var.set_heartbeat_interval(config[CONF_HEARTBEAT_INTERVAL]))
     for client in config[CONF_HEARTBEAT_CLIENTS]:
         cg.add(
-            var.add_heartbeat_consumer(
+            var.monitor_node(
                 client[CONF_NODE_ID], client[CONF_TIMEOUT].total_milliseconds
             )
         )
-
-    for conf in config.get(CONF_ON_HB_CONSUMER_EVENT, []):
-        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
-        await automation.build_automation(trigger, [(cg.uint8, "node_id")], conf)
-        cg.add(var.set_hb_consumer_event_trigger(trigger))
 
     await automation.build_callback_automations(var, config, CALLBACK_AUTOMATIONS)

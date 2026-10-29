@@ -13,18 +13,30 @@
 namespace esphome {
 namespace canopen {
 
-class HbConsumerEventTrigger : public Trigger<uint8_t> {};
-
 class CANopenComponent : public Component {
  public:
   explicit CANopenComponent(uint8_t node_id) : node_id_(node_id) {}
 
   void set_canbus(canbus::Canbus *canbus);
   void set_heartbeat_interval(uint32_t ms) { this->hb_producer_ms_ = ms; }
-  void add_heartbeat_consumer(uint8_t node_id, uint16_t timeout_ms) {
-    this->hb_cons_.push_back(((uint32_t) node_id << 16) | timeout_ms);
+
+  // Heartbeat monitoring of another node (CANopenNode heartbeat consumer, OD 0x1016). Before setup() only (called
+  // from codegen). Registering a node again keeps the shortest timeout.
+  void monitor_node(uint8_t node_id, uint16_t timeout_ms);
+  // events of all monitored nodes: (node_id, event, state)
+  template<typename F> void add_on_node_event_callback(F &&callback) {
+    this->node_event_callback_.add(std::forward<F>(callback));
   }
-  void set_hb_consumer_event_trigger(HbConsumerEventTrigger *trigger) { this->on_hb_cons_event_ = trigger; }
+  // events of one monitored node: (event, state)
+  template<typename F> void add_on_node_event(uint8_t node_id, F &&callback) {
+    this->node_event_callback_.add([node_id, callback](uint8_t node, NodeEvent event, NMTState state) {
+      if (node == node_id)
+        callback(event, state);
+    });
+  }
+  // state of a monitored node from its last heartbeat; UNKNOWN / false for nodes that aren't monitored
+  NMTState get_node_state(uint8_t node_id);
+  bool is_node_online(uint8_t node_id);
 
   // every heartbeat / EMCY frame on the bus, from any node (our own frames aren't received)
   template<typename F> void add_on_heartbeat_callback(F &&callback) {
@@ -51,6 +63,7 @@ class CANopenComponent : public Component {
   void on_frame_(uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data);
   void process_();
   void check_frame_listener_(uint32_t can_id, uint32_t mask);
+  void node_event_(uint8_t node_id, NodeEvent event, NMTState state);
 
   static void on_hb_started_(uint8_t node_id, uint8_t idx, void *object);
   static void on_hb_nmt_changed_(uint8_t node_id, uint8_t idx, CO_NMT_internalState_t state, void *object);
@@ -73,7 +86,7 @@ class CANopenComponent : public Component {
   std::vector<uint32_t> hb_cons_;      // 0x1016:1.., (node_id << 16) | timeout_ms
 
   uint32_t last_us_{0};
-  HbConsumerEventTrigger *on_hb_cons_event_{nullptr};
+  LazyCallbackManager<void(uint8_t, NodeEvent, NMTState)> node_event_callback_;
   struct FrameListener {
     uint32_t can_id;
     uint32_t mask;

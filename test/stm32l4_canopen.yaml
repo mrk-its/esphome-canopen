@@ -143,10 +143,16 @@ canopen:
   heartbeat_clients:
     - node_id: 0x01
       timeout: 7s  # node 0x01 sends a heartbeat every 5 s
-  on_hb_consumer_event:
+    # duplicate on purpose: merged into one 0x1016 entry with the shorter timeout (7 s)
+    - node_id: 0x01
+      timeout: 10s
+  on_node_event:
     - logger.log:
-        format: "heartbeat lost: node 0x%02x"
-        args: [node_id]
+        format: "node event: node 0x%02x %s, %s"
+        args:
+          - node_id
+          - "esphome::canopen::node_event_to_string(event)"
+          - "esphome::canopen::nmt_state_to_string(state)"
   on_heartbeat:
     - logger.log:
         format: "heartbeat: node 0x%02x %s"

@@ -20,6 +20,14 @@ enum class NMTState : uint8_t {
 
 const char *nmt_state_to_string(NMTState state);
 
+// Events of a monitored node (CANopenComponent::monitor_node(), from CANopenNode's heartbeat consumer):
+// ONLINE: first heartbeat, or the first after a timeout; OFFLINE: no heartbeat within the timeout;
+// NMT_CHANGED: the state in the heartbeat changed (also unknown -> state right after ONLINE, state -> unknown after
+// OFFLINE); RESET: boot-up message, the node restarted and lost its runtime configuration.
+enum class NodeEvent : uint8_t { ONLINE, OFFLINE, NMT_CHANGED, RESET };
+
+const char *node_event_to_string(NodeEvent event);
+
 // raw CAN frame listener (see CANopenComponent::add_frame_listener()); data is valid only during the call
 using FrameCallback = void (*)(void *context, uint32_t can_id, const uint8_t *data, uint8_t len);
 

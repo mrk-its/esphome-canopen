@@ -145,16 +145,23 @@ NMT:
 - `bool send_nmt(node, NMTCommand)` → `CO_NMT_sendCommand()` (node 0 = all; for our own id or 0 CANopenNode also
   applies it to us). `NMTState get_nmt_state() const` for our own state.
 
-Node monitoring (CANopenNode HB consumer):
+Node monitoring (CANopenNode HB consumer; done, moved to PR 1):
 - `void monitor_node(uint8_t node, uint16_t timeout_ms)`: called from codegen, before `setup()`. All monitored nodes
   plus the YAML `heartbeat_clients` become the 0x1016 entries; duplicates are merged (CANopenNode rejects duplicate
   node ids in 0x1016), keeping the shortest timeout.
-- `template<typename F> void add_on_node_event(uint8_t node, F &&cb)` with `(NodeEvent, NMTState)`, from the HB
-  consumer callbacks (`HeartbeatStarted` → ONLINE, `Timeout` → OFFLINE, `NmtChanged` → NMT_CHANGED,
-  `RemoteReset` → RESET).
+- One `LazyCallbackManager<void(uint8_t node, NodeEvent, NMTState)>`, fed from the HB consumer callbacks
+  (`HeartbeatStarted` → ONLINE, `Timeout` → OFFLINE, `NmtChanged` → NMT_CHANGED, `RemoteReset` → RESET):
+  `add_on_node_event_callback(F)` gets all monitored nodes (the YAML trigger), `add_on_node_event(node, F)` with
+  `(NodeEvent, NMTState)` is a filter on top for profiles. Events are passed as CANopenNode reports them:
+  NMT_CHANGED also comes right after ONLINE (unknown → state) and after OFFLINE (→ unknown). ONLINE's state is read
+  from the consumer entry directly: `CO_HBconsumer_getNmtState()` returns it only once HBstate is ACTIVE, which is
+  set after the started callback.
 - `NMTState get_node_state(node)`, `bool is_node_online(node)` via `CO_HBconsumer_getIdxByNodeId` /
   `CO_HBconsumer_getState` / `CO_HBconsumer_getNmtState`.
-- `heartbeat_clients` + `on_hb_consumer_event` from step 1 are rebuilt on this (same YAML).
+- YAML: `heartbeat_clients` (→ `monitor_node()`; timeout max 65535 ms, uint16 in 0x1016; our own node id is
+  rejected) and **`on_node_event`** (`node_id`, `event`, `state`), which **replaces `on_hb_consumer_event`**
+  (decision 2026-10-29: one trigger with all events; the new component has no compatibility obligation, the old
+  name goes away at the switch-over).
 
 Raw events (any node, no registration; done, moved to PR 1):
 - `add_on_heartbeat_callback(F)` with `(uint8_t node, NMTState)` for every heartbeat frame, and
