@@ -330,7 +330,8 @@ The SDO server and our own entities/OTA/logs (steps 3-8) are a later chain.
 
 How the branches are made: `components_next/canopen` stays the full development tree (tested on hardware here).
 In `~/repos/esphome` (branches from `upstream/dev`, nothing pushed, no PRs opened):
-- `canopen`: the full `components_next` state as one commit (reference);
+- (the `canopen` reference branch with the full component is deleted, 2026-10-29: `components_next` is the full
+  tree, each PR branch is cut from it)
 - `canopen-1-node`: PR 1, one commit, cut from `components_next` by removing the later parts (raw events, frame
   listeners, `send_frame()`, `add_record()`, `add_on_node_event(node, cb)`, the port header's SDO/PDO/CRC/FIFO
   config). Later PR branches stack on it and add those parts back.
