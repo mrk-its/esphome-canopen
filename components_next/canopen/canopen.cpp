@@ -11,21 +11,6 @@ namespace canopen {
 
 ESPHOME_LOG_TAG(TAG, "canopen");
 
-static const char *nmt_state_str(CO_NMT_internalState_t state) {
-  switch (state) {
-    case CO_NMT_INITIALIZING:
-      return "initializing";
-    case CO_NMT_PRE_OPERATIONAL:
-      return "pre-operational";
-    case CO_NMT_OPERATIONAL:
-      return "operational";
-    case CO_NMT_STOPPED:
-      return "stopped";
-    default:
-      return "unknown";
-  }
-}
-
 const char *nmt_state_to_string(NMTState state) {
   switch (state) {
     case NMTState::BOOTUP:
@@ -313,7 +298,7 @@ void CANopenComponent::on_hb_remote_reset_(uint8_t node_id, uint8_t idx, void *o
 }
 
 void CANopenComponent::on_nmt_changed_(CO_NMT_internalState_t state) {
-  ESP_LOGI(TAG, "NMT state: %s", nmt_state_str(state));
+  ESP_LOGI(TAG, "NMT state: %s", nmt_state_to_string(to_nmt_state(state)));
 }
 
 }  // namespace canopen

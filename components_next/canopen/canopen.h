@@ -30,13 +30,6 @@ class CANopenComponent : public Component {
   template<typename F> void add_on_node_event_callback(F &&callback) {
     this->node_event_callback_.add(std::forward<F>(callback));
   }
-  // events of one monitored node: (event, state)
-  template<typename F> void add_on_node_event(uint8_t node_id, F &&callback) {
-    this->node_event_callback_.add([node_id, callback](uint8_t node, NodeEvent event, NMTState state) {
-      if (node == node_id)
-        callback(event, state);
-    });
-  }
   // state of a monitored node from its last heartbeat; UNKNOWN / false for nodes that aren't monitored
   NMTState get_node_state(uint8_t node_id);
   bool is_node_online(uint8_t node_id);
