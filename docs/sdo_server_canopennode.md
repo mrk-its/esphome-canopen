@@ -7,7 +7,7 @@ old combined component:
 - generic CiA 301, nothing esphome-canopen specific: `identity:` (`vendor_id`, `product_code`, `revision_number`,
   `serial_number`, default 0) instead of the fixed ESPHome vendor/product, `device_name` (default: the node's name),
   `hardware_version` (0x1009 only if set), `software_version` (default `ESPHOME_VERSION`), with setters
-  (`set_identity()`, `set_device_name()`, ...) so `esphome_entity_mapper` sets the ESPHome values and can2mqtt's
+  (`set_identity()`, `set_device_name()`, ...) so `canopen_entity_mapper` sets the ESPHome values and can2mqtt's
   version string;
 - the SDO server is always on (CiA 301), segmented only with CANopenNode's 32-byte buffer (port header defaults
   `CO_CONFIG_SDO_SRV` / `_BUFFER_SIZE`); block transfer (buffer >= 900) comes with OTA / the block size option;

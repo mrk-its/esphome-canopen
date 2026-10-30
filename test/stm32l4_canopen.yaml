@@ -10,7 +10,7 @@ external_components:
     components: [canopen]
   # entity mapper (step 7)
   - source: ../components_next
-    components: [esphome_entity_mapper]
+    components: [canopen_entity_mapper]
   # profile API hardware test (canopen_test_profile below)
   - source: external
 
@@ -304,7 +304,7 @@ binary_sensor:
     id: test_binary
     name: "Test binary"
 
-esphome_entity_mapper:
+canopen_entity_mapper:
   canopen_id: can_gate
   entities:
     - id: uptime_sensor

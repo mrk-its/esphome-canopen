@@ -40,7 +40,7 @@ ESPHOME_VENDOR_ID = 0xA59A08F5
 ESPHOME_PRODUCT_CODE = 0x6BDFA1D9
 ESPHOME_REVISION = 1
 
-ns = cg.esphome_ns.namespace("esphome_entity_mapper")
+ns = cg.esphome_ns.namespace("canopen_entity_mapper")
 EntityMapper = ns.class_("EntityMapper", cg.Component)
 
 # entity C++ class -> layout domain; order matters only for classes inheriting from each other
@@ -185,7 +185,7 @@ async def to_code(config: ConfigType) -> None:
     cg.add(hub.set_software_version(cg.RawExpression(f"version_str_{node_id} + 18")))
 
     # the mapper keeps its entities in a StaticVector of this size
-    cg.add_define("ESPHOME_ENTITY_MAPPER_ENTITIES", max(1, len(config[CONF_ENTITIES])))
+    cg.add_define("CANOPEN_ENTITY_MAPPER_ENTITIES", max(1, len(config[CONF_ENTITIES])))
     var = cg.new_Pvariable(config[CONF_ID], hub)
     await cg.register_component(var, config)
 

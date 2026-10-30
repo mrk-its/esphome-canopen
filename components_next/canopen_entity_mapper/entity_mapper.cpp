@@ -8,9 +8,9 @@
 #include "esphome/core/log.h"
 #include "esphome/core/progmem.h"
 
-namespace esphome::esphome_entity_mapper {
+namespace esphome::canopen_entity_mapper {
 
-ESPHOME_LOG_TAG(TAG, "esphome_entity_mapper");
+ESPHOME_LOG_TAG(TAG, "canopen_entity_mapper");
 
 using canopen::OD_READ;
 using canopen::OD_TPDO;
@@ -320,4 +320,4 @@ void EntityMapper::dump_config() {
   }
 }
 
-}  // namespace esphome::esphome_entity_mapper
+}  // namespace esphome::canopen_entity_mapper

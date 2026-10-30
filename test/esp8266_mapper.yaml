@@ -1,4 +1,4 @@
-# ESP8266 build check for esphome_entity_mapper on the upstream canopen hub (~/repos/esphome, branch canopen-next),
+# ESP8266 build check for canopen_entity_mapper on the upstream canopen hub (~/repos/esphome, branch canopen-next),
 # with upstream ESPHome (dev venv): ~/repos/esphome-upstream-venv/bin/esphome compile test/esp8266_mapper.yaml
 
 external_components:
@@ -7,7 +7,7 @@ external_components:
       path: ../../esphome/esphome/components
     components: [canopen]
   - source: ../components_next
-    components: [esphome_entity_mapper]
+    components: [canopen_entity_mapper]
 
 esphome:
   name: esp8266-mapper
@@ -51,7 +51,7 @@ switch:
     name: Test switch
     optimistic: true
 
-esphome_entity_mapper:
+canopen_entity_mapper:
   canopen_id: can_hub
   entities:
     - id: uptime_sensor

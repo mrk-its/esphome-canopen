@@ -1,4 +1,4 @@
-"""Tests for components_next/esphome_entity_mapper (run: pytest test/).
+"""Tests for components_next/canopen_entity_mapper (run: pytest test/).
 
 Codegen and validation go through the ESPHome CLI of the upstream venv (`esphome compile --only-generate`,
 `esphome config`), with the canopen hub from an upstream checkout (branch canopen-next) as a local external
@@ -16,7 +16,7 @@ import subprocess
 import pytest
 
 REPO = Path(__file__).parent.parent
-MAPPER = REPO / "components_next" / "esphome_entity_mapper"
+MAPPER = REPO / "components_next" / "canopen_entity_mapper"
 VENV = Path(os.environ.get("ESPHOME_UPSTREAM_VENV", Path.home() / "repos" / "esphome-upstream-venv"))
 HUB = Path(os.environ.get("ESPHOME_CANOPEN_HUB", Path.home() / "repos" / "esphome" / "esphome" / "components"))
 ESPHOME = VENV / "bin" / "esphome"
@@ -37,7 +37,7 @@ external_components:
   - source: {{type: local, path: {HUB}}}
     components: [canopen]
   - source: {{type: local, path: {REPO / "components_next"}}}
-    components: [esphome_entity_mapper]
+    components: [canopen_entity_mapper]
 esphome:
   name: mapper-test
 esp8266:
@@ -87,7 +87,7 @@ def write_config(tmp_path: Path, entities: list) -> Path:
     path = tmp_path / "node.yaml"
     # JSON is YAML (flow style)
     mapper = {"canopen_id": "can_hub", "entities": entities}
-    path.write_text(BASE + f"esphome_entity_mapper: {json.dumps(mapper)}\n", encoding="utf-8")
+    path.write_text(BASE + f"canopen_entity_mapper: {json.dumps(mapper)}\n", encoding="utf-8")
     return path
 
 
@@ -170,7 +170,7 @@ def test_codegen(tmp_path):
     positions = [main_cpp.index(f"{mapper}{call};") for call in calls]
     assert positions == sorted(positions)
     # the entity StaticVector
-    assert "#define ESPHOME_ENTITY_MAPPER_ENTITIES 8" in defines
+    assert "#define CANOPEN_ENTITY_MAPPER_ENTITIES 8" in defines
 
 
 @needs_esphome
@@ -179,7 +179,7 @@ def test_codegen_no_entities(tmp_path):
     for tpdo in range(layout.TPDO_COUNT):
         assert f"can_hub->configure_tpdo({tpdo}, {layout.tpdo_cob_id(tpdo, NODE_ID)}, {{}});" in main_cpp
     assert "->add_" not in main_cpp.split("set_layout_hash")[1]
-    assert "#define ESPHOME_ENTITY_MAPPER_ENTITIES 1" in defines
+    assert "#define CANOPEN_ENTITY_MAPPER_ENTITIES 1" in defines
 
 
 @needs_esphome

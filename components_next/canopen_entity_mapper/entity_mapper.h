@@ -31,7 +31,7 @@
 #include "esphome/components/alarm_control_panel/alarm_control_panel.h"
 #endif
 
-namespace esphome::esphome_entity_mapper {
+namespace esphome::canopen_entity_mapper {
 
 // Entity type codes (0x2001:N bits 0..7), see OBJECT_DICTIONARY.md
 enum EntityType : uint8_t {
@@ -170,8 +170,8 @@ class EntityMapper : public Component {
 #endif
 
   canopen::CANopenComponent *hub_;
-  // ESPHOME_ENTITY_MAPPER_ENTITIES: from codegen, the number of entities
-  StaticVector<MappedEntity, ESPHOME_ENTITY_MAPPER_ENTITIES> entities_;
+  // CANOPEN_ENTITY_MAPPER_ENTITIES: from codegen, the number of entities
+  StaticVector<MappedEntity, CANOPEN_ENTITY_MAPPER_ENTITIES> entities_;
   // 0x2001: entity types, sub N = type of entity N
   uint8_t types_highest_{0};
   // 0x3002: TPDO layout hash (layout.py)
@@ -179,4 +179,4 @@ class EntityMapper : public Component {
   uint32_t layout_hash_{0};
 };
 
-}  // namespace esphome::esphome_entity_mapper
+}  // namespace esphome::canopen_entity_mapper

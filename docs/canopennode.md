@@ -258,7 +258,7 @@ Things to watch:
 
 ## Layers (target)
 ```
-entity mapper    (esphome_entity_mapper) ESPHome entities <-> 0x2000+, remote slots 0x4000+, template_entities,
+entity mapper    (canopen_entity_mapper) ESPHome entities <-> 0x2000+, remote slots 0x4000+, template_entities,
                  remote states (rpdo: {node, entity}, platform: canopen), canopen.<domain>.<action>,
                  OD writer, layout hash   (layout.py, remote.py unchanged)
 services         OTA (0x3000), remote logs (0x3100), device API (SDO client queue, NMT, HB, EMCY)
@@ -305,14 +305,14 @@ Each step is a commit on `feature/canopennode` (or its own `feature/...` branch)
 8. **Commands from the host:** the OD writer (COB-ID `0x500 + node`, data `[node, sub, idx_lo, idx_hi, value...]`,
    written through the OD IO so handlers fire), loopback between local instances. The remote states (RPDO slots
    `0x4000+n`, `rpdo: {node, entity}`, `platform: canopen` entities reading other nodes, `canopen.<domain>.<action>`)
-   stay, but in the entity mapper (`esphome_entity_mapper`), not in the `canopen` hub (decision 2026-10-30; replaces
+   stay, but in the entity mapper (`canopen_entity_mapper`), not in the `canopen` hub (decision 2026-10-30; replaces
    the 2026-10-29 decision to drop them).
 9. **Switch over:**
    - `components_next/canopen` replaces `components/canopen`;
    - remove the canopen-stack code (`co_cmd`, `co_storage`, the old `driver_can`/`od`, the `CO_*` build flags,
      `cg.add_library("canopenstack")`);
    - the remote-state code (`remote.py`, `remote_entities.*`, the `platform: canopen` entity files) moves to
-     `esphome_entity_mapper`;
+     `canopen_entity_mapper`;
    - update CLAUDE.md and `docs/`;
    - check that `CANOPENNODE_SOURCE` points at the current fork commit (or CANopenNode upstream, if it took the
      `library.json`);
@@ -388,12 +388,13 @@ callback refactors):
     and kept.
   - Mapper: no string copies (metadata strings are read from the entity by the handler on each upload: name and
     device class from flash on ESP8266, unit, state class), entities in a `StaticVector` sized by codegen
-    (`ESPHOME_ENTITY_MAPPER_ENTITIES`), states in `std::array`, callbacks capturing only the entity pointer,
+    (`CANOPEN_ENTITY_MAPPER_ENTITIES`), states in `std::array`, callbacks capturing only the entity pointer,
     `static constexpr`, `ESPHOME_LOG_TAG`, concatenated namespace, Python type hints. stm32l4 flash -2.8 KB.
 
 ## Hub for the entity mapper
 Target split (2026-10-30): the `canopen` hub (generic CiA 301) goes upstream; everything specific to esphome-canopen
-and can2mqtt stays here as the external component `esphome_entity_mapper`, which refers to a hub with `canopen_id`:
+and can2mqtt stays here as the external component `canopen_entity_mapper` (named `esphome_entity_mapper` until
+2026-10-31), which refers to a hub with `canopen_id`:
 entities (0x2000+16n), TPDO layout and hash (0x3002), remote states (0x4000+n, `rpdo: {node, entity}`,
 `platform: canopen`, `canopen.<domain>.<action>`), the OD writer, OTA (0x3000), remote logs (0x3100), and the
 ESPHome identity values and version string.
@@ -500,7 +501,7 @@ disabled); the layout hash; the identity after the hub's default; the version st
 the validation errors (duplicate index, unsupported domain, TPDO over 8 bytes, caps, size, ranges). It also checks
 that `layout.py` is identical to the old component's copy. ESP8266 build check: `test/esp8266_mapper.yaml`.
 
-Open points for `esphome_entity_mapper` itself (not in the steps yet):
+Open points for `canopen_entity_mapper` itself (not in the steps yet):
 - OD writer COB-ID (step 8): today `0x500 + target`, which is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7
   frame whose first byte equals another node's id is applied there as an OD write; the ID also has several
   producers. Proposal: the CiA 301 MPDO format (destination address mode: byte 0 = `0x80 | target`, 0 = all;
@@ -512,7 +513,7 @@ Open points for `esphome_entity_mapper` itself (not in the steps yet):
 - `canopen.entity_cmd` (a command to another node's entity, on `write_sdo` or the OD writer frame);
 - `csdo:` and its lambda API (`setup_csdo`, `csdo_recv`, `csdo_send_*`): map onto the hub's SDO client; custom
   tx/rx IDs need the pinned channels (device_api_canopennode.md, "Open points");
-- user migration: YAML changes from one `canopen:` block to `canopen:` + `esphome_entity_mapper:`; update
+- user migration: YAML changes from one `canopen:` block to `canopen:` + `canopen_entity_mapper:`; update
   `configuration.md` / `linking-nodes.md`;
 - until the hub is merged, where the mapper gets the hub from (the esphome fork branch as an external component, or
   `components_next` here).
