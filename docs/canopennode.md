@@ -362,6 +362,15 @@ entities (0x2000+16n), TPDO layout and hash (0x3002), remote states (0x4000+n, `
 `platform: canopen`, `canopen.<domain>.<action>`), the OD writer, OTA (0x3000), remote logs (0x3100), and the
 ESPHome identity values and version string.
 
+**Milestone (2026-10-30): can2mqtt discovers a node on the new hub.** `test/stm32l4_canopen.yaml` (hub from
+`canopen-next`, PRs 1-8) with `test/can2mqtt_test.h`: the ESPHome identity (vendor `0xA59A08F5`, product
+`0x6BDFA1D9`, revision 1), one hand-built sensor in the entity layout (0x2001 types, 0x2010 metadata, 0x2011:1 REAL32
+state) through `get_od()`, read-only TPDO config records (0x1800-0x1807 / 0x1A00-0x1A07, TPDO 0 on 0x1FF mapped to
+0x2011:1) and the TPDO emulated with `send_frame()` every 5 s. can2mqtt ran its whole discovery (identity, strings
+as segmented uploads, entity types, metadata, the TPDO config, the initial state) and the sensor shows up in Home
+Assistant with live values. Confirms PRs 7/8 against a real client; real entities need PR 9 (own PDOs) and the
+mapper building this from YAML.
+
 What the hub still lacks for that (checked against `components_next`, 2026-10-30):
 1. **SDO server** (0x1200, `CNT_SDO_SRV = 1`): can2mqtt only talks to nodes through it
    (step 3, [sdo_server_canopennode.md](sdo_server_canopennode.md)). **Done, PR 7**: always on (CiA 301), segmented,
