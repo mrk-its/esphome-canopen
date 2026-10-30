@@ -34,7 +34,7 @@ canopen:
       timeout: 7s
   on_node_event:
     - lambda: |-
-        if (event == esphome::canopen::NodeEvent::OFFLINE)
+        if (event == esphome::canopen::NodeEvent::NODE_EVENT_OFFLINE)
           ESP_LOGW("test", "node 0x%02x offline", node_id);
   on_heartbeat:
     - logger.log:

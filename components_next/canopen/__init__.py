@@ -54,11 +54,11 @@ SDOWriteAction = ns.class_("SDOWriteAction", automation.Action)
 NMTAction = ns.class_("NMTAction", automation.Action)
 
 NMT_COMMANDS = {
-    "start": NMTCommand.START,
-    "stop": NMTCommand.STOP,
-    "pre_operational": NMTCommand.PRE_OPERATIONAL,
-    "reset_node": NMTCommand.RESET_NODE,
-    "reset_communication": NMTCommand.RESET_COMMUNICATION,
+    "start": NMTCommand.NMT_COMMAND_START,
+    "stop": NMTCommand.NMT_COMMAND_STOP,
+    "pre_operational": NMTCommand.NMT_COMMAND_PRE_OPERATIONAL,
+    "reset_node": NMTCommand.NMT_COMMAND_RESET_NODE,
+    "reset_communication": NMTCommand.NMT_COMMAND_RESET_COMMUNICATION,
 }
 
 KEY_CANOPEN = "canopen"

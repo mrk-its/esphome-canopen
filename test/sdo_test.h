@@ -40,7 +40,7 @@ struct Test {
   // TEST_NODE heartbeats, from on_heartbeat
   uint32_t hb_last_ms{0};
   uint32_t hb_interval_ms{0};
-  NMTState hb_state{NMTState::UNKNOWN};
+  NMTState hb_state{NMTState::NMT_STATE_UNKNOWN};
   uint16_t hb_orig{0};  // measured period, 0 = no heartbeat seen
 
   void check(bool ok, const char *what) {
@@ -133,7 +133,7 @@ inline void start(CANopenComponent *co, uint8_t own_node_id) {
   });
   s.push_back([] {
     test.co->read_sdo<uint32_t>(TEST_NODE, 0x1001, 0, on_reply, pending([](const SDOReply &r) {
-                                  test.check(r.result == SDOResult::SIZE_MISMATCH && r.size == 1,
+                                  test.check(r.result == SDOResult::SDO_RESULT_SIZE_MISMATCH && r.size == 1,
                                              "read<uint32_t> of a u8 -> SIZE_MISMATCH");
                                   test.next();
                                 }));
@@ -155,7 +155,7 @@ inline void start(CANopenComponent *co, uint8_t own_node_id) {
   });
   s.push_back([] {
     test.co->read_sdo(TEST_NODE, 0x5FFF, 0, 0, on_reply, pending([](const SDOReply &r) {
-                        test.check(r.result == SDOResult::ABORT && r.abort_code == 0x06020000,
+                        test.check(r.result == SDOResult::SDO_RESULT_ABORT && r.abort_code == 0x06020000,
                                    "read 0x5FFF -> ABORT 0x06020000");
                         test.next();
                       }));
@@ -165,7 +165,7 @@ inline void start(CANopenComponent *co, uint8_t own_node_id) {
     test.co->read_sdo(ABSENT_NODE, 0x1000, 0, 0, on_reply, pending([](const SDOReply &r) {
                         uint32_t dt = millis() - test.t0;
                         ESP_LOGI(TAG, "absent node: %s after %u ms", sdo_result_to_string(r.result), (unsigned) dt);
-                        test.check(r.result == SDOResult::TIMEOUT && dt >= 450 && dt < 1000,
+                        test.check(r.result == SDOResult::SDO_RESULT_TIMEOUT && dt >= 450 && dt < 1000,
                                    "read from absent node -> TIMEOUT after ~500 ms");
                         test.next();
                       }));
@@ -272,26 +272,26 @@ inline void start(CANopenComponent *co, uint8_t own_node_id) {
   });
   // NMT: the state in the next heartbeats
   s.push_back([] {
-    test.check(test.co->send_nmt(TEST_NODE, NMTCommand::PRE_OPERATIONAL), "send_nmt PRE_OPERATIONAL");
+    test.check(test.co->send_nmt(TEST_NODE, NMTCommand::NMT_COMMAND_PRE_OPERATIONAL), "send_nmt PRE_OPERATIONAL");
     if (test.hb_orig == 0) {
       test.skip("node state pre-operational");
       test.next();
       return;
     }
     test.after(test.hb_orig + 500, [] {
-      test.check(test.hb_state == NMTState::PRE_OPERATIONAL, "heartbeat state pre-operational");
+      test.check(test.hb_state == NMTState::NMT_STATE_PRE_OPERATIONAL, "heartbeat state pre-operational");
       test.next();
     });
   });
   s.push_back([] {
-    test.check(test.co->send_nmt(TEST_NODE, NMTCommand::START), "send_nmt START");
+    test.check(test.co->send_nmt(TEST_NODE, NMTCommand::NMT_COMMAND_START), "send_nmt START");
     if (test.hb_orig == 0) {
       test.skip("node state operational");
       test.next();
       return;
     }
     test.after(test.hb_orig + 500, [] {
-      test.check(test.hb_state == NMTState::OPERATIONAL, "heartbeat state operational");
+      test.check(test.hb_state == NMTState::NMT_STATE_OPERATIONAL, "heartbeat state operational");
       test.next();
     });
   });

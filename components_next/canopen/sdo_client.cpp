@@ -18,17 +18,17 @@ static constexpr uint32_t ABORT_GUARD_MS = 50;
 
 const char *sdo_result_to_string(SDOResult result) {
   switch (result) {
-    case SDOResult::SUCCESS:
+    case SDOResult::SDO_RESULT_SUCCESS:
       return "success";
-    case SDOResult::ABORT:
+    case SDOResult::SDO_RESULT_ABORT:
       return "abort";
-    case SDOResult::TIMEOUT:
+    case SDOResult::SDO_RESULT_TIMEOUT:
       return "timeout";
-    case SDOResult::SIZE_MISMATCH:
+    case SDOResult::SDO_RESULT_SIZE_MISMATCH:
       return "size mismatch";
-    case SDOResult::TRANSPORT_ERROR:
+    case SDOResult::SDO_RESULT_TRANSPORT_ERROR:
       return "transport error";
-    case SDOResult::REJECTED:
+    case SDOResult::SDO_RESULT_REJECTED:
       return "rejected";
     default:
       return "unknown";
@@ -37,7 +37,7 @@ const char *sdo_result_to_string(SDOResult result) {
 
 static void reject(SDOCallback callback, void *context) {
   if (callback != nullptr)
-    callback(context, SDOReply{SDOResult::REJECTED, 0, 0, 0, nullptr, 0});
+    callback(context, SDOReply{SDOResult::SDO_RESULT_REJECTED, 0, 0, 0, nullptr, 0});
 }
 
 bool CANopenComponent::read_sdo(uint8_t node_id, uint16_t index, uint8_t sub, uint8_t expected_size,
@@ -46,7 +46,7 @@ bool CANopenComponent::read_sdo(uint8_t node_id, uint16_t index, uint8_t sub, ui
     reject(callback, context);
     return false;
   }
-  return this->queue_sdo_(SDORequest{node_id, index, sub, SDOKind::READ, expected_size, 0, {}, callback, context});
+  return this->queue_sdo_(SDORequest{node_id, index, sub, SDOKind::SDO_KIND_READ, expected_size, 0, {}, callback, context});
 }
 
 bool CANopenComponent::write_sdo(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size,
@@ -55,12 +55,12 @@ bool CANopenComponent::write_sdo(uint8_t node_id, uint16_t index, uint8_t sub, u
     reject(callback, context);
     return false;
   }
-  return this->queue_sdo_(SDORequest{node_id, index, sub, SDOKind::WRITE, size, value, {}, callback, context});
+  return this->queue_sdo_(SDORequest{node_id, index, sub, SDOKind::SDO_KIND_WRITE, size, value, {}, callback, context});
 }
 
 bool CANopenComponent::read_sdo_data(uint8_t node_id, uint16_t index, uint8_t sub, SDOCallback callback,
                                      void *context) {
-  return this->queue_sdo_(SDORequest{node_id, index, sub, SDOKind::READ_DATA, 0, 0, {}, callback, context});
+  return this->queue_sdo_(SDORequest{node_id, index, sub, SDOKind::SDO_KIND_READ_DATA, 0, 0, {}, callback, context});
 }
 
 bool CANopenComponent::write_sdo_data(uint8_t node_id, uint16_t index, uint8_t sub, const uint8_t *data, size_t len,
@@ -69,7 +69,7 @@ bool CANopenComponent::write_sdo_data(uint8_t node_id, uint16_t index, uint8_t s
     reject(callback, context);
     return false;
   }
-  return this->queue_sdo_(SDORequest{node_id, index, sub, SDOKind::WRITE_DATA, 0, 0,
+  return this->queue_sdo_(SDORequest{node_id, index, sub, SDOKind::SDO_KIND_WRITE_DATA, 0, 0,
                                      std::vector<uint8_t>(data, data + len), callback, context});
 }
 
@@ -110,13 +110,13 @@ bool CANopenComponent::start_sdo_() {
   this->sdo_offset_ = 0;
   this->sdo_rx_.clear();
   switch (r.kind) {
-    case SDOKind::READ:
+    case SDOKind::SDO_KIND_READ:
       return CO_SDOclientUploadInitiate(cli, r.index, r.sub, this->response_timeout_ms_, false) ==
              CO_SDO_RT_ok_communicationEnd;
-    case SDOKind::READ_DATA:
+    case SDOKind::SDO_KIND_READ_DATA:
       return CO_SDOclientUploadInitiate(cli, r.index, r.sub, this->response_timeout_ms_, true) ==
              CO_SDO_RT_ok_communicationEnd;
-    case SDOKind::WRITE: {
+    case SDOKind::SDO_KIND_WRITE: {
       uint8_t buf[4] = {(uint8_t) r.value, (uint8_t) (r.value >> 8), (uint8_t) (r.value >> 16),
                         (uint8_t) (r.value >> 24)};
       if (CO_SDOclientDownloadInitiate(cli, r.index, r.sub, r.size, this->response_timeout_ms_, false) !=
@@ -125,7 +125,7 @@ bool CANopenComponent::start_sdo_() {
       this->sdo_offset_ = CO_SDOclientDownloadBufWrite(cli, buf, r.size);
       return this->sdo_offset_ == r.size;
     }
-    case SDOKind::WRITE_DATA:
+    case SDOKind::SDO_KIND_WRITE_DATA:
       if (CO_SDOclientDownloadInitiate(cli, r.index, r.sub, r.data.size(), this->response_timeout_ms_,
                                        r.data.size() > BLOCK_THRESHOLD) != CO_SDO_RT_ok_communicationEnd)
         return false;
@@ -149,7 +149,7 @@ void CANopenComponent::process_sdo_(uint32_t dt_us) {
     this->sdo_count_--;
     this->sdo_busy_ = true;
     if (!this->start_sdo_()) {
-      this->finish_sdo_(SDOResult::TRANSPORT_ERROR, 0);
+      this->finish_sdo_(SDOResult::SDO_RESULT_TRANSPORT_ERROR, 0);
       return;
     }
     dt_us = 0;
@@ -159,7 +159,7 @@ void CANopenComponent::process_sdo_(uint32_t dt_us) {
   SDORequest &r = this->sdo_active_;
   CO_SDO_abortCode_t abort = CO_SDO_AB_NONE;
   CO_SDO_return_t ret;
-  if (r.kind == SDOKind::READ || r.kind == SDOKind::READ_DATA) {
+  if (r.kind == SDOKind::SDO_KIND_READ || r.kind == SDOKind::SDO_KIND_READ_DATA) {
     ret = CO_SDOclientUpload(cli, dt_us, false, &abort, nullptr, nullptr, nullptr);
     if (ret == CO_SDO_RT_uploadDataBufferFull || ret == CO_SDO_RT_ok_communicationEnd) {
       uint8_t buf[64];
@@ -169,28 +169,28 @@ void CANopenComponent::process_sdo_(uint32_t dt_us) {
       if (this->sdo_rx_.size() > SDO_MAX_UPLOAD) {
         abort = CO_SDO_AB_OUT_OF_MEM;
         CO_SDOclientUpload(cli, 0, true, &abort, nullptr, nullptr, nullptr);
-        this->finish_sdo_(SDOResult::ABORT, abort);
+        this->finish_sdo_(SDOResult::SDO_RESULT_ABORT, abort);
         return;
       }
     }
   } else {
-    if (r.kind == SDOKind::WRITE_DATA && this->sdo_offset_ < r.data.size()) {
+    if (r.kind == SDOKind::SDO_KIND_WRITE_DATA && this->sdo_offset_ < r.data.size()) {
       this->sdo_offset_ +=
           CO_SDOclientDownloadBufWrite(cli, r.data.data() + this->sdo_offset_, r.data.size() - this->sdo_offset_);
     }
-    bool partial = r.kind == SDOKind::WRITE_DATA && this->sdo_offset_ < r.data.size();
+    bool partial = r.kind == SDOKind::SDO_KIND_WRITE_DATA && this->sdo_offset_ < r.data.size();
     ret = CO_SDOclientDownload(cli, dt_us, false, partial, &abort, nullptr, nullptr);
   }
 
   if (ret == CO_SDO_RT_ok_communicationEnd) {
-    this->finish_sdo_(SDOResult::SUCCESS, 0);
+    this->finish_sdo_(SDOResult::SDO_RESULT_SUCCESS, 0);
   } else if (ret < 0) {
     if (abort == CO_SDO_AB_TIMEOUT) {
-      this->finish_sdo_(SDOResult::TIMEOUT, abort);
+      this->finish_sdo_(SDOResult::SDO_RESULT_TIMEOUT, abort);
     } else if (ret == CO_SDO_RT_endedWithServerAbort || ret == CO_SDO_RT_endedWithClientAbort) {
-      this->finish_sdo_(SDOResult::ABORT, abort);
+      this->finish_sdo_(SDOResult::SDO_RESULT_ABORT, abort);
     } else {
-      this->finish_sdo_(SDOResult::TRANSPORT_ERROR, abort);
+      this->finish_sdo_(SDOResult::SDO_RESULT_TRANSPORT_ERROR, abort);
     }
   }
 }
@@ -201,25 +201,25 @@ void CANopenComponent::finish_sdo_(SDOResult result, uint32_t abort_code) {
   this->sdo_busy_ = false;
 
   SDOReply reply{result, abort_code, 0, 0, nullptr, 0};
-  if (result == SDOResult::SUCCESS) {
-    if (r.kind == SDOKind::READ) {
+  if (result == SDOResult::SDO_RESULT_SUCCESS) {
+    if (r.kind == SDOKind::SDO_KIND_READ) {
       size_t len = this->sdo_rx_.size();
       if (len == 0 || len > 4 || (r.size != 0 && len != r.size)) {
-        reply.result = SDOResult::SIZE_MISMATCH;
+        reply.result = SDOResult::SDO_RESULT_SIZE_MISMATCH;
       } else {
         for (size_t i = 0; i < len; i++)
           reply.value |= (uint32_t) this->sdo_rx_[i] << (8 * i);
       }
       reply.size = len;
-    } else if (r.kind == SDOKind::READ_DATA) {
+    } else if (r.kind == SDOKind::SDO_KIND_READ_DATA) {
       reply.data = this->sdo_rx_.data();
       reply.len = this->sdo_rx_.size();
-    } else if (r.kind == SDOKind::WRITE) {
+    } else if (r.kind == SDOKind::SDO_KIND_WRITE) {
       reply.value = r.value;
       reply.size = r.size;
     }
   }
-  if (reply.result != SDOResult::SUCCESS) {
+  if (reply.result != SDOResult::SDO_RESULT_SUCCESS) {
     ESP_LOGW(TAG, "node 0x%02x, 0x%04x:%u: %s (abort 0x%08" PRIx32 ")", r.node_id, r.index, r.sub,
              sdo_result_to_string(reply.result), abort_code);
   }
@@ -233,7 +233,7 @@ void CANopenComponent::abort_sdo_() {
   SDORequest &r = this->sdo_active_;
   CO_SDO_abortCode_t abort = CO_SDO_AB_GENERAL;
   CO_SDO_return_t ret;
-  if (r.kind == SDOKind::READ || r.kind == SDOKind::READ_DATA) {
+  if (r.kind == SDOKind::SDO_KIND_READ || r.kind == SDOKind::SDO_KIND_READ_DATA) {
     ret = CO_SDOclientUpload(cli, 0, true, &abort, nullptr, nullptr, nullptr);
   } else {
     ret = CO_SDOclientDownload(cli, 0, true, false, &abort, nullptr, nullptr);

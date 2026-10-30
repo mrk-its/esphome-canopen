@@ -360,6 +360,27 @@ Before PR 1:
 - **#21522** (another author's open `canopen` hub, base of #21533): talk to its author / comment there before
   opening a competing component (open question below).
 
+## Upstream conventions (checked 2026-10-31)
+Against upstream `AGENTS.md` and its `embedded-memory` / `automations` skills (Nick Koston's recent memory, string and
+callback refactors):
+- Done, folded into every PR commit (the branches were rewritten with a tree filter, so each PR passes on its own):
+  enum values prefixed with the enum name (`NMTState::NMT_STATE_OPERATIONAL`, `SDOResult::SDO_RESULT_SUCCESS`,
+  `OdResult::OD_RESULT_OK`, ...: bare `SUCCESS` / `OK` break LibreTiny, whose SDK defines them as macros), concatenated
+  namespaces, static methods without the trailing `_`, a NOLINT block around CANopenNode's C driver API, no
+  `volatile` in the port header (main loop only). Docs branches updated too.
+- clang-tidy (23.1.4, `script/clang-tidy -e esp8266-arduino-tidy esphome/components/canopen`) is clean. It needs a
+  local setup that is **not** in the PRs yet (`test/upstream_tidy_setup.diff`, apply in `~/repos/esphome` with
+  `git apply`): CANopenNode and the port directory
+  (`file://esphome/components/canopen/canopennode_port`) in `platformio.ini` `lib_deps`, the `CO_CONFIG_*` flags in
+  its `build_flags`, and `USE_CANOPEN_*` in `esphome/core/defines.h`. Open for PR 1: upstream's tidy script drops
+  include dirs inside the repo (so a plain `-I` to the port header doesn't work), and `esp32-idf-tidy` rejects relative
+  `file://` libraries and ignores `build_flags`. Needs a decision before PR 1 goes out.
+- Still to do (one commit on `canopen-next`, folded into the PRs when they are cut): no `std::deque` in
+  `ObjectDictionary` (512-byte blocks), `*_to_string()` returning `const LogString *`, `mark_failed(LOG_STR(...))`,
+  `canopen.nmt` as `register_apply_action`, no heap use after setup in the SDO client (`write_sdo_data()` copy,
+  `sdo_rx_` growth); in the mapper: `get_name_to()` instead of the deprecated `get_name()`, pointer-sized state
+  callbacks, `std::array` states, `static constexpr`, `ESPHOME_LOG_TAG`, Python type hints.
+
 ## Hub for the entity mapper
 Target split (2026-10-30): the `canopen` hub (generic CiA 301) goes upstream; everything specific to esphome-canopen
 and can2mqtt stays here as the external component `esphome_entity_mapper`, which refers to a hub with `canopen_id`:

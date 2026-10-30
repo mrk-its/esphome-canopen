@@ -31,7 +31,7 @@ struct Generated : OdObject {
       static_cast<uint8_t *>(buf)[i] = stream.offset() + i;
     stream.set_offset(stream.offset() + n);
     *done = n;
-    return stream.offset() < stream.size() ? OdResult::PARTIAL : OdResult::OK;
+    return stream.offset() < stream.size() ? OdResult::OD_RESULT_PARTIAL : OdResult::OD_RESULT_OK;
   }
 };
 
@@ -57,9 +57,9 @@ inline void run(uint8_t own_id) {
     // write_od(): synchronous, same handler
     uint32_t v = 0xBEEF;
     OdResult res = hub->write_od(0x5000, 0, &v, sizeof(v));
-    check(res == OdResult::OK && counted.value == 0xBEEF && counted.writes == 2, "write_od 0x5000");
+    check(res == OdResult::OD_RESULT_OK && counted.value == 0xBEEF && counted.writes == 2, "write_od 0x5000");
     uint8_t b = 1;
-    check(hub->write_od(0x5001, 0, &b, 1) == OdResult::READ_ONLY, "write_od of a read-only entry -> READ_ONLY");
+    check(hub->write_od(0x5001, 0, &b, 1) == OdResult::OD_RESULT_READ_ONLY, "write_od of a read-only entry -> READ_ONLY");
     // read back through the default od_read()
     hub->read_sdo<uint32_t>(0x7F, 0x5000, 0, +[](void *, const SDOReply &r) {
       check(r.ok() && r.value == 0xBEEF, "SDO read 0x5000 (default od_read)");

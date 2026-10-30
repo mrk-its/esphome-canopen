@@ -13,11 +13,11 @@ namespace canopen {
 
 // NMT state as sent in a heartbeat (CiA 301); also used for our own state
 enum class NMTState : uint8_t {
-  BOOTUP = 0,
-  STOPPED = 4,
-  OPERATIONAL = 5,
-  PRE_OPERATIONAL = 127,
-  UNKNOWN = 255,
+  NMT_STATE_BOOTUP = 0,
+  NMT_STATE_STOPPED = 4,
+  NMT_STATE_OPERATIONAL = 5,
+  NMT_STATE_PRE_OPERATIONAL = 127,
+  NMT_STATE_UNKNOWN = 255,
 };
 
 const char *nmt_state_to_string(NMTState state);
@@ -26,26 +26,26 @@ const char *nmt_state_to_string(NMTState state);
 // ONLINE: first heartbeat, or the first after a timeout; OFFLINE: no heartbeat within the timeout;
 // NMT_CHANGED: the state in the heartbeat changed (also unknown -> state right after ONLINE, state -> unknown after
 // OFFLINE); RESET: boot-up message, the node restarted and lost its runtime configuration.
-enum class NodeEvent : uint8_t { ONLINE, OFFLINE, NMT_CHANGED, RESET };
+enum class NodeEvent : uint8_t { NODE_EVENT_ONLINE, NODE_EVENT_OFFLINE, NODE_EVENT_NMT_CHANGED, NODE_EVENT_RESET };
 
 const char *node_event_to_string(NodeEvent event);
 
 // NMT commands (CiA 301), see CANopenComponent::send_nmt()
 enum class NMTCommand : uint8_t {
-  START = 1,
-  STOP = 2,
-  PRE_OPERATIONAL = 128,
-  RESET_NODE = 129,
-  RESET_COMMUNICATION = 130,
+  NMT_COMMAND_START = 1,
+  NMT_COMMAND_STOP = 2,
+  NMT_COMMAND_PRE_OPERATIONAL = 128,
+  NMT_COMMAND_RESET_NODE = 129,
+  NMT_COMMAND_RESET_COMMUNICATION = 130,
 };
 
 enum class SDOResult : uint8_t {
-  SUCCESS,
-  ABORT,            // the server aborted the transfer, see abort_code
-  TIMEOUT,          // no response within response_timeout
-  SIZE_MISMATCH,    // a value read returned another width than expected
-  TRANSPORT_ERROR,  // the transfer couldn't be started or failed locally
-  REJECTED,         // not queued (queue full, invalid arguments, stack not running)
+  SDO_RESULT_SUCCESS,
+  SDO_RESULT_ABORT,            // the server aborted the transfer, see abort_code
+  SDO_RESULT_TIMEOUT,          // no response within response_timeout
+  SDO_RESULT_SIZE_MISMATCH,    // a value read returned another width than expected
+  SDO_RESULT_TRANSPORT_ERROR,  // the transfer couldn't be started or failed locally
+  SDO_RESULT_REJECTED,         // not queued (queue full, invalid arguments, stack not running)
 };
 
 const char *sdo_result_to_string(SDOResult result);
@@ -60,7 +60,7 @@ struct SDOReply {
   const uint8_t *data;
   size_t len;
 
-  bool ok() const { return this->result == SDOResult::SUCCESS; }
+  bool ok() const { return this->result == SDOResult::SDO_RESULT_SUCCESS; }
   // value as T: sign-extended from size bytes for signed T, bit cast for float
   template<typename T> T as() const {
     static_assert(sizeof(T) <= 4, "SDO values are at most 4 bytes");
@@ -101,19 +101,19 @@ inline bool decode_heartbeat(uint32_t can_id, const uint8_t *data, size_t len, u
   // bit 7 is the node guarding toggle bit, always 0 in a heartbeat
   switch (data[0] & 0x7F) {
     case 0:
-      state = NMTState::BOOTUP;
+      state = NMTState::NMT_STATE_BOOTUP;
       break;
     case 4:
-      state = NMTState::STOPPED;
+      state = NMTState::NMT_STATE_STOPPED;
       break;
     case 5:
-      state = NMTState::OPERATIONAL;
+      state = NMTState::NMT_STATE_OPERATIONAL;
       break;
     case 127:
-      state = NMTState::PRE_OPERATIONAL;
+      state = NMTState::NMT_STATE_PRE_OPERATIONAL;
       break;
     default:
-      state = NMTState::UNKNOWN;
+      state = NMTState::NMT_STATE_UNKNOWN;
       break;
   }
   return true;

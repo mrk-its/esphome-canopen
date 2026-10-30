@@ -1,0 +1,40 @@
+diff --git i/esphome/core/defines.h w/esphome/core/defines.h
+index ac583ba197..668a8cf419 100644
+--- i/esphome/core/defines.h
++++ w/esphome/core/defines.h
+@@ -63,6 +63,9 @@
+ #define BQ25186_TEXT_SENSOR_COUNT 1
+ #define USE_BUTTON
+ #define USE_CAMERA
++#define USE_CANOPEN_NMT_MASTER
++#define USE_CANOPEN_PDO
++#define USE_CANOPEN_SDO_CLIENT
+ #define USE_CLIMATE
+ #define USE_CLIMATE_VISUAL_OVERRIDES
+ #define USE_CONTROLLER_REGISTRY
+diff --git i/platformio.ini w/platformio.ini
+index f7e5b3c382..c99a70b2aa 100644
+--- i/platformio.ini
++++ w/platformio.ini
+@@ -39,6 +39,8 @@ lib_deps_base =
+     pavlodn/HaierProtocol@0.9.31           ; haier
+     esphome/dsmr_parser@1.10.0             ; dsmr
+     https://github.com/esphome/TinyGPSPlus.git#v1.1.0     ; gps
++    https://github.com/mrk-its/CANopenNode.git#9ff367b8205d746a84111b38e01ace3feaffb401 ; canopen
++    file://esphome/components/canopen/canopennode_port ; canopen (CANopenNode's CO_driver_target.h)
+ ; This is using the repository until a new release is published to PlatformIO
+     https://github.com/Sensirion/arduino-gas-index-algorithm.git#3.2.1 ; Sensirion Gas Index Algorithm Arduino Library
+ 
+@@ -56,6 +58,12 @@ lib_deps =
+ build_flags =
+     -DESPHOME_LOG_LEVEL=ESPHOME_LOG_LEVEL_VERY_VERBOSE
+     -std=gnu++20
++    ; canopen: the CANopenNode configuration codegen sets for its optional parts
++    -DCO_CONFIG_SDO_CLI=0x0F
++    -DCO_CONFIG_FIFO=0x07
++    -DCO_CONFIG_CRC16=0x01
++    -DCO_CONFIG_NMT=0x03
++    -DCO_CONFIG_PDO=0x402F
+ build_unflags =
+     -std=gnu++11
+     -std=gnu++14

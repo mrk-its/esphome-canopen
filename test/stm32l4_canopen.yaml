@@ -227,12 +227,12 @@ canopen:
         args: ["esphome::canopen::nmt_state_to_string(state)"]
     - if:
         condition:
-          lambda: return state == esphome::canopen::NMTState::PRE_OPERATIONAL;
+          lambda: return state == esphome::canopen::NMTState::NMT_STATE_PRE_OPERATIONAL;
         then:
           - delay: 3s
           - lambda: |-
               ESP_LOGI("test", "set_nmt_state(OPERATIONAL): %s",
-                       YESNO(id(can_gate).set_nmt_state(esphome::canopen::NMTState::OPERATIONAL)));
+                       YESNO(id(can_gate).set_nmt_state(esphome::canopen::NMTState::NMT_STATE_OPERATIONAL)));
   heartbeat_clients:
     - node_id: 0x01
       timeout: 7s  # node 0x01 sends a heartbeat every 5 s

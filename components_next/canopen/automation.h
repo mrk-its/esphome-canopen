@@ -50,7 +50,7 @@ template<typename... Ts> class NMTAction : public Action<Ts...>, public Parented
   void play(const Ts &...x) override { this->parent_->send_nmt(this->node_id_.value(x...), this->command_); }
 
  protected:
-  NMTCommand command_{NMTCommand::START};
+  NMTCommand command_{NMTCommand::NMT_COMMAND_START};
 };
 #endif
 

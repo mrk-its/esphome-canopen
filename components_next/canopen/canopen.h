@@ -95,7 +95,7 @@ class CANopenComponent : public Component {
   void on_frame_(uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data);
   void process_();
 #ifdef USE_CANOPEN_SDO_CLIENT
-  enum class SDOKind : uint8_t { READ, WRITE, READ_DATA, WRITE_DATA };
+  enum class SDOKind : uint8_t { SDO_KIND_READ, SDO_KIND_WRITE, SDO_KIND_READ_DATA, SDO_KIND_WRITE_DATA };
   struct SDORequest {
     uint8_t node_id;
     uint16_t index;
