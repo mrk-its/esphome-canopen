@@ -1,5 +1,28 @@
 # CANopenNode step 3: SDO server and identity
 
+## Status (2026-10-30): done as upstream PR 7
+Implemented in `~/repos/esphome` on branch `canopen-next` (`38e6a3f`, on top of `canopen-4-profile`; the branch for
+all remaining hub PRs, cut into separate PR branches later). Differs from the plan below, which was written for the
+old combined component:
+- generic CiA 301, nothing esphome-canopen specific: `identity:` (`vendor_id`, `product_code`, `revision_number`,
+  `serial_number`, default 0) instead of the fixed ESPHome vendor/product, `device_name` (default: the node's name),
+  `hardware_version` (0x1009 only if set), `software_version` (default `ESPHOME_VERSION`), with setters
+  (`set_identity()`, `set_device_name()`, ...) so `esphome_entity_mapper` sets the ESPHome values and can2mqtt's
+  version string;
+- the SDO server is always on (CiA 301), segmented only with CANopenNode's 32-byte buffer (port header defaults
+  `CO_CONFIG_SDO_SRV` / `_BUFFER_SIZE`); block transfer (buffer >= 900) comes with OTA / the block size option;
+- `ObjectDictionary::add_string(index, const char *)`: read only, no `ODA_STR`, no `ODA_MB`; empty string = one zero
+  byte.
+
+Tests: Python codegen and defaults, gtest `od_test.cpp` (strings, records, `OD_set_u32` on 0x1200 as CANopenNode
+does), the 4-platform build test, `prek`. Hardware (nucleo, `test/stm32l4_canopen.yaml`): `dump_config` shows identity
+and strings; local reads of 0x1008/0x1009/0x100A/0x1018:1 OK; another node on the bus (most likely can2mqtt)
+read 0x1018:1..3 from our server right after boot (seen by a frame listener on 0x67F; each read follows the reply
+to the previous one) and then stopped, as can2mqtt does for non-ESPHome vendors; `sdo_test` still 24/24. Flash
++672 B, RAM +128 B, CANopenNode heap 1932 B.
+Not covered: segmented uploads and writes from a remote client (needs python-can via the bridge or can2mqtt with
+matching identity).
+
 ## Context
 Step 1 ([minimal_canopennode.md](minimal_canopennode.md)) gave `components_next/canopen` with NMT, heartbeat
 producer/consumer, the driver and a runtime OD with VAR and ARRAY entries. Step 2

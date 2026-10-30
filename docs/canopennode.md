@@ -404,7 +404,7 @@ Upstream PRs for it (estimates, not measured; independent of PRs 4-6, could go b
 
 | PR | Content | Lines |
 |---|---|---|
-| 7 | SDO server, device info / identity, `add_string()` | ~200 |
+| 7 | SDO server, device info / identity, `add_string()`; done, `canopen-next` `38e6a3f` ([sdo_server_canopennode.md](sdo_server_canopennode.md)) | ~100 (tests ~85) |
 | 8 | public OD API, extensions, `write_od()`, own NMT state API and startup option | ~300 |
 | 9 | own PDOs (records, init, processing, `request_tpdo()`) | ~400 |
 | 10 | 0x1010/0x1011 store/restore | ~200 |
@@ -412,6 +412,10 @@ Upstream PRs for it (estimates, not measured; independent of PRs 4-6, could go b
 | 12 | block size option (after a CANopenNode upstream PR) | ~30 |
 
 PRs 7-9 are the minimum for the mapper against can2mqtt; 10-12 for full parity.
+
+All of them are developed on one branch, `canopen-next` in `~/repos/esphome` (from `canopen-4-profile`, one commit per
+PR), and cut into stacked PR branches when they go out. `test/stm32l4_canopen.yaml` builds `canopen` from
+`../../esphome`, i.e. whatever branch is checked out there.
 
 Open points for `esphome_entity_mapper` itself (not in the steps yet):
 - raw RPDO linking (`rpdo: {node_id, tpdo, offset, cmd}`, `add_rpdo_node` / `add_rpdo_entity_cmd`, `linking-nodes.md`);

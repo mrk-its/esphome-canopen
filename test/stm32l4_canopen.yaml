@@ -22,12 +22,29 @@ esphome:
         id(can_gate).add_frame_listener(0x180, 0x780, +[](void *, uint32_t can_id, const uint8_t *data, uint8_t len) {
           ESP_LOGI("test", "rx 0x%03x, %u bytes, first 0x%02x", (unsigned) can_id, len, len ? data[0] : 0);
         }, nullptr);
+        // SDO requests to our server (0x600 + 0x7f), e.g. from can2mqtt
+        id(can_gate).add_frame_listener(0x67F, 0x7FF, +[](void *, uint32_t, const uint8_t *data, uint8_t len) {
+          ESP_LOGI("test", "SDO request to us: cmd 0x%02x, 0x%02x%02x:%u", data[0], data[2], data[1], data[3]);
+        }, nullptr);
         // overlaps the heartbeat consumer for node 0x01: setup() logs a warning
         id(can_gate).add_frame_listener(0x700, 0x780, +[](void *, uint32_t, const uint8_t *, uint8_t) {}, nullptr);
     - delay: 5s
     - lambda: sdo_test::start(id(can_gate), 0x7f);
     - delay: 75s
     - script.execute: canopen_actions
+    # PR 7: our own device info / identity, read with the local SDO client (OD contents, not the server path)
+    - delay: 5s
+    - lambda: |-
+        static auto log_str = +[](void *context, const canopen::SDOReply &r) {
+          ESP_LOGI("test", "own 0x%04x: %s '%.*s'", (unsigned) (uintptr_t) context,
+                   canopen::sdo_result_to_string(r.result), (int) r.len, (const char *) r.data);
+        };
+        for (uint16_t index : {0x1008, 0x1009, 0x100A})
+          id(can_gate).read_sdo_data(0x7f, index, 0, log_str, (void *) (uintptr_t) index);
+        id(can_gate).read_sdo<uint32_t>(0x7f, 0x1018, 1, +[](void *, const canopen::SDOReply &r) {
+          ESP_LOGI("test", "own 0x1018:1 (vendor id): %s 0x%08x", canopen::sdo_result_to_string(r.result),
+                   (unsigned) r.value);
+        }, nullptr);
 
 zephyr:
   variant: STM32L4
@@ -180,6 +197,10 @@ canopen:
   canbus_id: can_bus
   node_id: 0x7f
   heartbeat_interval: 1s
+  identity:
+    vendor_id: 0x12345678
+    product_code: 0x2A
+  hardware_version: nucleo_l476rg
   heartbeat_clients:
     - node_id: 0x01
       timeout: 7s  # node 0x01 sends a heartbeat every 5 s

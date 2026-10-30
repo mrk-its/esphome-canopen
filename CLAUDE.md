@@ -7,7 +7,9 @@ User docs: README.md is the overview / quick start only; the option reference li
 `docs/linking-nodes.md`, `docs/ota.md`, `docs/remote-logs.md`. Document new options there.
 Port to CANopenNode (replacing canopen-stack), in progress: plan and handoff state in `docs/canopennode.md`,
 current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopennode.md`, done; step 3:
-`docs/sdo_server_canopennode.md`). Upstream PRs 1-3 as built and tested: `docs/upstream_prs_1-3.md`.
+`docs/sdo_server_canopennode.md`). Upstream PRs 1-3 as built and tested: `docs/upstream_prs_1-3.md`. Hub PRs 7+
+(generic CiA 301 for `esphome_entity_mapper`) are developed on branch `canopen-next` in `~/repos/esphome`
+("Hub for the entity mapper" in `docs/canopennode.md`; PR 7 SDO server done).
 
 ## Workflow
 - Always do new features and fixes on a `feature/<short-name>` branch (created from the current branch,
