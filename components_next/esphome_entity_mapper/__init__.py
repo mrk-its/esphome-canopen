@@ -42,13 +42,19 @@ EntityMapper = ns.class_("EntityMapper", cg.Component)
 # entity C++ class -> layout domain; order matters only for classes inheriting from each other
 ENTITY_DOMAINS = [
     (cg.esphome_ns.namespace("sensor").class_("Sensor"), layout.DOMAIN_SENSOR),
+    (cg.esphome_ns.namespace("number").class_("Number"), layout.DOMAIN_NUMBER),
     (
         cg.esphome_ns.namespace("binary_sensor").class_("BinarySensor"),
         layout.DOMAIN_BINARY_SENSOR,
     ),
+    (cg.esphome_ns.namespace("switch_").class_("Switch"), layout.DOMAIN_SWITCH),
+    (cg.esphome_ns.namespace("light").class_("LightState"), layout.DOMAIN_LIGHT),
+    (cg.esphome_ns.namespace("cover").class_("Cover"), layout.DOMAIN_COVER),
+    (
+        cg.esphome_ns.namespace("alarm_control_panel").class_("AlarmControlPanel"),
+        layout.DOMAIN_ALARM,
+    ),
 ]
-# the other layout.py domains come in later steps
-SUPPORTED_DOMAINS = {domain for _, domain in ENTITY_DOMAINS}
 
 TPDO_SCHEMA = cv.Schema(
     {
@@ -114,7 +120,7 @@ def resolve_entity(full_config, entity_config):
     )
     if domain is None:
         raise layout.LayoutError(
-            f"Entity '{entity_id}' of type {declared_id.type} is not supported (yet)"
+            f"Entity '{entity_id}' of type {declared_id.type} is not supported"
         )
     return domain, full_config.get_config_for_path(path[:-1])
 
@@ -202,15 +208,27 @@ async def to_code(config):
 
     for entity_config in sorted(config[CONF_ENTITIES], key=lambda e: e[CONF_INDEX]):
         entity = await cg.get_variable(entity_config[CONF_ID])
-        domain, _ = resolve_entity(CORE.config, entity_config)
+        domain, platform_config = resolve_entity(CORE.config, entity_config)
         index = entity_config[CONF_INDEX]
-        if domain == layout.DOMAIN_SENSOR:
+        if domain in (layout.DOMAIN_SENSOR, layout.DOMAIN_NUMBER):
             size = entity_config.get(CONF_SIZE, 4)
             # 255 / 65535 are reserved for NaN
             min_value = entity_config.get(CONF_MIN_VALUE, 0.0)
             max_value = entity_config.get(
                 CONF_MAX_VALUE, 254.0 if size == 1 else 65534.0
             )
-            cg.add(var.add_sensor(entity, index, size, min_value, max_value))
+            add = var.add_sensor if domain == layout.DOMAIN_SENSOR else var.add_number
+            cg.add(add(entity, index, size, min_value, max_value))
         elif domain == layout.DOMAIN_BINARY_SENSOR:
             cg.add(var.add_binary_sensor(entity, index))
+        elif domain == layout.DOMAIN_SWITCH:
+            cg.add(var.add_switch(entity, index))
+        elif domain in (layout.DOMAIN_LIGHT, layout.DOMAIN_COVER):
+            # the OD layout depends on the caps: computed here (layout.py), not from the traits at runtime
+            caps = layout.entity_caps(
+                domain, platform_config, entity_config.get(CONF_CAPS)
+            )
+            add = var.add_light if domain == layout.DOMAIN_LIGHT else var.add_cover
+            cg.add(add(entity, index, caps))
+        elif domain == layout.DOMAIN_ALARM:
+            cg.add(var.add_alarm(entity, index))

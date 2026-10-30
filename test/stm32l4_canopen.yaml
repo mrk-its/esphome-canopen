@@ -135,6 +135,14 @@ output:
   - platform: gpio
     pin: 5  # PA5
     id: led_output
+  # for the test light
+  - platform: template
+    id: dummy_output
+    type: float
+    write_action:
+      - logger.log:
+          format: "test light output %.2f"
+          args: [state]
 
 script:
   # canopen.sdo_write / canopen.nmt (they also compile the SDO client and NMT master in)
@@ -270,6 +278,10 @@ interval:
           on = !on;
           id(test_binary).publish_state(on);
           id(test_percent).publish_state(fmod(millis() / 1000.0f, 100.0f));
+          id(test_switch).publish_state(on);
+          id(test_number).publish_state(fmod(millis() / 1000.0f, 100.0f) - 50.0f);
+          id(test_cover).position = on ? 1.0f : 0.25f;
+          id(test_cover).publish_state();
   - interval: 5s
     then:
       - lambda: |-
@@ -299,3 +311,54 @@ esphome_entity_mapper:
     - id: test_binary
       index: 3
       tpdo: 1
+    - id: test_switch
+      index: 4
+      tpdo: 1
+    - id: test_number
+      index: 5
+      size: 2
+      min_value: -50
+      max_value: 50
+      tpdo: 2
+    - id: test_cover
+      index: 6
+      tpdo: 3
+    - id: test_light
+      index: 7
+      tpdo: 3
+    - id: test_alarm
+      index: 8
+      tpdo: 4
+
+switch:
+  - platform: template
+    id: test_switch
+    name: "Test switch"
+    optimistic: true
+
+number:
+  - platform: template
+    id: test_number
+    name: "Test number"
+    optimistic: true
+    min_value: -50
+    max_value: 50
+    step: 0.5
+
+cover:
+  - platform: template
+    id: test_cover
+    name: "Test cover"
+    optimistic: true
+    has_position: true
+
+light:
+  - platform: monochromatic
+    id: test_light
+    name: "Test light"
+    output: dummy_output
+
+alarm_control_panel:
+  - platform: template
+    id: test_alarm
+    name: "Test alarm"

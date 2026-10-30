@@ -14,6 +14,21 @@
 #ifdef USE_BINARY_SENSOR
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #endif
+#ifdef USE_NUMBER
+#include "esphome/components/number/number.h"
+#endif
+#ifdef USE_SWITCH
+#include "esphome/components/switch/switch.h"
+#endif
+#ifdef USE_LIGHT
+#include "esphome/components/light/light_state.h"
+#endif
+#ifdef USE_COVER
+#include "esphome/components/cover/cover.h"
+#endif
+#ifdef USE_ALARM_CONTROL_PANEL
+#include "esphome/components/alarm_control_panel/alarm_control_panel.h"
+#endif
 
 namespace esphome {
 namespace esphome_entity_mapper {
@@ -22,12 +37,30 @@ namespace esphome_entity_mapper {
 enum EntityType : uint8_t {
   ENTITY_TYPE_SENSOR = 1,
   ENTITY_TYPE_BINARY_SENSOR = 2,
+  ENTITY_TYPE_SWITCH = 3,
+  ENTITY_TYPE_COVER = 4,
+  ENTITY_TYPE_LIGHT = 5,
   ENTITY_TYPE_SENSOR_UINT8 = 6,
   ENTITY_TYPE_SENSOR_UINT16 = 7,
+  ENTITY_TYPE_NUMBER = 8,
+  ENTITY_TYPE_NUMBER_UINT8 = 9,
+  ENTITY_TYPE_NUMBER_UINT16 = 10,
+  ENTITY_TYPE_ALARM = 16,
+};
+
+// light / cover capability bits (0x2001:N bits 16..23), from codegen (layout.py)
+enum : uint32_t {
+  LIGHT_CAP_ON_OFF = 1,
+  LIGHT_CAP_BRIGHTNESS = 2,
+  LIGHT_CAP_COLOR_TEMPERATURE = 4,
+  COVER_CAP_POSITION = 1,
+  COVER_CAP_TILT = 2,
 };
 
 // wire encoding of scaled states, see "Scaled values" in OBJECT_DICTIONARY.md
 uint32_t scale_to_wire(float value, float min_val, float max_val, uint32_t max_int);
+inline uint32_t percentage_to_wire(float value) { return scale_to_wire(value, 0.0f, 1.0f, 255); }
+inline uint32_t color_temp_to_wire(float mireds) { return scale_to_wire(mireds, 100.0f, 1000.0f, 255); }
 
 // One exposed entity: metadata at 0x2000 + 16 * index, states at 0x2001 + 16 * index (the handler gives the states
 // their TPDO request flags).
@@ -81,6 +114,21 @@ class EntityMapper : public Component {
 #ifdef USE_BINARY_SENSOR
   void add_binary_sensor(binary_sensor::BinarySensor *sensor, uint8_t index);
 #endif
+#ifdef USE_NUMBER
+  void add_number(number::Number *number, uint8_t index, uint8_t size, float min_value, float max_value);
+#endif
+#ifdef USE_SWITCH
+  void add_switch(switch_::Switch *sw, uint8_t index);
+#endif
+#ifdef USE_LIGHT
+  void add_light(light::LightState *light, uint8_t index, uint32_t caps);
+#endif
+#ifdef USE_COVER
+  void add_cover(cover::Cover *cover, uint8_t index, uint32_t caps);
+#endif
+#ifdef USE_ALARM_CONTROL_PANEL
+  void add_alarm(alarm_control_panel::AlarmControlPanel *alarm, uint8_t index);
+#endif
 
   // adds the OD entries: before the hub's setup()
   void setup() override;
@@ -89,6 +137,22 @@ class EntityMapper : public Component {
 
  protected:
   MappedEntity *add_entity_(uint8_t index, uint32_t type);
+#ifdef USE_LIGHT
+  // light values reach the mapper through a listener object
+  class LightListener : public light::LightRemoteValuesListener {
+   public:
+    LightListener(EntityMapper *mapper, MappedEntity *entity, light::LightState *light, uint32_t caps)
+        : mapper_(mapper), entity_(entity), light_(light), caps_(caps) {}
+    void on_light_remote_values_update() override;
+
+   protected:
+    EntityMapper *mapper_;
+    MappedEntity *entity_;
+    light::LightState *light_;
+    uint32_t caps_;
+  };
+  std::vector<std::unique_ptr<LightListener>> light_listeners_;
+#endif
 
   canopen::CANopenComponent *hub_;
   std::vector<std::unique_ptr<MappedEntity>> entities_;
