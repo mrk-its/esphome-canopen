@@ -242,7 +242,7 @@ Slots are numbered at build time (sorted by remote node, entity and state); the 
 
 ## OD writer
 
-When `pdo_od_writer` is enabled (default), node listens on COB-ID `0x500 + sender_node_id` (the same COB-ID as TPDO 7 of the sender) for remote OD writes. Frame layout:
+When `pdo_od_writer` is enabled (default), a node accepts remote OD writes on COB-IDs `0x500..0x57F` whose byte 0 is its node id. The sender uses `0x500 + target_node_id`, which is also the target's TPDO 7 COB-ID, so TPDO 7 is reserved on every node using it. Writes go through the OD like an SDO download (handlers run), without a reply. Frame layout:
 
 | Byte  | Content |
 |-------|---------|

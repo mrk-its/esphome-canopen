@@ -462,7 +462,32 @@ void MappedEntity::alarm_command_(uint32_t value) {
 }
 #endif
 
+bool EntityMapper::send_od_write(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size) {
+  if (size == 0 || size > 4 || node_id == 0 || node_id > 127)
+    return false;
+  uint8_t data[8] = {node_id, sub, uint8_t(index), uint8_t(index >> 8),
+                     uint8_t(value), uint8_t(value >> 8), uint8_t(value >> 16), uint8_t(value >> 24)};
+  if (node_id == this->node_id_)
+    return this->hub_->write_od(index, sub, data + 4, size) == OdResult::OD_RESULT_OK;
+  return this->hub_->send_frame(OD_WRITER_COB_ID + node_id, data, 4 + size);
+}
+
+void EntityMapper::handle_od_writer_frame(const uint8_t *data, uint8_t len) {
+  if (len < 5 || data[0] != this->node_id_)
+    return;
+  uint8_t sub = data[1];
+  uint16_t index = data[2] | (data[3] << 8);
+  OdResult ret = this->hub_->write_od(index, sub, data + 4, len - 4);
+  if (ret != OdResult::OD_RESULT_OK) {
+    ESP_LOGW(TAG, "OD writer: 0x%04x:%u (%u bytes) not written: %d", index, sub, len - 4, static_cast<int>(ret));
+  } else {
+    ESP_LOGD(TAG, "OD writer: 0x%04x:%u written", index, sub);
+  }
+}
+
 void EntityMapper::setup() {
+  if (this->od_writer_)
+    this->hub_->add_frame_listener(OD_WRITER_COB_ID, 0x780, on_od_writer_frame, this);
   auto &od = this->hub_->get_od();
   // 0x2001: one allocation, freed when the OD has copied it
   std::vector<RecordSub> types;
@@ -479,6 +504,7 @@ void EntityMapper::setup() {
 void EntityMapper::dump_config() {
   ESP_LOGCONFIG(TAG, "ESPHome entity mapper:");
   ESP_LOGCONFIG(TAG, "  TPDO layout hash: %08" PRIx32, this->layout_hash_);
+  ESP_LOGCONFIG(TAG, "  OD writer: %s", YESNO(this->od_writer_));
   for (auto &entity : this->entities_) {
     ESP_LOGCONFIG(TAG, "  Entity %u: type %" PRIu32, entity.get_index(), entity.get_type());
   }

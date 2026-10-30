@@ -147,6 +147,16 @@ class EntityMapper : public Component {
   explicit EntityMapper(canopen::CANopenComponent *hub) : hub_(hub) {}
 
   void set_layout_hash(uint32_t hash) { this->layout_hash_ = hash; }
+  // our node id (the hub's, from codegen)
+  void set_node_id(uint8_t node_id) { this->node_id_ = node_id; }
+  void enable_od_writer() { this->od_writer_ = true; }
+
+  // OD writer (node-to-node commands, OBJECT_DICTIONARY.md "OD writer"): writes value (size 1..4 bytes, little endian)
+  // to index:sub of node_id's OD in one frame on 0x500 + node_id, without a reply; our own node is written directly.
+  // False if it wasn't sent / written.
+  bool send_od_write(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size);
+  // a received OD writer frame (data / len of a 0x500..0x57F frame); public for tests
+  void handle_od_writer_frame(const uint8_t *data, uint8_t len);
 #ifdef USE_SENSOR
   void add_sensor(sensor::Sensor *sensor, uint8_t index, uint8_t size, float min_value, float max_value);
 #endif
@@ -176,6 +186,12 @@ class EntityMapper : public Component {
 
  protected:
   MappedEntity *add_entity_(EntityBase *entity, uint8_t index, uint32_t type);
+  // byte 0 of the frame is the target, so every node listens on all of 0x500..0x57F (other nodes' TPDO 7 COB-IDs
+  // too: TPDO 7 is reserved while the OD writer is on)
+  static constexpr uint32_t OD_WRITER_COB_ID = 0x500;
+  static void on_od_writer_frame(void *context, uint32_t can_id, const uint8_t *data, uint8_t len) {
+    static_cast<EntityMapper *>(context)->handle_od_writer_frame(data, len);
+  }
 #ifdef USE_LIGHT
   // light values reach the mapper through a listener object
   class LightListener : public light::LightRemoteValuesListener {
@@ -189,6 +205,8 @@ class EntityMapper : public Component {
 #endif
 
   canopen::CANopenComponent *hub_;
+  uint8_t node_id_{0};
+  bool od_writer_{false};
   // CANOPEN_ENTITY_MAPPER_ENTITIES: from codegen, the number of entities
   StaticVector<MappedEntity, CANOPEN_ENTITY_MAPPER_ENTITIES> entities_;
   // 0x2001: entity types, sub N = type of entity N

@@ -90,6 +90,29 @@ esphome:
         id(can_gate).read_sdo<uint8_t>(0x7f, 0x2071, 2, +[](void *, const canopen::SDOReply &r) {
           ESP_LOGI("test", "state 0x2071:2 (light brightness): %u", (unsigned) r.value);
         }, nullptr);
+    # OD writer: received frames (injected: our own frames don't come back from the bus) and send_od_write() to us
+    - delay: 1s
+    - lambda: |-
+        const uint8_t switch_off[5] = {0x7f, 1, 0x42, 0x20, 0};  // 0x2042:1 = 0
+        const uint8_t other_node[5] = {0x61, 1, 0x42, 0x20, 1};  // for node 0x61: ignored
+        const uint8_t bad_index[5] = {0x7f, 1, 0x99, 0x50, 1};   // 0x5099: no such entry (warning)
+        const uint8_t short_frame[4] = {0x7f, 1, 0x42, 0x20};    // no value: ignored
+        id(mapper).handle_od_writer_frame(switch_off, 5);
+        id(mapper).handle_od_writer_frame(other_node, 5);
+        id(mapper).handle_od_writer_frame(bad_index, 5);
+        id(mapper).handle_od_writer_frame(short_frame, 4);
+        bool local = id(mapper).send_od_write(0x7f, 0x2072, 1, 0, 1);  // light off, written directly
+        ESP_LOGI("test", "OD writer: switch %s (expect OFF), send_od_write to us %s, light %s (expect OFF)",
+                 ONOFF(id(test_switch).state), YESNO(local), ONOFF(id(test_light).remote_values.is_on()));
+        // a real one over the bus: dimmer4 (node 0x37, old component) light5 "biuro" off (0x2052:1 = 0)
+        bool sent = id(mapper).send_od_write(0x37, 0x2052, 1, 0, 1);
+        ESP_LOGI("test", "OD writer: dimmer4 light5 (biuro) off sent: %s", YESNO(sent));
+    - delay: 1s
+    - lambda: |-
+        id(can_gate).read_sdo<uint8_t>(0x37, 0x2051, 1, +[](void *, const canopen::SDOReply &r) {
+          ESP_LOGI("test", "dimmer4 light5 (biuro) state 0x2051:1: %s %u (expect 0)",
+                   LOG_STR_ARG(canopen::sdo_result_to_string(r.result)), (unsigned) r.value);
+        }, nullptr);
     - lambda: od_handler_test::run(0x7f);
 
 zephyr:
@@ -331,6 +354,7 @@ binary_sensor:
     name: "Test binary"
 
 canopen_entity_mapper:
+  id: mapper
   canopen_id: can_gate
   entities:
     - id: uptime_sensor

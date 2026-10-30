@@ -83,10 +83,10 @@ ENTITIES = [
 ]
 
 
-def write_config(tmp_path: Path, entities: list) -> Path:
+def write_config(tmp_path: Path, entities: list, **options) -> Path:
     path = tmp_path / "node.yaml"
     # JSON is YAML (flow style)
-    mapper = {"canopen_id": "can_hub", "entities": entities}
+    mapper = {"canopen_id": "can_hub", "entities": entities, **options}
     path.write_text(BASE + f"canopen_entity_mapper: {json.dumps(mapper)}\n", encoding="utf-8")
     return path
 
@@ -97,9 +97,9 @@ def run_esphome(tmp_path: Path, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def generate(tmp_path: Path, entities: list) -> tuple[str, str]:
+def generate(tmp_path: Path, entities: list, **options) -> tuple[str, str]:
     """(main.cpp, defines.h) of the config."""
-    write_config(tmp_path, entities)
+    write_config(tmp_path, entities, **options)
     result = run_esphome(tmp_path, "compile", "--only-generate")
     assert result.returncode == 0, result.stdout + result.stderr
     src = tmp_path / ".esphome" / "build" / "mapper-test" / "src"
@@ -171,6 +171,18 @@ def test_codegen(tmp_path):
     assert positions == sorted(positions)
     # the entity StaticVector
     assert "#define CANOPEN_ENTITY_MAPPER_ENTITIES 8" in defines
+    # the hub's node id, the OD writer on by default
+    assert f"{mapper}set_node_id({NODE_ID});" in main_cpp
+    assert f"{mapper}enable_od_writer();" in main_cpp
+
+
+@needs_esphome
+def test_codegen_od_writer_off(tmp_path):
+    """Without the OD writer TPDO 7 is free for entities."""
+    main_cpp, _ = generate(tmp_path, [{"id": "temp", "index": 1, "tpdo": 7}], od_writer=False)
+    assert "enable_od_writer()" not in main_cpp
+    cob_id = layout.tpdo_cob_id(7, NODE_ID)
+    assert f"can_hub->configure_tpdo(7, {cob_id}, {{{{0x2011, 1, 32}}}});" in main_cpp
 
 
 @needs_esphome
@@ -211,6 +223,11 @@ def test_codegen_no_entities(tmp_path):
         ),
         pytest.param(
             [{"id": "temp", "index": 1, "size": 3}], "Unknown value '3', valid options are '1', '2', '4'", id="size-3"
+        ),
+        pytest.param(
+            [{"id": "temp", "index": 1, "tpdo": {"number": 7}}],
+            "TPDO 7 is reserved for the OD writer (od_writer: false frees it)",
+            id="tpdo-7-od-writer",
         ),
         pytest.param([{"id": "temp", "index": 1, "tpdo": 8}], "value must be at most 7", id="tpdo-8"),
     ],

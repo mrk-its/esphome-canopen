@@ -516,12 +516,20 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   restore don't run. `number->make_call().set_value(v).perform()` instead; the state then comes back through the
   normal state callback (optimistic or set by the action). Changes behaviour for existing nodes: note it in the
   release notes / `configuration.md` and update `OBJECT_DICTIONARY.md` ("sets the number" instead of "publishes").
-- OD writer COB-ID (step 8): today `0x500 + target`, which is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7
-  frame whose first byte equals another node's id is applied there as an OD write; the ID also has several
-  producers. Proposal: the CiA 301 MPDO format (destination address mode: byte 0 = `0x80 | target`, 0 = all;
-  index LE; subindex; 4 data bytes) on the **sender's** TPDO 7 (`0x500 + sender`), TPDO 7 reserved in `layout.py`;
-  can2mqtt needs a node id of its own. Alternatives: extended 29-bit IDs, or `0x680 + sender` (only senders up to
-  0x5F). Changes the wire protocol (can2mqtt). Not decided.
+- OD writer **ported as is** (2026-10-31): `od_writer: true` (default; the old `pdo_od_writer`) in the mapper, a hub
+  frame listener on 0x500..0x57F, byte 0 = target, written with `write_od()` (handlers run, so the entity commands
+  work through it); `send_od_write(node, index, sub, value, size)` sends `0x500 + target` (our own node is written
+  directly, no frame). TPDO 7 is rejected for entities while it's on (`od_writer: false` frees it). The node id comes
+  from codegen (`set_node_id()`, the hub has no getter). Tested on the nucleo: injected frames (own id, other id,
+  bad index, short) and a real frame to dimmer4 (node 0x37, old component) turning light5 off, state read back over
+  SDO.
+- **MPDO for the OD writer (own step, changes the wire protocol, needs can2mqtt and all nodes updated):** today
+  `0x500 + target` is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7 frame whose first byte equals another
+  node's id is applied there as an OD write, and the ID has several producers. Proposal: the CiA 301 MPDO format
+  (destination address mode: byte 0 = `0x80 | target`, 0 = all; index LE; subindex; 4 data bytes) on the
+  **sender's** TPDO 7 (`0x500 + sender`), TPDO 7 reserved in `layout.py`; can2mqtt needs a node id of its own if
+  it sends them. Alternatives: extended 29-bit IDs, or `0x680 + sender` (only senders up to 0x5F). Needs a
+  migration (accept both formats for a while).
 - raw RPDO linking (`rpdo: {node_id, tpdo, offset, cmd}`, `add_rpdo_node` / `add_rpdo_entity_cmd`, `linking-nodes.md`);
 - `template_entities` (custom OD entries with typed command triggers, states, metadata);
 - `canopen.entity_cmd` (a command to another node's entity, on `write_sdo` or the OD writer frame);

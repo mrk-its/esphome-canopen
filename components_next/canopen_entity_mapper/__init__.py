@@ -34,6 +34,9 @@ CONF_TPDO = "tpdo"
 CONF_NUMBER = "number"
 CONF_IMMEDIATE = "immediate"
 CONF_CAPS = "caps"
+CONF_OD_WRITER = "od_writer"
+# the OD writer listens on 0x500..0x57F, which are the TPDO 7 COB-IDs (0x500 + node) of all nodes
+OD_WRITER_TPDO = 7
 
 # what can2mqtt accepts (can2mqtt.py ESPHOME_VENDOR_ID / ESPHOME_PRODUCT_CODE); revision 1: entity types in 0x2001
 ESPHOME_VENDOR_ID = 0xA59A08F5
@@ -97,15 +100,30 @@ def validate_unique_indices(config: ConfigType) -> ConfigType:
     return config
 
 
+def validate_od_writer_tpdo(config: ConfigType) -> ConfigType:
+    if not config[CONF_OD_WRITER]:
+        return config
+    for pos, entity in enumerate(config[CONF_ENTITIES]):
+        if CONF_TPDO in entity and layout.tpdo_number(entity) == OD_WRITER_TPDO:
+            raise cv.Invalid(
+                f"TPDO {OD_WRITER_TPDO} is reserved for the OD writer (od_writer: false frees it)",
+                path=[CONF_ENTITIES, pos, CONF_TPDO],
+            )
+    return config
+
+
 CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(EntityMapper),
             cv.GenerateID(canopen.CONF_CANOPEN_ID): cv.use_id(canopen.CANopenComponent),
             cv.Optional(CONF_ENTITIES, default=[]): cv.ensure_list(ENTITY_SCHEMA),
+            # node-to-node commands (OBJECT_DICTIONARY.md "OD writer"); reserves TPDO 7
+            cv.Optional(CONF_OD_WRITER, default=True): cv.boolean,
         }
     ).extend(cv.COMPONENT_SCHEMA),
     validate_unique_indices,
+    validate_od_writer_tpdo,
 )
 
 
@@ -188,6 +206,9 @@ async def to_code(config: ConfigType) -> None:
     cg.add_define("CANOPEN_ENTITY_MAPPER_ENTITIES", max(1, len(config[CONF_ENTITIES])))
     var = cg.new_Pvariable(config[CONF_ID], hub)
     await cg.register_component(var, config)
+    cg.add(var.set_node_id(node_id))
+    if config[CONF_OD_WRITER]:
+        cg.add(var.enable_od_writer())
 
     # TPDOs: all 8 exist (can2mqtt reads them), unused ones disabled
     states = node_states(CORE.config, config)
