@@ -8,6 +8,9 @@ external_components:
       type: local
       path: ../../esphome/esphome/components
     components: [canopen]
+  # entity mapper (step 7)
+  - source: ../components_next
+    components: [esphome_entity_mapper]
   # profile API hardware test (canopen_test_profile below)
   - source: external
 
@@ -17,13 +20,10 @@ esphome:
   includes:
     - sdo_test.h
     - od_handler_test.h
-    - can2mqtt_test.h
   on_boot:
     - lambda: |-
         // PR 8: OD handlers, added before the hub's setup() (on_boot runs at priority 600, the hub at 400)
         od_handler_test::register_objects(id(can_gate));
-        // can2mqtt discovery: one fake sensor (entity 1) and the TPDO config can2mqtt reads
-        can2mqtt_test::register_objects(id(can_gate), 0x7f);
         // TPDO1 of every node (0x181..0x1ff)
         id(can_gate).add_frame_listener(0x180, 0x780, +[](void *, uint32_t can_id, const uint8_t *data, uint8_t len) {
           ESP_LOGI("test", "rx 0x%03x, %u bytes, first 0x%02x", (unsigned) can_id, len, len ? data[0] : 0);
@@ -180,8 +180,13 @@ script:
 
 sensor:
   - platform: uptime
+    id: uptime_sensor
     name: "Uptime"
-    update_interval: 60s
+    update_interval: 10s
+  - platform: template
+    id: test_percent
+    name: "Test percent"
+    unit_of_measurement: "%"
 
 canbus:
   - platform: zephyr_can
@@ -205,11 +210,6 @@ canopen:
   canbus_id: can_bus
   node_id: 0x7f
   heartbeat_interval: 1s
-  # ESPHome's identity, as can2mqtt expects it (revision 1: entity types at 0x2001, uint32)
-  identity:
-    vendor_id: 0xA59A08F5
-    product_code: 0x6BDFA1D9
-    revision_number: 1
   hardware_version: nucleo_l476rg
   # PR 8: start pre-operational, then switch ourselves to operational (no NMT master needed)
   nmt_startup: pre_operational
@@ -263,10 +263,13 @@ canopen_test_profile:
     heartbeat_timeout: 12s
 
 interval:
-  # fake sensor state for can2mqtt, as TPDO 0
-  - interval: 5s
+  - interval: 10s
     then:
-      - lambda: can2mqtt_test::update(id(can_gate));
+      - lambda: |-
+          static bool on = false;
+          on = !on;
+          id(test_binary).publish_state(on);
+          id(test_percent).publish_state(fmod(millis() / 1000.0f, 100.0f));
   - interval: 5s
     then:
       - lambda: |-
@@ -274,3 +277,25 @@ interval:
           static uint8_t n = 0;
           uint8_t data[1] = {n++};
           ESP_LOGI("test", "send_frame 0x37f: %s", id(can_gate).send_frame(0x37F, data, 1) ? "ok" : "refused");
+
+# entity mapper (step 7): exposed to can2mqtt (ESPHome identity, entity layout, TPDOs)
+binary_sensor:
+  - platform: template
+    id: test_binary
+    name: "Test binary"
+
+esphome_entity_mapper:
+  canopen_id: can_gate
+  entities:
+    - id: uptime_sensor
+      index: 1
+      tpdo: 0
+    - id: test_percent
+      index: 2
+      size: 1
+      min_value: 0
+      max_value: 100
+      tpdo: 0
+    - id: test_binary
+      index: 3
+      tpdo: 1
