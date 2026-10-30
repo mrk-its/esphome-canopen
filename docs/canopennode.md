@@ -375,11 +375,21 @@ callback refactors):
   its `build_flags`, and `USE_CANOPEN_*` in `esphome/core/defines.h`. Open for PR 1: upstream's tidy script drops
   include dirs inside the repo (so a plain `-I` to the port header doesn't work), and `esp32-idf-tidy` rejects relative
   `file://` libraries and ignores `build_flags`. Needs a decision before PR 1 goes out.
-- Still to do (one commit on `canopen-next`, folded into the PRs when they are cut): no `std::deque` in
-  `ObjectDictionary` (512-byte blocks), `*_to_string()` returning `const LogString *`, `mark_failed(LOG_STR(...))`,
-  `canopen.nmt` as `register_apply_action`, no heap use after setup in the SDO client (`write_sdo_data()` copy,
-  `sdo_rx_` growth); in the mapper: `get_name_to()` instead of the deprecated `get_name()`, pointer-sized state
-  callbacks, `std::array` states, `static constexpr`, `ESPHOME_LOG_TAG`, Python type hints.
+- Done on `canopen-next` (2026-10-31, one commit, to fold into the PRs when they are cut):
+  - `ObjectDictionary` without `std::deque` (512-byte blocks): plain vectors that only grow until `finalize()`;
+    entries refer to their objects by position until then, and the pointers CANopenNode gets are taken in
+    `finalize()`. `add_*()` / `set_object()` after `finalize()` are ignored. `add_record()` takes an
+    `initializer_list` or a pointer and count (no temporary vector); so do `configure_tpdo/rpdo()`.
+  - `nmt_state_to_string()`, `node_event_to_string()` and `sdo_result_to_string()` return `const LogString *`
+    (`LOG_STR_ARG()` in lambdas); `mark_failed(LOG_STR(...))` where nothing else is logged.
+  - `canopen.nmt` registered with `apply_action_builder()` (no action class, a static function calling `send_nmt()`).
+  - SDO client without heap use after setup: `write_sdo_data()` no longer copies (**the data must stay valid until the
+    callback**, documented); value reads use a 4-byte array, buffer reads one 1 KB buffer allocated on the first one
+    and kept.
+  - Mapper: no string copies (metadata strings are read from the entity by the handler on each upload: name and
+    device class from flash on ESP8266, unit, state class), entities in a `StaticVector` sized by codegen
+    (`ESPHOME_ENTITY_MAPPER_ENTITIES`), states in `std::array`, callbacks capturing only the entity pointer,
+    `static constexpr`, `ESPHOME_LOG_TAG`, concatenated namespace, Python type hints. stm32l4 flash -2.8 KB.
 
 ## Hub for the entity mapper
 Target split (2026-10-30): the `canopen` hub (generic CiA 301) goes upstream; everything specific to esphome-canopen

@@ -20,7 +20,7 @@ class TestProfile : public Component, public canopen::CANopenNode {
   void setup() override {
     this->set_interval(10000, [this]() {
       ESP_LOGI(TAG, "node 0x%02x: online %s, state %s, operational %s", this->get_node_id(),
-               YESNO(this->is_online()), canopen::nmt_state_to_string(this->get_nmt_state()),
+               YESNO(this->is_online()), LOG_STR_ARG(canopen::nmt_state_to_string(this->get_nmt_state())),
                YESNO(this->is_operational()));
     });
   }
@@ -34,7 +34,7 @@ class TestProfile : public Component, public canopen::CANopenNode {
     this->read_sdo<uint32_t>(0x1018, 1, +[](void *context, const SDOReply &reply) {
       auto *self = CANopenNode::from_context<TestProfile>(context);
       ESP_LOGI(TAG, "forwarded read 0x1018:1: %s, value 0x%08x, context is the profile: %s",
-               canopen::sdo_result_to_string(reply.result), (unsigned) reply.value, YESNO(self->is_self_(context)));
+               LOG_STR_ARG(canopen::sdo_result_to_string(reply.result)), (unsigned) reply.value, YESNO(self->is_self_(context)));
       // cancelled right away: must never call back
       bool queued = self->read_sdo<uint32_t>(0x1018, 2, +[](void *, const SDOReply &) {
         ESP_LOGE(TAG, "FAIL: callback of a cancelled request");
@@ -45,7 +45,7 @@ class TestProfile : public Component, public canopen::CANopenNode {
   }
   void on_node_offline() override { ESP_LOGW(TAG, "hook: offline (node 0x%02x)", this->get_node_id()); }
   void on_node_nmt_changed(NMTState state) override {
-    ESP_LOGI(TAG, "hook: NMT changed (node 0x%02x): %s", this->get_node_id(), canopen::nmt_state_to_string(state));
+    ESP_LOGI(TAG, "hook: NMT changed (node 0x%02x): %s", this->get_node_id(), LOG_STR_ARG(canopen::nmt_state_to_string(state)));
   }
   void on_node_reset() override { ESP_LOGI(TAG, "hook: reset (node 0x%02x)", this->get_node_id()); }
   void on_node_emcy(const canopen::Emergency &emergency) override {

@@ -1,0 +1,65 @@
+# ESP8266 build check for esphome_entity_mapper on the upstream canopen hub (~/repos/esphome, branch canopen-next),
+# with upstream ESPHome (dev venv): ~/repos/esphome-upstream-venv/bin/esphome compile test/esp8266_mapper.yaml
+
+external_components:
+  - source:
+      type: local
+      path: ../../esphome/esphome/components
+    components: [canopen]
+  - source: ../components_next
+    components: [esphome_entity_mapper]
+
+esphome:
+  name: esp8266-mapper
+
+esp8266:
+  board: d1_mini
+
+logger:
+
+spi:
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
+canbus:
+  - platform: mcp2515
+    id: can_bus
+    cs_pin: GPIO15
+    can_id: 0
+    bit_rate: 125kbps
+
+canopen:
+  id: can_hub
+  canbus_id: can_bus
+  node_id: 0x7d
+
+sensor:
+  - platform: uptime
+    id: uptime_sensor
+    name: Uptime
+
+binary_sensor:
+  - platform: template
+    id: test_binary
+    name: Test binary
+    device_class: door
+
+switch:
+  - platform: template
+    id: test_switch
+    name: Test switch
+    optimistic: true
+
+esphome_entity_mapper:
+  canopen_id: can_hub
+  entities:
+    - id: uptime_sensor
+      index: 1
+      tpdo: 0
+    - id: test_binary
+      index: 2
+      tpdo: 0
+    - id: test_switch
+      index: 3
+      tpdo: 0

@@ -1,12 +1,13 @@
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
+#include <array>
+#include <span>
 
 #include "esphome/components/canopen/canopen.h"
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
+#include "esphome/core/entity_base.h"
+#include "esphome/core/helpers.h"
 
 #ifdef USE_SENSOR
 #include "esphome/components/sensor/sensor.h"
@@ -30,8 +31,7 @@
 #include "esphome/components/alarm_control_panel/alarm_control_panel.h"
 #endif
 
-namespace esphome {
-namespace esphome_entity_mapper {
+namespace esphome::esphome_entity_mapper {
 
 // Entity type codes (0x2001:N bits 0..7), see OBJECT_DICTIONARY.md
 enum EntityType : uint8_t {
@@ -62,45 +62,65 @@ uint32_t scale_to_wire(float value, float min_val, float max_val, uint32_t max_i
 inline uint32_t percentage_to_wire(float value) { return scale_to_wire(value, 0.0f, 1.0f, 255); }
 inline uint32_t color_temp_to_wire(float mireds) { return scale_to_wire(mireds, 100.0f, 1000.0f, 255); }
 
-// One exposed entity: metadata at 0x2000 + 16 * index, states at 0x2001 + 16 * index (the handler gives the states
-// their TPDO request flags).
+// One exposed entity: metadata at 0x2000 + 16 * index, states at 0x2001 + 16 * index. As the handler of both records
+// it reads the metadata strings from the entity on each upload (no copies) and gives the states their TPDO request
+// flags. Callbacks capture only the MappedEntity pointer.
 class MappedEntity : public canopen::OdObject {
  public:
-  MappedEntity(uint8_t index, uint32_t type) : index_(index), type_(type) {}
+  static constexpr size_t MAX_STATES = 3;
+
+  void init(canopen::CANopenComponent *hub, EntityBase *entity, uint8_t index, uint32_t type);
 
   uint16_t meta_index() const { return 0x2000 + 0x10 * this->index_; }
   uint16_t states_index() const { return 0x2001 + 0x10 * this->index_; }
   uint8_t get_index() const { return this->index_; }
   uint32_t get_type() const { return this->type_; }
   uint32_t *type_storage() { return &this->type_; }
+  // light / cover capabilities (type bits 16..23)
+  uint32_t get_caps() const { return (this->type_ >> 16) & 0xFF; }
 
   // states in subindex order (layout.py entity_states()), all before add_to_od()
-  void add_state(uint8_t size, uint32_t value) {
-    this->state_sizes_.push_back(size);
-    this->states_.push_back(value);
+  void add_state(uint8_t size, uint32_t value);
+  // metadata subindices 3 (unit) and 4 (state class): sensors only
+  void set_sensor_metadata(bool unit, uint8_t state_class) {
+    this->has_unit_ = unit;
+    this->state_class_ = state_class;
   }
-  void set_metadata(std::string name, std::string device_class, std::string unit, std::string state_class) {
-    this->name_ = std::move(name);
-    this->device_class_ = std::move(device_class);
-    this->unit_ = std::move(unit);
-    this->state_class_ = std::move(state_class);
-  }
+  // scale of a 1 / 2 byte sensor or number (metadata subindices 7 / 8), also the color temperature range of a light
   void set_min_max(float min_value, float max_value);
 
   void add_to_od(canopen::ObjectDictionary &od);
   // new value of state sub (1..), sent by the TPDO that maps it
-  void set_state(canopen::CANopenComponent *hub, uint8_t sub, uint32_t value);
+  void set_state(uint8_t sub, uint32_t value);
+  // sensor / number value, scaled to the state's size
+  void set_value(float value) { this->set_state(1, this->value_to_wire(value)); }
+  uint32_t value_to_wire(float value) const;
+#ifdef USE_COVER
+  void update_cover();
+#endif
+#ifdef USE_LIGHT
+  void update_light();
+#endif
+
+  canopen::OdResult od_read(canopen::OdStream stream, void *buf, size_t count, size_t *done);
 
  protected:
-  uint8_t index_;
-  uint32_t type_;
-  std::vector<uint8_t> state_sizes_;
-  std::vector<uint32_t> states_;  // little-endian storage, size bytes used
+  // the metadata string of sub into buf (null terminated), its length; 0 = none
+  size_t meta_string_(uint8_t sub, std::span<char, ENTITY_NAME_BUF_SIZE> buf) const;
+
+  canopen::CANopenComponent *hub_{nullptr};
+  EntityBase *entity_{nullptr};
+  uint32_t type_{0};
+  std::array<uint32_t, MAX_STATES> states_{};  // little-endian storage, size bytes used
+  std::array<uint8_t, MAX_STATES> state_sizes_{};
   uint8_t states_count_{0};
+  uint8_t index_{0};
   uint8_t meta_highest_{4};
-  std::string name_, device_class_, unit_, state_class_;
+  uint8_t state_class_{0};  // sensor::StateClass, 0 = none
+  bool has_unit_{false};
   bool has_min_max_{false};
-  uint32_t min_value_{0}, max_value_{0};  // REAL32 bits
+  float min_value_{0.0f};  // REAL32 in the OD
+  float max_value_{0.0f};
 };
 
 class EntityMapper : public Component {
@@ -136,26 +156,22 @@ class EntityMapper : public Component {
   float get_setup_priority() const override { return setup_priority::PROCESSOR + 1.0f; }
 
  protected:
-  MappedEntity *add_entity_(uint8_t index, uint32_t type);
+  MappedEntity *add_entity_(EntityBase *entity, uint8_t index, uint32_t type);
 #ifdef USE_LIGHT
   // light values reach the mapper through a listener object
   class LightListener : public light::LightRemoteValuesListener {
    public:
-    LightListener(EntityMapper *mapper, MappedEntity *entity, light::LightState *light, uint32_t caps)
-        : mapper_(mapper), entity_(entity), light_(light), caps_(caps) {}
-    void on_light_remote_values_update() override;
+    explicit LightListener(MappedEntity *entity) : entity_(entity) {}
+    void on_light_remote_values_update() override { this->entity_->update_light(); }
 
    protected:
-    EntityMapper *mapper_;
     MappedEntity *entity_;
-    light::LightState *light_;
-    uint32_t caps_;
   };
-  std::vector<std::unique_ptr<LightListener>> light_listeners_;
 #endif
 
   canopen::CANopenComponent *hub_;
-  std::vector<std::unique_ptr<MappedEntity>> entities_;
+  // ESPHOME_ENTITY_MAPPER_ENTITIES: from codegen, the number of entities
+  StaticVector<MappedEntity, ESPHOME_ENTITY_MAPPER_ENTITIES> entities_;
   // 0x2001: entity types, sub N = type of entity N
   uint8_t types_highest_{0};
   // 0x3002: TPDO layout hash (layout.py)
@@ -163,5 +179,4 @@ class EntityMapper : public Component {
   uint32_t layout_hash_{0};
 };
 
-}  // namespace esphome_entity_mapper
-}  // namespace esphome
+}  // namespace esphome::esphome_entity_mapper

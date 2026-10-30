@@ -4,15 +4,19 @@ Sits on top of the `canopen` hub (`canopen_id`): entity metadata and states at 0
 layout.py, the layout hash at 0x3002, and the ESPHome identity can2mqtt checks.
 """
 
-import datetime
+from collections.abc import Iterable
+import datetime as dt
 import logging
+from typing import Any
 
 import esphome.codegen as cg
 from esphome.components import canopen
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
 from esphome.core import CORE
+from esphome.cpp_generator import MockObj
 import esphome.final_validate as fv
+from esphome.types import ConfigType
 
 from . import layout
 
@@ -81,7 +85,7 @@ ENTITY_SCHEMA = cv.Schema(
 )
 
 
-def validate_unique_indices(config):
+def validate_unique_indices(config: ConfigType) -> ConfigType:
     seen = set()
     for pos, entity in enumerate(config[CONF_ENTITIES]):
         if entity[CONF_INDEX] in seen:
@@ -97,9 +101,7 @@ CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(EntityMapper),
-            cv.GenerateID(canopen.CONF_CANOPEN_ID): cv.use_id(
-                canopen.CANopenComponent
-            ),
+            cv.GenerateID(canopen.CONF_CANOPEN_ID): cv.use_id(canopen.CANopenComponent),
             cv.Optional(CONF_ENTITIES, default=[]): cv.ensure_list(ENTITY_SCHEMA),
         }
     ).extend(cv.COMPONENT_SCHEMA),
@@ -107,10 +109,12 @@ CONFIG_SCHEMA = cv.All(
 )
 
 
-def resolve_entity(full_config, entity_config):
+def resolve_entity(
+    full_config: fv.FinalValidateConfig, entity_config: ConfigType
+) -> tuple[str, ConfigType]:
     """(domain, platform config) of an exposed entity, via its declared C++ type."""
     entity_id = entity_config[CONF_ID]
-    for declared_id, path in full_config.declare_ids:
+    for declared_id, path in full_config.declare_ids:  # noqa: B007 (path: after the loop)
         if declared_id.id == entity_id.id:
             break
     else:
@@ -125,7 +129,7 @@ def resolve_entity(full_config, entity_config):
     return domain, full_config.get_config_for_path(path[:-1])
 
 
-def node_states(full_config, config):
+def node_states(full_config: fv.FinalValidateConfig, config: ConfigType) -> list[Any]:
     try:
         return layout.node_states(
             config, lambda entity: resolve_entity(full_config, entity)
@@ -135,12 +139,12 @@ def node_states(full_config, config):
         raise cv.Invalid(str(err), path=path) from err
 
 
-def hub_config(full_config, canopen_id):
+def hub_config(full_config: fv.FinalValidateConfig, canopen_id: Any) -> ConfigType:
     path = full_config.get_path_for_id(canopen_id)[:-1]
     return full_config.get_config_for_path(path)
 
 
-def _final_validate(config):
+def _final_validate(config: ConfigType) -> ConfigType:
     full_config = fv.full_config.get()
     try:
         layout.tpdo_mapping(node_states(full_config, config))
@@ -152,16 +156,16 @@ def _final_validate(config):
 FINAL_VALIDATE_SCHEMA = _final_validate
 
 
-def pdo_mappings(entries):
-    """canopen::PdoMapping initializer of layout.tpdo_mapping() words."""
+def pdo_mappings(entries: Iterable[int]) -> MockObj:
+    """Braced canopen::PdoMapping list (std::initializer_list) of layout.tpdo_mapping() words."""
     items = ", ".join(
         f"{{0x{word >> 16:04X}, {(word >> 8) & 0xFF}, {word & 0xFF}}}"
         for word in entries
     )
-    return cg.RawExpression(f"std::vector<canopen::PdoMapping>{{{items}}}")
+    return cg.RawExpression(f"{{{items}}}")
 
 
-async def to_code(config):
+async def to_code(config: ConfigType) -> None:
     hub = await cg.get_variable(config[canopen.CONF_CANOPEN_ID])
     node_id = hub_config(CORE.config, config[canopen.CONF_CANOPEN_ID])[
         canopen.CONF_NODE_ID
@@ -170,20 +174,18 @@ async def to_code(config):
 
     # the ESPHome identity can2mqtt checks, and the version string its firmware scanner finds in the binary
     cg.add(
-        hub.set_identity(
-            ESPHOME_VENDOR_ID, ESPHOME_PRODUCT_CODE, ESPHOME_REVISION, 0
-        )
+        hub.set_identity(ESPHOME_VENDOR_ID, ESPHOME_PRODUCT_CODE, ESPHOME_REVISION, 0)
     )
-    ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d.%H%M%S")
+    ts = dt.datetime.now(dt.UTC).strftime("%Y%m%d.%H%M%S")
     cg.add_global(
         cg.RawStatement(
             f'const char *const version_str_{node_id} = "node_id: {node_id:02x}, ver: " ESPHOME_VERSION ".{ts}";'
         )
     )
-    cg.add(
-        hub.set_software_version(cg.RawExpression(f"version_str_{node_id} + 18"))
-    )
+    cg.add(hub.set_software_version(cg.RawExpression(f"version_str_{node_id} + 18")))
 
+    # the mapper keeps its entities in a StaticVector of this size
+    cg.add_define("ESPHOME_ENTITY_MAPPER_ENTITIES", max(1, len(config[CONF_ENTITIES])))
     var = cg.new_Pvariable(config[CONF_ID], hub)
     await cg.register_component(var, config)
 

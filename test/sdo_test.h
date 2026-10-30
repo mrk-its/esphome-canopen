@@ -164,7 +164,7 @@ inline void start(CANopenComponent *co, uint8_t own_node_id) {
     test.t0 = millis();
     test.co->read_sdo(ABSENT_NODE, 0x1000, 0, 0, on_reply, pending([](const SDOReply &r) {
                         uint32_t dt = millis() - test.t0;
-                        ESP_LOGI(TAG, "absent node: %s after %u ms", sdo_result_to_string(r.result), (unsigned) dt);
+                        ESP_LOGI(TAG, "absent node: %s after %u ms", LOG_STR_ARG(sdo_result_to_string(r.result)), (unsigned) dt);
                         test.check(r.result == SDOResult::SDO_RESULT_TIMEOUT && dt >= 450 && dt < 1000,
                                    "read from absent node -> TIMEOUT after ~500 ms");
                         test.next();
@@ -209,7 +209,7 @@ inline void start(CANopenComponent *co, uint8_t own_node_id) {
                                 }));
   });
   s.push_back([] {
-    const uint8_t v[2] = {0xDC, 0x05};  // 1500
+    static const uint8_t v[2] = {0xDC, 0x05};  // 1500; write_sdo_data() does not copy
     test.co->write_sdo_data(test.own, 0x1017, 0, v, 2, on_reply, pending([](const SDOReply &r) {
                               test.check(r.ok(), "local write_sdo_data 0x1017 = 1500");
                               test.next();
