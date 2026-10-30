@@ -492,6 +492,14 @@ information, the SDO server, an object dictionary table, `nmt_startup`, `on_nmt_
 `get_nmt_state()` / `set_nmt_state()`. The C++ APIs for other components (PR 4 profile API, PR 8 OD handlers,
 PR 9 PDO configuration) aren't documented there. Split per PR like the code when the PRs go out.
 
+Mapper tests: `test/test_entity_mapper.py` (in `pytest test/`). It runs codegen and validation through the upstream
+venv's CLI (`esphome compile --only-generate`, `esphome config`) with the hub from `~/repos/esphome` as a local external
+component (`$ESPHOME_UPSTREAM_VENV`, `$ESPHOME_CANOPEN_HUB`; skipped without them). It checks: one entity of every
+domain to the `add_*()` calls in index order; the 8 `configure_tpdo()` calls (COB-IDs, mappings, the empty ones
+disabled); the layout hash; the identity after the hub's default; the version string; the entity count define; and
+the validation errors (duplicate index, unsupported domain, TPDO over 8 bytes, caps, size, ranges). It also checks
+that `layout.py` is identical to the old component's copy. ESP8266 build check: `test/esp8266_mapper.yaml`.
+
 Open points for `esphome_entity_mapper` itself (not in the steps yet):
 - OD writer COB-ID (step 8): today `0x500 + target`, which is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7
   frame whose first byte equals another node's id is applied there as an OD write; the ID also has several
