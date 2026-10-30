@@ -169,7 +169,8 @@ All in `~/repos/esphome`, branched from `upstream/dev`, one commit each, stacked
 - No CANopenNode changes beyond packaging; configuration through build flags.
 - Small PRs: the chain above instead of one ~2000-line PR; `send_frame()` without a queue, one SDO channel, no
   priorities, no SDO server yet.
-- `on_node_event` replaces the old `on_hb_consumer_event`; the new component drops the old remote states.
+- `on_node_event` replaces the old `on_hb_consumer_event`; the remote states (`platform: canopen`, `0x4000+n`
+  slots, `canopen.<domain>.<action>`) aren't in the hub, they move to the entity mapper (`esphome_entity_mapper`).
 - Several `canopen:` nodes per build are allowed (unlike #21522's one hub per bus).
 
 ## Open

@@ -22,8 +22,9 @@ their API**. The API below fixes what makes `cia402` complicated or slow there:
 Decisions taken (with the user, 2026-10-29):
 - Functionality of #21522/#21533 is the target; their API may change. `cia402` gets ported onto this API later
   (its own step, after this one).
-- The new component drops the old remote states (`platform: canopen` entities reading other esphome-canopen nodes,
-  `0x4000+n` slots, `canopen.<domain>.<action>`). No SDO-polled sensor for now.
+- The remote states (`platform: canopen` entities reading other esphome-canopen nodes, `0x4000+n` slots,
+  `canopen.<domain>.<action>`) aren't part of the `canopen` hub; they move to the entity mapper
+  (`esphome_entity_mapper`, decision 2026-10-30). No SDO-polled sensor for now.
 - This step comes before the SDO server step ([sdo_server_canopennode.md](sdo_server_canopennode.md), now step 3);
   it's tested against node 0x01 on the bus, no host bridge needed.
 

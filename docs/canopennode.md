@@ -253,8 +253,9 @@ Things to watch:
 
 ## Layers (target)
 ```
-entity mapper    ESPHome entities <-> 0x2000+, remote slots 0x4000+, template_entities,
-                 canopen.<domain>.<action>, OD writer, layout hash   (layout.py, remote.py unchanged)
+entity mapper    (esphome_entity_mapper) ESPHome entities <-> 0x2000+, remote slots 0x4000+, template_entities,
+                 remote states (rpdo: {node, entity}, platform: canopen), canopen.<domain>.<action>,
+                 OD writer, layout hash   (layout.py, remote.py unchanged)
 services         OTA (0x3000), remote logs (0x3100), device API (SDO client queue, NMT, HB, EMCY)
 node core        CANopenComponent: OD builder, NodeConfig (heartbeat, HB consumers, SDO clients, PDOs),
                  persistence (preferences), driver glue on ESPHome canbus
@@ -297,14 +298,16 @@ Each step is a commit on `feature/canopennode` (or its own `feature/...` branch)
    - layout hash `0x3002:1` (FNV-1a over the 0x1A00..0x1A07 mappings, must match `layout_hash()` in `layout.py`);
    - `test/test_layout.py` unchanged.
 8. **Commands from the host:** the OD writer (COB-ID `0x500 + node`, data `[node, sub, idx_lo, idx_hi, value...]`,
-   written through the OD IO so handlers fire), loopback between local instances. The old remote states (RPDO
-   slots `0x4000+n`, `platform: canopen` entities reading other nodes, `canopen.<domain>.<action>`) are **dropped**
-   from the new component (decision 2026-10-29).
+   written through the OD IO so handlers fire), loopback between local instances. The remote states (RPDO slots
+   `0x4000+n`, `rpdo: {node, entity}`, `platform: canopen` entities reading other nodes, `canopen.<domain>.<action>`)
+   stay, but in the entity mapper (`esphome_entity_mapper`), not in the `canopen` hub (decision 2026-10-30; replaces
+   the 2026-10-29 decision to drop them).
 9. **Switch over:**
    - `components_next/canopen` replaces `components/canopen`;
    - remove the canopen-stack code (`co_cmd`, `co_storage`, the old `driver_can`/`od`, the `CO_*` build flags,
-     `cg.add_library("canopenstack")`) and the remote-state code (`remote.py`, `remote_entities.*`, the
-     `platform: canopen` entity files);
+     `cg.add_library("canopenstack")`);
+   - the remote-state code (`remote.py`, `remote_entities.*`, the `platform: canopen` entity files) moves to
+     `esphome_entity_mapper`;
    - update CLAUDE.md and `docs/`;
    - check that `CANOPENNODE_SOURCE` points at the current fork commit (or CANopenNode upstream, if it took the
      `library.json`);
@@ -350,6 +353,75 @@ Before PR 1:
 - **Upstream boilerplate:** `tests/components/canopen/*.yaml`, Python tests, CODEOWNERS, esphome.io docs.
 - **#21522** (another author's open `canopen` hub, base of #21533): talk to its author / comment there before
   opening a competing component (open question below).
+
+## Hub for the entity mapper
+Target split (2026-10-30): the `canopen` hub (generic CiA 301) goes upstream; everything specific to esphome-canopen
+and can2mqtt stays here as the external component `esphome_entity_mapper`, which refers to a hub with `canopen_id`:
+entities (0x2000+16n), TPDO layout and hash (0x3002), remote states (0x4000+n, `rpdo: {node, entity}`,
+`platform: canopen`, `canopen.<domain>.<action>`), the OD writer, OTA (0x3000), remote logs (0x3100), and the
+ESPHome identity values and version string.
+
+What the hub still lacks for that (checked against `components_next`, 2026-10-30):
+1. **SDO server** (0x1200, `CNT_SDO_SRV = 1`, `enable_sdo_server()`): can2mqtt only talks to nodes through it
+   (step 3, [sdo_server_canopennode.md](sdo_server_canopennode.md)).
+2. **Device info and identity:** 0x1008/0x1009/0x100A and 0x1018 (vendor, product, revision, serial) as setters or
+   YAML options, so the mapper sets the ESPHome vendor/product and the firmware scanner's version string, and
+   upstream doesn't carry them. `add_string()` without `ODA_STR` (uploads indicate the size).
+3. **OD API for other components:**
+   - public `add_var` / `add_array` / `add_record` / `add_string` on `CANopenComponent` (`od_` is protected today),
+     before `CO_CANopenInit` only, duplicate index = error;
+   - **extensions**: read/write handlers per index, dispatching on the subindex, with partial reads and
+     `dataLength` (log upload) and chunked domain writes (OTA), and a way to request a TPDO on change
+     (`OD_requestTPDO`). Choice: CANopenNode's `OD_stream_t` or a neutral `OdHandler` (likely preferred upstream,
+     keeps CANopenNode headers out of other components);
+   - `write_od(index, sub, data, len)`: a synchronous local write through the OD IO, for the OD writer (the local SDO
+     client works, but is asynchronous and goes through the 16-entry queue).
+4. **Own PDOs** (not PR 6, which is about other devices' PDOs): `CO_CONFIG_PDO`, `CNT_TPDO` / `CNT_RPDO` from codegen,
+   0x1400/0x1600/0x1800/0x1A00 records with full COB-IDs (CANopenNode adds the node id only for PDO 1-4),
+   `CO_CANopenInitPDO`, RPDO/TPDO processing in `process_()`, `request_tpdo(n)` and immediate sends. The TPDO layout,
+   the remote-state RPDOs and the raw `rpdo:` linking sit on this.
+5. **Store/restore** (0x1010/0x1011 "save"/"load" into preferences): the host changes the RPDO config and it must
+   survive a reboot. An upstream hub uses its own preferences key, so saved configs (`canopen_comm_state_v2`) are lost
+   unless the mapper migrates them (to decide).
+6. **Own NMT state:** `get_nmt_state()` (missing), a callback / trigger for own state changes (the old
+   `on_operational` / `on_pre_operational`), and a startup option (operational, or pre-operational until told).
+7. **SDO block size** (`sdo_block_transfer_size`, see "Block size"): needed for OTA and log uploads. Needs
+   `CO_CONFIG_SDO_SRV_BLKSIZE` in CANopenNode upstream first, then a hub option. Ideally also YAML sizes for the
+   server buffer (900) and client FIFO (1000).
+8. **Loopback between local nodes** in the driver (`CO_CANsend` and `send_frame()` deliver to the other `canopen:`
+   nodes on the same canbus; was step 8).
+9. **Codegen hooks:** `enable_sdo_server()`, `enable_pdo(tpdo=N, rpdo=M)`, and a defined point where other
+   components add OD entries before the hub's `setup()` (from codegen / constructors, or a setup priority above
+   `PROCESSOR`).
+
+Not needed in the hub: raw frames and monitoring exist already (OD writer = frame listener, remote commands =
+`send_frame()` / `write_sdo()`, `monitor_node()`); ESP32 TWAI alerts / bus-off recovery / `get_can_status` belong in
+`esp32_can` / `canbus`; `CO_RESET_COMM` re-init is simpler if extensions and PDO configs are kept in the hub's own
+lists.
+
+Upstream PRs for it (estimates, not measured; independent of PRs 4-6, could go before them):
+
+| PR | Content | Lines |
+|---|---|---|
+| 7 | SDO server, device info / identity, `add_string()` | ~200 |
+| 8 | public OD API, extensions, `write_od()`, own NMT state API and startup option | ~300 |
+| 9 | own PDOs (records, init, processing, `request_tpdo()`) | ~400 |
+| 10 | 0x1010/0x1011 store/restore | ~200 |
+| 11 | loopback between local nodes | ~100 |
+| 12 | block size option (after a CANopenNode upstream PR) | ~30 |
+
+PRs 7-9 are the minimum for the mapper against can2mqtt; 10-12 for full parity.
+
+Open points for `esphome_entity_mapper` itself (not in the steps yet):
+- raw RPDO linking (`rpdo: {node_id, tpdo, offset, cmd}`, `add_rpdo_node` / `add_rpdo_entity_cmd`, `linking-nodes.md`);
+- `template_entities` (custom OD entries with typed command triggers, states, metadata);
+- `canopen.entity_cmd` (a command to another node's entity, on `write_sdo` or the OD writer frame);
+- `csdo:` and its lambda API (`setup_csdo`, `csdo_recv`, `csdo_send_*`): map onto the hub's SDO client; custom
+  tx/rx IDs need the pinned channels (device_api_canopennode.md, "Open points");
+- user migration: YAML changes from one `canopen:` block to `canopen:` + `esphome_entity_mapper:`; update
+  `configuration.md` / `linking-nodes.md`;
+- until the hub is merged, where the mapper gets the hub from (the esphome fork branch as an external component, or
+  `components_next` here).
 
 ## Verification for each step
 - `../esphomeplatformzephyr/venv/bin/esphome config test/stm32l4_canopen.yaml`, then `compile`.
