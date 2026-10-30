@@ -383,7 +383,7 @@ What the hub still lacks for that (checked against `components_next`, 2026-10-30
 2. **Device info and identity:** 0x1008/0x1009/0x100A and 0x1018 (vendor, product, revision, serial) as setters or
    YAML options, so the mapper sets the ESPHome vendor/product and the firmware scanner's version string, and
    upstream doesn't carry them. `add_string()` without `ODA_STR` (uploads indicate the size). **Done, PR 7**.
-3. **OD API for other components.** **Done, PR 8** (2026-10-30, `canopen-next` `7ce34c1`): `get_od()` (entries and
+3. **OD API for other components.** **Done, PR 8** (2026-10-30, `canopen-next`): `get_od()` (entries and
    handlers before setup only), `ObjectDictionary::set_object<T>()` with `OdObject` handlers (plain base class with
    default `od_read` / `od_write` on the entry's storage; template trampoline per handler type, no virtual calls),
    `OdStream` (sub, offset, size indication, `read_original` / `write_original`), `OdResult` (= `ODR_t` values),
@@ -393,8 +393,8 @@ What the hub still lacks for that (checked against `components_next`, 2026-10-30
 4. **Own PDOs** (not PR 6, which is about other devices' PDOs): `CO_CONFIG_PDO`, `CNT_TPDO` / `CNT_RPDO` from codegen,
    0x1400/0x1600/0x1800/0x1A00 records with full COB-IDs (CANopenNode adds the node id only for PDO 1-4),
    `CO_CANopenInitPDO`, RPDO/TPDO processing in `process_()`, `request_tpdo(n)` and immediate sends. The TPDO layout,
-   the remote-state RPDOs and the raw `rpdo:` linking sit on this. **Done, PR 9** (2026-10-30, `canopen-next`
-   `d6f97cb`): `canopen.enable_pdo()` (`-DCO_CONFIG_PDO=0x402F`: RPDO, TPDO, timers, `OD_IO_ACCESS`, `OD_DYNAMIC`; no
+   the remote-state RPDOs and the raw `rpdo:` linking sit on this. **Done, PR 9** (2026-10-30, `canopen-next`):
+   `canopen.enable_pdo()` (`-DCO_CONFIG_PDO=0x402F`: RPDO, TPDO, timers, `OD_IO_ACCESS`, `OD_DYNAMIC`; no
    SYNC), `configure_tpdo(n, cob_id, mappings, event_timer, inhibit, type)` / `configure_rpdo(...)` before setup (the
    hub creates the contiguous records 0..n; unconfigured PDOs and PDOs without mappings are disabled; up to 32 PDOs,
    8 mappings, 64 bits, whole bytes), `request_tpdo(n)` and `request_tpdo(index, sub)`. CANopenNode has one request
@@ -442,9 +442,9 @@ Upstream PRs for it (estimates, not measured; independent of PRs 4-6, could go b
 
 | PR | Content | Lines |
 |---|---|---|
-| 7 | SDO server, device info / identity, `add_string()`; done, `canopen-next` `38e6a3f` ([sdo_server_canopennode.md](sdo_server_canopennode.md)) | ~100 (tests ~85) |
-| 8 | public OD API, `OdObject` handlers, `write_od()`, own NMT state and `nmt_startup`; done, `canopen-next` `7ce34c1` | ~240 (tests ~115) |
-| 9 | own PDOs (records, init, processing, `request_tpdo()`); done, `canopen-next` `d6f97cb` | ~170 (tests ~165) |
+| 7 | SDO server, device info / identity, `add_string()`; done, `canopen-next` ([sdo_server_canopennode.md](sdo_server_canopennode.md)) | ~100 (tests ~85) |
+| 8 | public OD API, `OdObject` handlers, `write_od()`, own NMT state and `nmt_startup`; done, `canopen-next` | ~240 (tests ~115) |
+| 9 | own PDOs (records, init, processing, `request_tpdo()`); done, `canopen-next` | ~170 (tests ~165) |
 | 10 | 0x1010/0x1011 store/restore | ~200 |
 | 11 | loopback between local nodes | ~100 |
 | 12 | block size option (after a CANopenNode upstream PR) | ~30 |

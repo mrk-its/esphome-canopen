@@ -10,11 +10,11 @@ the plans and their history are in [canopennode.md](canopennode.md) (overall por
 All in `~/repos/esphome`, branched from `upstream/dev`, one commit each, stacked, pushed to `origin`
 (mrk-its/esphome). No PRs opened yet.
 
-| PR | Branch | Commit | Content | Size (component / tests) |
-|---|---|---|---|---|
-| 1 | `canopen-1-node` | `2d145d6` | CANopenNode integration, NMT, heartbeat producer, `heartbeat_clients`, `on_node_event` | 845 / 175 |
-| 2 | `canopen-2-frames` | `7c18230` | `on_heartbeat`, `on_emcy`, `add_frame_listener()`, `send_frame()` | +136 / +109 |
-| 3 | `canopen-3-sdo` | `30e380a` | SDO client, NMT master, `canopen.sdo_write`, `canopen.nmt`, `add_record()` | +631 / +107 |
+| PR | Branch | Content | Size (component / tests) |
+|---|---|---|---|
+| 1 | `canopen-1-node` | CANopenNode integration, NMT, heartbeat producer, `heartbeat_clients`, `on_node_event` | 845 / 175 |
+| 2 | `canopen-2-frames` | `on_heartbeat`, `on_emcy`, `add_frame_listener()`, `send_frame()` | +136 / +109 |
+| 3 | `canopen-3-sdo` | SDO client, NMT master, `canopen.sdo_write`, `canopen.nmt`, `add_record()` | +631 / +107 |
 
 - Source of truth is `components_next/canopen` in this repo (tested on hardware); each branch is cut from it by
   removing the later parts (synced with the branches on 2026-10-30). PR 4 (`canopen-4-profile`, the profile API)
