@@ -363,29 +363,45 @@ entities (0x2000+16n), TPDO layout and hash (0x3002), remote states (0x4000+n, `
 ESPHome identity values and version string.
 
 What the hub still lacks for that (checked against `components_next`, 2026-10-30):
-1. **SDO server** (0x1200, `CNT_SDO_SRV = 1`, `enable_sdo_server()`): can2mqtt only talks to nodes through it
-   (step 3, [sdo_server_canopennode.md](sdo_server_canopennode.md)).
+1. **SDO server** (0x1200, `CNT_SDO_SRV = 1`): can2mqtt only talks to nodes through it
+   (step 3, [sdo_server_canopennode.md](sdo_server_canopennode.md)). **Done, PR 7**: always on (CiA 301), segmented,
+   32-byte buffer.
 2. **Device info and identity:** 0x1008/0x1009/0x100A and 0x1018 (vendor, product, revision, serial) as setters or
    YAML options, so the mapper sets the ESPHome vendor/product and the firmware scanner's version string, and
-   upstream doesn't carry them. `add_string()` without `ODA_STR` (uploads indicate the size).
-3. **OD API for other components:**
-   - public `add_var` / `add_array` / `add_record` / `add_string` on `CANopenComponent` (`od_` is protected today),
-     before `CO_CANopenInit` only, duplicate index = error;
-   - **extensions**: read/write handlers per index, dispatching on the subindex, with partial reads and
-     `dataLength` (log upload) and chunked domain writes (OTA), and a way to request a TPDO on change
-     (`OD_requestTPDO`). Choice: CANopenNode's `OD_stream_t` or a neutral `OdHandler` (likely preferred upstream,
-     keeps CANopenNode headers out of other components);
-   - `write_od(index, sub, data, len)`: a synchronous local write through the OD IO, for the OD writer (the local SDO
-     client works, but is asynchronous and goes through the 16-entry queue).
+   upstream doesn't carry them. `add_string()` without `ODA_STR` (uploads indicate the size). **Done, PR 7**.
+3. **OD API for other components.** **Done, PR 8** (2026-10-30, `canopen-next` `7ce34c1`): `get_od()` (entries and
+   handlers before setup only), `ObjectDictionary::set_object<T>()` with `OdObject` handlers (plain base class with
+   default `od_read` / `od_write` on the entry's storage; template trampoline per handler type, no virtual calls),
+   `OdStream` (sub, offset, size indication, `read_original` / `write_original`), `OdResult` (= `ODR_t` values),
+   `OD_READ` / `OD_WRITE` / `OD_TPDO` / `OD_RPDO`, `write_od()` (synchronous, through the handler), duplicate index =
+   setup error. Hardware: local SDO write / read and `write_od()` through a handler, a generated 100-byte domain read
+   in PARTIAL chunks. Still missing for PDOs: a way to request a TPDO on change (`OD_requestTPDO`, comes with PR 9).
 4. **Own PDOs** (not PR 6, which is about other devices' PDOs): `CO_CONFIG_PDO`, `CNT_TPDO` / `CNT_RPDO` from codegen,
    0x1400/0x1600/0x1800/0x1A00 records with full COB-IDs (CANopenNode adds the node id only for PDO 1-4),
    `CO_CANopenInitPDO`, RPDO/TPDO processing in `process_()`, `request_tpdo(n)` and immediate sends. The TPDO layout,
-   the remote-state RPDOs and the raw `rpdo:` linking sit on this.
+   the remote-state RPDOs and the raw `rpdo:` linking sit on this. **Next: PR 9.** Facts from CANopenNode
+   (`301/CO_PDO.c`, `CANopen.c`, checked 2026-10-30):
+   - `CO_CANopenInitPDO` takes `ENTRY_H1400/1600/1800/1A00` and steps with `++` (pointer arithmetic, not `OD_find`):
+     the N records of each range must be **contiguous** in the OD array (0x1400..0x1400+N-1 all present, no gaps);
+   - mapped objects need `OD_TPDO` / `OD_RPDO` and a length >= the mapped bits (byte aligned without
+     `CO_CONFIG_PDO_BITWISE_MAPPING`), else the PDO is invalid and an EMCY `CO_EM_PDO_WRONG_MAPPING` is sent; a valid
+     COB-ID with 0 mapped objects is invalid too;
+   - TPDO triggers: `CO_TPDOsendRequest()`, `OD_requestTPDO(entry, sub)` (only for objects with an extension, the flag
+     bits are `OD_extension_t.flagsPDO`: every `set_object()` entry has one), or the event timer. Init sets
+     `sendRequest`, so each TPDO goes out once on entering OPERATIONAL. Both process functions only run in
+     OPERATIONAL;
+   - RPDO data goes through the object's `od_write()` only with `CO_CONFIG_PDO_OD_IO_ACCESS`;
+   - with `CO_CONFIG_FLAG_OD_DYNAMIC` PDO init installs CANopenNode's own extensions on 0x14xx-0x1Axx (live changes
+     over SDO): no `set_object()` there; store/restore (PR 10) reads the records' data;
+   - COB-IDs: any valid 11-bit ID; only a stored predefined base (0x180, ...) gets the node id added, for PDO 1-4
+     (`CO_xPDO_DEFAULT_CANID_COUNT = 4`). The old component's TPDO 4-7 on 0x200/0x300/0x400/0x500 + node (the RPDO
+     defaults) work as full COB-IDs; SDO writes to them are allowed (not restricted IDs).
 5. **Store/restore** (0x1010/0x1011 "save"/"load" into preferences): the host changes the RPDO config and it must
    survive a reboot. An upstream hub uses its own preferences key, so saved configs (`canopen_comm_state_v2`) are lost
    unless the mapper migrates them (to decide).
-6. **Own NMT state:** `get_nmt_state()` (missing), a callback / trigger for own state changes (the old
-   `on_operational` / `on_pre_operational`), and a startup option (operational, or pre-operational until told).
+6. **Own NMT state.** **Done, PR 8**: `get_nmt_state()`, `set_nmt_state()` (no NMT master needed),
+   `on_nmt_state_change`, `nmt_startup: operational | pre_operational` (default operational). Tracked in `process_()`
+   (CANopenNode's change callback has no context pointer).
 7. **SDO block size** (`sdo_block_transfer_size`, see "Block size"): needed for OTA and log uploads. Needs
    `CO_CONFIG_SDO_SRV_BLKSIZE` in CANopenNode upstream first, then a hub option. Ideally also YAML sizes for the
    server buffer (900) and client FIFO (1000).
@@ -405,7 +421,7 @@ Upstream PRs for it (estimates, not measured; independent of PRs 4-6, could go b
 | PR | Content | Lines |
 |---|---|---|
 | 7 | SDO server, device info / identity, `add_string()`; done, `canopen-next` `38e6a3f` ([sdo_server_canopennode.md](sdo_server_canopennode.md)) | ~100 (tests ~85) |
-| 8 | public OD API, extensions, `write_od()`, own NMT state API and startup option | ~300 |
+| 8 | public OD API, `OdObject` handlers, `write_od()`, own NMT state and `nmt_startup`; done, `canopen-next` `7ce34c1` | ~240 (tests ~115) |
 | 9 | own PDOs (records, init, processing, `request_tpdo()`) | ~400 |
 | 10 | 0x1010/0x1011 store/restore | ~200 |
 | 11 | loopback between local nodes | ~100 |
@@ -418,6 +434,12 @@ PR), and cut into stacked PR branches when they go out. `test/stm32l4_canopen.ya
 `../../esphome`, i.e. whatever branch is checked out there.
 
 Open points for `esphome_entity_mapper` itself (not in the steps yet):
+- OD writer COB-ID (step 8): today `0x500 + target`, which is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7
+  frame whose first byte equals another node's id is applied there as an OD write; the ID also has several
+  producers. Proposal: the CiA 301 MPDO format (destination address mode: byte 0 = `0x80 | target`, 0 = all;
+  index LE; subindex; 4 data bytes) on the **sender's** TPDO 7 (`0x500 + sender`), TPDO 7 reserved in `layout.py`;
+  can2mqtt needs a node id of its own. Alternatives: extended 29-bit IDs, or `0x680 + sender` (only senders up to
+  0x5F). Changes the wire protocol (can2mqtt). Not decided.
 - raw RPDO linking (`rpdo: {node_id, tpdo, offset, cmd}`, `add_rpdo_node` / `add_rpdo_entity_cmd`, `linking-nodes.md`);
 - `template_entities` (custom OD entries with typed command triggers, states, metadata);
 - `canopen.entity_cmd` (a command to another node's entity, on `write_sdo` or the OD writer frame);

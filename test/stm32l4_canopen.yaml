@@ -16,8 +16,11 @@ esphome:
   # SDO client / NMT master hardware test (node 0x61 and our own node), see the file
   includes:
     - sdo_test.h
+    - od_handler_test.h
   on_boot:
     - lambda: |-
+        // PR 8: OD handlers, added before the hub's setup() (on_boot runs at priority 600, the hub at 400)
+        od_handler_test::register_objects(id(can_gate));
         // TPDO1 of every node (0x181..0x1ff)
         id(can_gate).add_frame_listener(0x180, 0x780, +[](void *, uint32_t can_id, const uint8_t *data, uint8_t len) {
           ESP_LOGI("test", "rx 0x%03x, %u bytes, first 0x%02x", (unsigned) can_id, len, len ? data[0] : 0);
@@ -45,6 +48,8 @@ esphome:
           ESP_LOGI("test", "own 0x1018:1 (vendor id): %s 0x%08x", canopen::sdo_result_to_string(r.result),
                    (unsigned) r.value);
         }, nullptr);
+    - delay: 2s
+    - lambda: od_handler_test::run(0x7f);
 
 zephyr:
   variant: STM32L4
@@ -201,6 +206,20 @@ canopen:
     vendor_id: 0x12345678
     product_code: 0x2A
   hardware_version: nucleo_l476rg
+  # PR 8: start pre-operational, then switch ourselves to operational (no NMT master needed)
+  nmt_startup: pre_operational
+  on_nmt_state_change:
+    - logger.log:
+        format: "own NMT state: %s"
+        args: ["esphome::canopen::nmt_state_to_string(state)"]
+    - if:
+        condition:
+          lambda: return state == esphome::canopen::NMTState::PRE_OPERATIONAL;
+        then:
+          - delay: 3s
+          - lambda: |-
+              ESP_LOGI("test", "set_nmt_state(OPERATIONAL): %s",
+                       YESNO(id(can_gate).set_nmt_state(esphome::canopen::NMTState::OPERATIONAL)));
   heartbeat_clients:
     - node_id: 0x01
       timeout: 7s  # node 0x01 sends a heartbeat every 5 s
