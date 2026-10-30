@@ -13,7 +13,9 @@ namespace esphome::canopen_entity_mapper {
 ESPHOME_LOG_TAG(TAG, "canopen_entity_mapper");
 
 using canopen::OD_READ;
+using canopen::OD_RPDO;
 using canopen::OD_TPDO;
+using canopen::OD_WRITE;
 using canopen::OdResult;
 using RecordSub = canopen::ObjectDictionary::RecordSub;
 
@@ -30,6 +32,12 @@ uint32_t scale_to_wire(float value, float min_val, float max_val, uint32_t max_i
     return max_int;
   float result = std::round((max_int - 1) * (value - min_val) / (max_val - min_val));
   return result < 0 ? 0 : (result > max_int - 1 ? max_int - 1 : (uint32_t) result);
+}
+
+float scale_from_wire(uint32_t wire, float min_val, float max_val, uint32_t max_int) {
+  if (wire >= max_int)
+    return NAN;
+  return wire * (max_val - min_val) / (max_int - 1) + min_val;
 }
 
 void MappedEntity::init(canopen::CANopenComponent *hub, EntityBase *entity, uint8_t index, uint32_t type) {
@@ -63,6 +71,20 @@ uint32_t MappedEntity::value_to_wire(float value) const {
       uint32_t bits;
       std::memcpy(&bits, &value, sizeof(bits));
       return bits;
+    }
+  }
+}
+
+float MappedEntity::value_from_wire(uint32_t wire) const {
+  switch (this->state_sizes_[0]) {
+    case 1:
+      return scale_from_wire(wire, this->min_value_, this->max_value_, 255);
+    case 2:
+      return scale_from_wire(wire, this->min_value_, this->max_value_, 65535);
+    default: {
+      float value;
+      std::memcpy(&value, &wire, sizeof(value));
+      return value;
     }
   }
 }
@@ -116,6 +138,66 @@ OdResult MappedEntity::od_read(canopen::OdStream stream, void *buf, size_t count
   return offset + n < total ? OdResult::OD_RESULT_PARTIAL : OdResult::OD_RESULT_OK;
 }
 
+OdResult MappedEntity::od_write(canopen::OdStream stream, const void *buf, size_t count, size_t *done) {
+  OdResult ret = stream.write_original(buf, count, done);
+  uint8_t sub = stream.sub();
+  // a whole command (expedited SDO, RPDO or write_od()) runs right away, from the hub's processing
+  if (ret == OdResult::OD_RESULT_OK && stream.index() == this->commands_index() && sub >= 1 &&
+      sub <= this->states_count_)
+    this->command_(sub, this->commands_[sub - 1]);
+  return ret;
+}
+
+void MappedEntity::command_(uint8_t sub, uint32_t value) {
+  switch (this->type_ & 0xFF) {
+#ifdef USE_SENSOR
+    case ENTITY_TYPE_SENSOR:
+    case ENTITY_TYPE_SENSOR_UINT8:
+    case ENTITY_TYPE_SENSOR_UINT16:
+      static_cast<sensor::Sensor *>(this->entity_)->publish_state(this->value_from_wire(value));
+      break;
+#endif
+#ifdef USE_NUMBER
+    case ENTITY_TYPE_NUMBER:
+    case ENTITY_TYPE_NUMBER_UINT8:
+    case ENTITY_TYPE_NUMBER_UINT16:
+      static_cast<number::Number *>(this->entity_)->publish_state(this->value_from_wire(value));
+      break;
+#endif
+#ifdef USE_BINARY_SENSOR
+    case ENTITY_TYPE_BINARY_SENSOR:
+      static_cast<binary_sensor::BinarySensor *>(this->entity_)->publish_state(value != 0);
+      break;
+#endif
+#ifdef USE_SWITCH
+    case ENTITY_TYPE_SWITCH:
+      if (value != 0) {
+        static_cast<switch_::Switch *>(this->entity_)->turn_on();
+      } else {
+        static_cast<switch_::Switch *>(this->entity_)->turn_off();
+      }
+      break;
+#endif
+#ifdef USE_LIGHT
+    case ENTITY_TYPE_LIGHT:
+      this->light_command_(sub, value);
+      break;
+#endif
+#ifdef USE_COVER
+    case ENTITY_TYPE_COVER:
+      this->cover_command_(sub, value);
+      break;
+#endif
+#ifdef USE_ALARM_CONTROL_PANEL
+    case ENTITY_TYPE_ALARM:
+      this->alarm_command_(value);
+      break;
+#endif
+    default:
+      break;
+  }
+}
+
 void MappedEntity::add_to_od(canopen::ObjectDictionary &od) {
   // metadata: strings only if not empty (can2mqtt skips missing subindices), read by od_read()
   std::array<RecordSub, 7> meta;
@@ -139,6 +221,14 @@ void MappedEntity::add_to_od(canopen::ObjectDictionary &od) {
     states[i + 1] = {uint8_t(i + 1), OD_READ | OD_TPDO, &this->states_[i], this->state_sizes_[i]};
   od.add_record(this->states_index(), states.data(), this->states_count_ + 1);
   od.set_object(this->states_index(), this);
+
+  // commands: one per state, same size
+  std::array<RecordSub, MAX_STATES + 1> commands;
+  commands[0] = {0, OD_READ, &this->states_count_, 1};
+  for (uint8_t i = 0; i < this->states_count_; i++)
+    commands[i + 1] = {uint8_t(i + 1), OD_WRITE | OD_RPDO, &this->commands_[i], this->state_sizes_[i]};
+  od.add_record(this->commands_index(), commands.data(), this->states_count_ + 1);
+  od.set_object(this->commands_index(), this);
 }
 
 void MappedEntity::set_state(uint8_t sub, uint32_t value) {
@@ -245,6 +335,24 @@ void MappedEntity::update_light() {
   if (caps & LIGHT_CAP_COLOR_TEMPERATURE)
     this->set_state(3, color_temp_to_wire(values.get_color_temperature()));
 }
+
+// sub 1: 0 off, other on; 2: brightness (percentage); 3: color temperature (mireds scaled to 100..1000)
+void MappedEntity::light_command_(uint8_t sub, uint32_t value) {
+  auto call = static_cast<light::LightState *>(this->entity_)->make_call();
+  if (sub == 1) {
+    call.set_state(value != 0);
+  } else {
+    float scaled = sub == 2 ? percentage_from_wire(value) : color_temp_from_wire(value);
+    if (std::isnan(scaled))
+      return;
+    if (sub == 2) {
+      call.set_brightness_if_supported(scaled);
+    } else {
+      call.set_color_temperature_if_supported(scaled);
+    }
+  }
+  call.perform();
+}
 #endif
 
 #ifdef USE_COVER
@@ -284,6 +392,33 @@ void MappedEntity::update_cover() {
   if (caps & COVER_CAP_TILT)
     this->set_state(sub, percentage_to_wire(cover->tilt));
 }
+
+// sub 1: 0 stop, 1 open, 2 close; then position, tilt (percentages), the ones in caps
+void MappedEntity::cover_command_(uint8_t sub, uint32_t value) {
+  auto call = static_cast<cover::Cover *>(this->entity_)->make_call();
+  if (sub == 1) {
+    if (value == 0) {
+      call.set_command_stop();
+    } else if (value == 1) {
+      call.set_command_open();
+    } else if (value == 2) {
+      call.set_command_close();
+    } else {
+      return;
+    }
+  } else {
+    float scaled = percentage_from_wire(value);
+    if (std::isnan(scaled))
+      return;
+    bool position = sub == 2 && (this->get_caps() & COVER_CAP_POSITION);
+    if (position) {
+      call.set_position(scaled);
+    } else {
+      call.set_tilt(scaled);
+    }
+  }
+  call.perform();
+}
 #endif
 
 #ifdef USE_ALARM_CONTROL_PANEL
@@ -295,6 +430,35 @@ void EntityMapper::add_alarm(alarm_control_panel::AlarmControlPanel *alarm, uint
   alarm->add_on_state_callback([entity](alarm_control_panel::AlarmControlPanelState state) {
     entity->set_state(1, static_cast<uint32_t>(state));
   });
+}
+
+void MappedEntity::alarm_command_(uint32_t value) {
+  auto *alarm = static_cast<alarm_control_panel::AlarmControlPanel *>(this->entity_);
+  switch (value) {
+    case 0:
+      alarm->disarm();
+      break;
+    case 1:
+      alarm->arm_away();
+      break;
+    case 2:
+      alarm->arm_home();
+      break;
+    case 3:
+      alarm->arm_night();
+      break;
+    case 4:
+      alarm->arm_vacation();
+      break;
+    case 5:
+      alarm->arm_custom_bypass();
+      break;
+    case 127:
+      alarm->publish_state(alarm_control_panel::ACP_STATE_TRIGGERED);
+      break;
+    default:
+      break;
+  }
 }
 #endif
 

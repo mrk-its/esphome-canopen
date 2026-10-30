@@ -60,6 +60,36 @@ esphome:
                    (unsigned) r.value);
         }, nullptr);
     - delay: 2s
+    # entity commands (0x2002 + 16 * N) written with the local SDO client, then the states they cause
+    - lambda: |-
+        static auto log_write = +[](void *context, const canopen::SDOReply &r) {
+          ESP_LOGI("test", "command 0x%06x: %s", (unsigned) (uintptr_t) context,
+                   LOG_STR_ARG(canopen::sdo_result_to_string(r.result)));
+        };
+        auto cmd = [](uint16_t index, uint8_t sub, uint32_t value, uint8_t size) {
+          id(can_gate).write_sdo(0x7f, index, sub, value, size, log_write, (void *) (uintptr_t) (index << 8 | sub));
+        };
+        cmd(0x2042, 1, 1, 1);      // switch on
+        cmd(0x2052, 1, 49151, 2);  // number: 49151 of 65534 in -50..50 = 25.0
+        cmd(0x2062, 2, 127, 1);    // cover position 50 %
+        cmd(0x2072, 1, 1, 1);      // light on
+        cmd(0x2072, 2, 127, 1);    // light brightness 50 %
+        cmd(0x2082, 1, 1, 1);      // alarm: arm away
+        cmd(0x2032, 1, 1, 1);      // binary sensor: publish on
+    - delay: 1s
+    - lambda: |-
+        ESP_LOGI("test", "after commands: switch %s, number %.2f, cover position %.2f, light %s brightness %.2f, "
+                 "alarm %s, binary %s", ONOFF(id(test_switch).state), id(test_number).state, id(test_cover).position,
+                 ONOFF(id(test_light).remote_values.is_on()), id(test_light).remote_values.get_brightness(),
+                 LOG_STR_ARG(alarm_control_panel_state_to_string(id(test_alarm).get_state())),
+                 ONOFF(id(test_binary).state));
+        // the state records follow (read back over SDO): switch, light brightness
+        id(can_gate).read_sdo<uint8_t>(0x7f, 0x2041, 1, +[](void *, const canopen::SDOReply &r) {
+          ESP_LOGI("test", "state 0x2041:1 (switch): %u", (unsigned) r.value);
+        }, nullptr);
+        id(can_gate).read_sdo<uint8_t>(0x7f, 0x2071, 2, +[](void *, const canopen::SDOReply &r) {
+          ESP_LOGI("test", "state 0x2071:2 (light brightness): %u", (unsigned) r.value);
+        }, nullptr);
     - lambda: od_handler_test::run(0x7f);
 
 zephyr:
@@ -286,10 +316,6 @@ interval:
           on = !on;
           id(test_binary).publish_state(on);
           id(test_percent).publish_state(fmod(millis() / 1000.0f, 100.0f));
-          id(test_switch).publish_state(on);
-          id(test_number).publish_state(fmod(millis() / 1000.0f, 100.0f) - 50.0f);
-          id(test_cover).position = on ? 1.0f : 0.25f;
-          id(test_cover).publish_state();
   - interval: 5s
     then:
       - lambda: |-

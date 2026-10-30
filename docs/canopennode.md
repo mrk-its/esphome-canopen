@@ -493,6 +493,15 @@ information, the SDO server, an object dictionary table, `nmt_startup`, `on_nmt_
 `get_nmt_state()` / `set_nmt_state()`. The C++ APIs for other components (PR 4 profile API, PR 8 OD handlers,
 PR 9 PDO configuration) aren't documented there. Split per PR like the code when the PRs go out.
 
+Entity commands (0x2002+16N, 2026-10-31): one write-only, RPDO-mappable sub per state with the same size, storage in
+the entity, run by the entity's `od_write()` when the write is complete (SDO, RPDO, `write_od()`). Semantics as the
+old component: sensor / number / binary sensor publish the value (a number is *published*, not `make_call()`, so its
+`set_action` doesn't run), switch on / off, light state / brightness / color temperature, cover stop / open / close /
+position / tilt, alarm disarm / arm / trigger (127); a scaled NaN (255 / 65535) is ignored. Tested on the nucleo with
+local SDO writes (`test/stm32l4_canopen.yaml`). CANopenNode quirk: the *local* SDO client reads a write-only entry
+anyway (`CO_SDOclientUpload()` sets the write-only abort but then reads and overwrites the result); the SDO server
+checks the access correctly.
+
 Mapper tests: `test/test_entity_mapper.py` (in `pytest test/`). It runs codegen and validation through the upstream
 venv's CLI (`esphome compile --only-generate`, `esphome config`) with the hub from `~/repos/esphome` as a local external
 component (`$ESPHOME_UPSTREAM_VENV`, `$ESPHOME_CANOPEN_HUB`; skipped without them). It checks: one entity of every

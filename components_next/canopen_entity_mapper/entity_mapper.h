@@ -57,14 +57,18 @@ enum : uint32_t {
   COVER_CAP_TILT = 2,
 };
 
-// wire encoding of scaled states, see "Scaled values" in OBJECT_DICTIONARY.md
+// wire encoding of scaled states and commands, see "Scaled values" in OBJECT_DICTIONARY.md (max_int = NaN)
 uint32_t scale_to_wire(float value, float min_val, float max_val, uint32_t max_int);
+float scale_from_wire(uint32_t wire, float min_val, float max_val, uint32_t max_int);
 inline uint32_t percentage_to_wire(float value) { return scale_to_wire(value, 0.0f, 1.0f, 255); }
+inline float percentage_from_wire(uint32_t wire) { return scale_from_wire(wire, 0.0f, 1.0f, 255); }
 inline uint32_t color_temp_to_wire(float mireds) { return scale_to_wire(mireds, 100.0f, 1000.0f, 255); }
+inline float color_temp_from_wire(uint32_t wire) { return scale_from_wire(wire, 100.0f, 1000.0f, 255); }
 
-// One exposed entity: metadata at 0x2000 + 16 * index, states at 0x2001 + 16 * index. As the handler of both records
-// it reads the metadata strings from the entity on each upload (no copies) and gives the states their TPDO request
-// flags. Callbacks capture only the MappedEntity pointer.
+// One exposed entity: metadata at 0x2000 + 16 * index, states at 0x2001 + 16 * index, commands at 0x2002 + 16 * index
+// (one per state, same size; write only, RPDO mappable). As the handler of the three records it reads the metadata
+// strings from the entity on each upload (no copies), gives the states their TPDO request flags and runs the commands.
+// Callbacks capture only the MappedEntity pointer.
 class MappedEntity : public canopen::OdObject {
  public:
   static constexpr size_t MAX_STATES = 3;
@@ -73,6 +77,7 @@ class MappedEntity : public canopen::OdObject {
 
   uint16_t meta_index() const { return 0x2000 + 0x10 * this->index_; }
   uint16_t states_index() const { return 0x2001 + 0x10 * this->index_; }
+  uint16_t commands_index() const { return 0x2002 + 0x10 * this->index_; }
   uint8_t get_index() const { return this->index_; }
   uint32_t get_type() const { return this->type_; }
   uint32_t *type_storage() { return &this->type_; }
@@ -95,6 +100,7 @@ class MappedEntity : public canopen::OdObject {
   // sensor / number value, scaled to the state's size
   void set_value(float value) { this->set_state(1, this->value_to_wire(value)); }
   uint32_t value_to_wire(float value) const;
+  float value_from_wire(uint32_t wire) const;
 #ifdef USE_COVER
   void update_cover();
 #endif
@@ -103,16 +109,29 @@ class MappedEntity : public canopen::OdObject {
 #endif
 
   canopen::OdResult od_read(canopen::OdStream stream, void *buf, size_t count, size_t *done);
+  canopen::OdResult od_write(canopen::OdStream stream, const void *buf, size_t count, size_t *done);
 
  protected:
   // the metadata string of sub into buf (null terminated), its length; 0 = none
   size_t meta_string_(uint8_t sub, std::span<char, ENTITY_NAME_BUF_SIZE> buf) const;
+  // command sub (1..) with its value (size bytes of the state it controls, little endian)
+  void command_(uint8_t sub, uint32_t value);
+#ifdef USE_LIGHT
+  void light_command_(uint8_t sub, uint32_t value);
+#endif
+#ifdef USE_COVER
+  void cover_command_(uint8_t sub, uint32_t value);
+#endif
+#ifdef USE_ALARM_CONTROL_PANEL
+  void alarm_command_(uint32_t value);
+#endif
 
   canopen::CANopenComponent *hub_{nullptr};
   EntityBase *entity_{nullptr};
   uint32_t type_{0};
   std::array<uint32_t, MAX_STATES> states_{};  // little-endian storage, size bytes used
   std::array<uint8_t, MAX_STATES> state_sizes_{};
+  std::array<uint32_t, MAX_STATES> commands_{};  // the last written commands (storage for SDO and RPDO writes)
   uint8_t states_count_{0};
   uint8_t index_{0};
   uint8_t meta_highest_{4};
