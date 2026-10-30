@@ -496,7 +496,7 @@ PR 9 PDO configuration) aren't documented there. Split per PR like the code when
 Entity commands (0x2002+16N, 2026-10-31): one write-only, RPDO-mappable sub per state with the same size, storage in
 the entity, run by the entity's `od_write()` when the write is complete (SDO, RPDO, `write_od()`). Semantics as the
 old component: sensor / number / binary sensor publish the value (a number is *published*, not `make_call()`, so its
-`set_action` doesn't run), switch on / off, light state / brightness / color temperature, cover stop / open / close /
+`set_action` doesn't run; to fix, see the open points), switch on / off, light state / brightness / color temperature, cover stop / open / close /
 position / tilt, alarm disarm / arm / trigger (127); a scaled NaN (255 / 65535) is ignored. Tested on the nucleo with
 local SDO writes (`test/stm32l4_canopen.yaml`). CANopenNode quirk: the *local* SDO client reads a write-only entry
 anyway (`CO_SDOclientUpload()` sets the write-only abort but then reads and overwrites the result); the SDO server
@@ -511,6 +511,11 @@ the validation errors (duplicate index, unsupported domain, TPDO over 8 bytes, c
 that `layout.py` is identical to the old component's copy. ESP8266 build check: `test/esp8266_mapper.yaml`.
 
 Open points for `canopen_entity_mapper` itself (not in the steps yet):
+- number commands through `make_call()` (own step, after the port): today a number command only publishes the value
+  (old component's behaviour), so a template number's `set_action`, `min_value` / `max_value` / step checks and
+  restore don't run. `number->make_call().set_value(v).perform()` instead; the state then comes back through the
+  normal state callback (optimistic or set by the action). Changes behaviour for existing nodes: note it in the
+  release notes / `configuration.md` and update `OBJECT_DICTIONARY.md` ("sets the number" instead of "publishes").
 - OD writer COB-ID (step 8): today `0x500 + target`, which is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7
   frame whose first byte equals another node's id is applied there as an OD write; the ID also has several
   producers. Proposal: the CiA 301 MPDO format (destination address mode: byte 0 = `0x80 | target`, 0 = all;
