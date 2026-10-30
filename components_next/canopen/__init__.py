@@ -35,8 +35,9 @@ CONF_CANOPENNODE_PATH = "canopennode_path"
 CONF_RESPONSE_TIMEOUT = "response_timeout"
 CONF_SUBINDEX = "subindex"
 
-# CANopenNode upstream + library.json (branch esphome), pinned to a commit
-CANOPENNODE_SOURCE = "https://github.com/mrk-its/CANopenNode.git#f38ec8a6442a5a598d26f88c4e7c8a39b83d2cd5"
+# CANopenNode upstream + library.json (upstream PR #664) + SDO server block size option (branch esphome), pinned to
+# a commit
+CANOPENNODE_SOURCE = "https://github.com/mrk-its/CANopenNode.git#9ff367b8205d746a84111b38e01ace3feaffb401"
 PORT_PATH = Path(__file__).resolve().parent / "canopennode_port"
 PORT_HEADER = "CO_driver_target.h"
 # a local IDF component is named after its directory

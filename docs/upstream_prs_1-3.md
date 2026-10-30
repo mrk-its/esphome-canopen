@@ -39,9 +39,10 @@ All in `~/repos/esphome`, branched from `upstream/dev`, one commit each, stacked
 
 ## CANopenNode integration
 - **Library:** `cg.add_library("CANopenNode", None, CANOPENNODE_SOURCE)`, the fork
-  `https://github.com/mrk-its/CANopenNode.git` pinned to `f38ec8a` (branch `esphome` = upstream master `9b8beed` +
-  `library.json`, no stack changes). The fork exists only because ESPHome's Zephyr and native ESP-IDF library
-  converters require a manifest; the `library.json` could go to CANopenNode upstream as is. `canopennode_path:` (an
+  `https://github.com/mrk-its/CANopenNode.git` pinned to `9ff367b` (branch `esphome` = upstream master `9b8beed` +
+  `library.json` (CANopenNode PR #664) + the SDO server block size patch, unused until hub PR 12; until 2026-10-30
+  `f38ec8a`, library.json only). The fork exists only because ESPHome's Zephyr and native ESP-IDF library converters
+  require a manifest. `canopennode_path:` (an
   absolute path) uses a local checkout instead, for development.
 - **Port header** in the component. Project `-I` flags don't reach converted libraries (only `-D`/`-W` do), so
   `add_canopennode_library()` adds its directory one way per backend:

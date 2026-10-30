@@ -30,12 +30,15 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
     asked.
 - **CANopenNode fork:**
   - local checkout `~/repos/CANopenNode` (origin `git@github.com:mrk-its/CANopenNode.git`);
-  - all on top of upstream master `9b8beed` (2026-07-10); `esphome` is pushed (2026-10-29), the others are local:
-    - branch `esphome`, commit `f38ec8a` "Add library.json": packaging only, no stack changes. `"build": {"srcDir":
-      ".", "includeDir": ".", "srcFilter": ["+<CANopen.c>", "+<301/*.c>"]}`. This is what the build uses, and the
-      `library.json` could be proposed to CANopenNode upstream as is;
-    - branch `sdo-srv-blksize`, commit `d1d354a`: the `CO_CONFIG_SDO_SRV_BLKSIZE` patch alone (below), needed from
-      step 3 on (or not at all, see "Block size");
+  - all on top of upstream master `9b8beed` (2026-07-10), pushed:
+    - branch `library-json`, commit `3fb805b` "Add library.json": packaging only, proposed upstream as CANopenNode PR
+      #664. Builds `CANopen.c`, `301`, `303`, `304`, `305`, `309`, `extra` and `storage/CO_storage.c`; the services
+      our port config disables are dropped by the linker (no size change);
+    - branch `sdo-srv-blksize`, commit `67ad4ba`: the `CO_CONFIG_SDO_SRV_BLKSIZE` patch alone (below), to propose
+      upstream separately;
+    - branch `esphome`, commit `9ff367b` (2026-10-30: reset to `library-json` + cherry-pick of `67ad4ba`, force-pushed;
+      was `f38ec8a`, library.json only): what every build pins (`CANOPENNODE_SOURCE` in the PR branches,
+      `canopen-next` and `components_next`);
     - branch `esphome-old-dce5a01`: the old all-in-one commit (library.json + port header + block-size patch), kept
       for reference.
 - **Port header** `components_next/canopen/canopennode_port/CO_driver_target.h` (moved out of the fork, 2026-10-29).
@@ -96,12 +99,14 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
     - project `cg.add_build_flag()` flags reach the library through `ESPHOME_LIBRARY_COMPILE_OPTIONS`;
     - include dirs (`includeDir`, `srcDir`, the library's own `-I` flags) are exported globally; project `-I`
       flags don't reach libraries at all (hence the port header as its own header-only library).
-  - Done 2026-10-29: the default is the git URL (checked: Zephyr, ESP32 esp-idf, ESP8266 clone `f38ec8a` and build).
+  - Done 2026-10-29: the default is the git URL (checked: Zephyr, ESP32 esp-idf, ESP8266 clone `f38ec8a` and build;
+    now `9ff367b`, see "CANopenNode fork").
 - **Block size: `sdo_block_transfer_size` dropped for now (2026-10-29), add it back later.** It needs
-  `CO_CONFIG_SDO_SRV_BLKSIZE` (the fork patch, option "D", branch `sdo-srv-blksize`, not in the `esphome` branch the
-  build uses), which caps the block-download size the SDO server announces. Without it CANopenNode always announces
-  127. To add it back: get the patch into CANopenNode upstream (or merge `sdo-srv-blksize` into `esphome`), then
-  restore the option (1..127, default 63) → `-DCO_CONFIG_SDO_SRV_BLKSIZE`. Needed at the latest for CAN OTA
+  `CO_CONFIG_SDO_SRV_BLKSIZE` (the fork patch, option "D"), which caps the block-download size the SDO server
+  announces; without it (default 127) CANopenNode announces 127. Since 2026-10-30 the patch is in the `esphome` branch
+  the build uses (`9ff367b`), so the option can come back (hub PR 12: 1..127, default 63 →
+  `-DCO_CONFIG_SDO_SRV_BLKSIZE`, plus block transfer in the server, buffer >= 900); for upstream ESPHome the patch
+  should still go to CANopenNode upstream (branch `sdo-srv-blksize`). Needed at the latest for CAN OTA
   (step 6), likely already for block download in step 3:
   - We need the node to choose (`sdo_block_transfer_size`): `zephyr_can` keeps at most 64 RX frames, and the
     esp_usb_serial bridge got only about 16 frames per burst through.
