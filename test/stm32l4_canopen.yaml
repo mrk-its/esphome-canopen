@@ -2,7 +2,14 @@ external_components:
   # - source: github://pr#12717
   #   components: [ds248x]
   # - source: github://mrk-its/esphome-canopen
-  - source: ../components_next
+  # - source: ../components_next
+  # canopen from the upstream PR branches (whatever is checked out in ../../esphome)
+  - source:
+      type: local
+      path: ../../esphome/esphome/components
+    components: [canopen]
+  # profile API hardware test (canopen_test_profile below)
+  - source: external
 
 esphome:
   name: stm32l4-blinking-led
@@ -201,6 +208,14 @@ canopen:
     - logger.log:
         format: "EMCY: node 0x%02x code 0x%04x register 0x%02x"
         args: [node_id, emergency.error_code, emergency.error_register]
+
+# profile API (CANopenNode base class) on node 0x61: logs its hooks, checks the SDO forwarders and cancel_sdo().
+# The timeout is merged with heartbeat_clients (15 s): monitored with 12 s.
+canopen_test_profile:
+  - id: test_profile
+    canopen_id: can_gate
+    node_id: 0x61
+    heartbeat_timeout: 12s
 
 interval:
   - interval: 5s

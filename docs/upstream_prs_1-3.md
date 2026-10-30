@@ -17,8 +17,8 @@ All in `~/repos/esphome`, branched from `upstream/dev`, one commit each, stacked
 | 3 | `canopen-3-sdo` | `30e380a` | SDO client, NMT master, `canopen.sdo_write`, `canopen.nmt`, `add_record()` | +631 / +107 |
 
 - Source of truth is `components_next/canopen` in this repo (tested on hardware); each branch is cut from it by
-  removing the later parts. `components_next` is a little ahead: per-node `add_on_node_event(node, cb)` (PR 4) and a
-  duplicate `nmt_state_str()` that the branches no longer have.
+  removing the later parts (synced with the branches on 2026-10-30). PR 4 (`canopen-4-profile`, the profile API)
+  is described in [cia402.md](cia402.md), "PR 4".
 - User docs: `~/repos/esphome-docs` branch `canopen` (`b632805`, pushed to mrk-its/esphome-docs, no PR), one page
   `src/content/docs/components/canopen.mdx` covering PRs 1-3 plus an index entry. To be opened together with PR 1.
 - Gist for the #21533 author (secret): https://gist.github.com/mrk-its/8c295e2847c7586954facd1cbc5d5bbe (`cia402`
