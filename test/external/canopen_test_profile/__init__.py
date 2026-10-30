@@ -30,6 +30,8 @@ async def to_code(config):
     hub = await cg.get_variable(config[canopen.CONF_CANOPEN_ID])
     var = cg.new_Pvariable(config[CONF_ID], hub, config[canopen.CONF_NODE_ID])
     await cg.register_component(var, config)
+    # test glue: own PDOs for can2mqtt_test.h (TPDO of the fake sensor, RPDO of node 0x63's TPDO)
+    canopen.enable_pdo()
     await canopen.register_node(
         var, config, sdo=True, nmt=True, heartbeat_timeout=config.get(CONF_HEARTBEAT_TIMEOUT)
     )

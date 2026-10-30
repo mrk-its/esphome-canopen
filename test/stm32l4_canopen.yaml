@@ -266,7 +266,7 @@ interval:
   # fake sensor state for can2mqtt, as TPDO 0
   - interval: 5s
     then:
-      - lambda: can2mqtt_test::update(id(can_gate), 0x7f);
+      - lambda: can2mqtt_test::update(id(can_gate));
   - interval: 5s
     then:
       - lambda: |-

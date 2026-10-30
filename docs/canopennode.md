@@ -368,8 +368,8 @@ ESPHome identity values and version string.
 state) through `get_od()`, read-only TPDO config records (0x1800-0x1807 / 0x1A00-0x1A07, TPDO 0 on 0x1FF mapped to
 0x2011:1) and the TPDO emulated with `send_frame()` every 5 s. can2mqtt ran its whole discovery (identity, strings
 as segmented uploads, entity types, metadata, the TPDO config, the initial state) and the sensor shows up in Home
-Assistant with live values. Confirms PRs 7/8 against a real client; real entities need PR 9 (own PDOs) and the
-mapper building this from YAML.
+Assistant with live values. Confirms PRs 7/8 against a real client. Since PR 9 the sensor's TPDO is a real CANopenNode
+TPDO (`configure_tpdo()`, `request_tpdo()`); what's left for real entities is the mapper building this from YAML.
 
 What the hub still lacks for that (checked against `components_next`, 2026-10-30):
 1. **SDO server** (0x1200, `CNT_SDO_SRV = 1`): can2mqtt only talks to nodes through it
@@ -388,7 +388,15 @@ What the hub still lacks for that (checked against `components_next`, 2026-10-30
 4. **Own PDOs** (not PR 6, which is about other devices' PDOs): `CO_CONFIG_PDO`, `CNT_TPDO` / `CNT_RPDO` from codegen,
    0x1400/0x1600/0x1800/0x1A00 records with full COB-IDs (CANopenNode adds the node id only for PDO 1-4),
    `CO_CANopenInitPDO`, RPDO/TPDO processing in `process_()`, `request_tpdo(n)` and immediate sends. The TPDO layout,
-   the remote-state RPDOs and the raw `rpdo:` linking sit on this. **Next: PR 9.** Facts from CANopenNode
+   the remote-state RPDOs and the raw `rpdo:` linking sit on this. **Done, PR 9** (2026-10-30, `canopen-next`
+   `d6f97cb`): `canopen.enable_pdo()` (`-DCO_CONFIG_PDO=0x402F`: RPDO, TPDO, timers, `OD_IO_ACCESS`, `OD_DYNAMIC`; no
+   SYNC), `configure_tpdo(n, cob_id, mappings, event_timer, inhibit, type)` / `configure_rpdo(...)` before setup (the
+   hub creates the contiguous records 0..n; unconfigured PDOs and PDOs without mappings are disabled; up to 32 PDOs,
+   8 mappings, 64 bits, whole bytes), `request_tpdo(n)` and `request_tpdo(index, sub)`. CANopenNode has one request
+   flag per sub-entry: with several TPDOs mapping it, only the first is sent. Unit test with a fake canbus (CANopenNode's
+   real PDO code on the host). Hardware: the can2mqtt test sensor as a real TPDO 0 (can2mqtt discovery through the real
+   records), node 0x63's TPDO 0 received by RPDO 0 through a handler, no EMCY for the disabled PDOs, heap 5.6 KB with
+   8 TPDOs + 1 RPDO. Not covered on hardware: event timer, inhibit time, a remap over SDO. Facts from CANopenNode
    (`301/CO_PDO.c`, `CANopen.c`, checked 2026-10-30):
    - `CO_CANopenInitPDO` takes `ENTRY_H1400/1600/1800/1A00` and steps with `++` (pointer arithmetic, not `OD_find`):
      the N records of each range must be **contiguous** in the OD array (0x1400..0x1400+N-1 all present, no gaps);
@@ -431,7 +439,7 @@ Upstream PRs for it (estimates, not measured; independent of PRs 4-6, could go b
 |---|---|---|
 | 7 | SDO server, device info / identity, `add_string()`; done, `canopen-next` `38e6a3f` ([sdo_server_canopennode.md](sdo_server_canopennode.md)) | ~100 (tests ~85) |
 | 8 | public OD API, `OdObject` handlers, `write_od()`, own NMT state and `nmt_startup`; done, `canopen-next` `7ce34c1` | ~240 (tests ~115) |
-| 9 | own PDOs (records, init, processing, `request_tpdo()`) | ~400 |
+| 9 | own PDOs (records, init, processing, `request_tpdo()`); done, `canopen-next` `d6f97cb` | ~170 (tests ~165) |
 | 10 | 0x1010/0x1011 store/restore | ~200 |
 | 11 | loopback between local nodes | ~100 |
 | 12 | block size option (after a CANopenNode upstream PR) | ~30 |
