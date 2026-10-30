@@ -450,6 +450,12 @@ All of them are developed on one branch, `canopen-next` in `~/repos/esphome` (fr
 PR), and cut into stacked PR branches when they go out. `test/stm32l4_canopen.yaml` builds `canopen` from
 `../../esphome`, i.e. whatever branch is checked out there.
 
+User docs: `~/repos/esphome-docs` branch `canopen-next` (from `canopen`, the PRs 1-3 page; `004611e`, pushed to
+mrk-its/esphome-docs, no PR) adds to `components/canopen.mdx` what PRs 7-9 add for YAML users: identity and device
+information, the SDO server, an object dictionary table, `nmt_startup`, `on_nmt_state_change`,
+`get_nmt_state()` / `set_nmt_state()`. The C++ APIs for other components (PR 4 profile API, PR 8 OD handlers,
+PR 9 PDO configuration) aren't documented there. Split per PR like the code when the PRs go out.
+
 Open points for `esphome_entity_mapper` itself (not in the steps yet):
 - OD writer COB-ID (step 8): today `0x500 + target`, which is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7
   frame whose first byte equals another node's id is applied there as an OD write; the ID also has several
