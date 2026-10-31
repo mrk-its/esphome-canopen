@@ -443,7 +443,8 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
    <target>` for the four targets, clang-tidy (`test/upstream_tidy_setup.diff`; the tidy setup for upstream CI is
    still an open decision, see "Upstream conventions"), and the line count (`scripts/pr_split_lines.py` on the
    branch's tree: PR N's own lines are the "PR N" row).
-4. Docs: re-split `~/repos/esphome-docs` (branches `canopen`, `canopen-next`) the same way, one page section per PR.
+4. Docs: re-split `~/repos/esphome-docs` (branch `canopen-full`, the whole page, matching this branch) the same way,
+   one page section per PR.
 5. Then: delete the old `canopen-1-node` .. `canopen-4-profile` branches on mrk-its/esphome (ask first), replace
    `docs/upstream_prs_1-3.md` with a description of the new branches, update CLAUDE.md, and before PR 1 goes out the
    open points of "Before PR 1" below (#21522, library source, CI boilerplate).
@@ -662,11 +663,14 @@ All of them are developed on one branch, `canopen-next` in `~/repos/esphome` (fr
 PR), and cut into stacked PR branches when they go out. `test/stm32l4_canopen.yaml` builds `canopen` from
 `../../esphome`, i.e. whatever branch is checked out there.
 
-User docs: `~/repos/esphome-docs` branch `canopen-next` (from `canopen`, the PRs 1-3 page; `004611e`, pushed to
-mrk-its/esphome-docs, no PR) adds to `components/canopen.mdx` what PRs 7-9 add for YAML users: identity and device
+User docs: `~/repos/esphome-docs` branch `canopen-full` (renamed from `canopen-next` 2026-10-31, pushed to
+mrk-its/esphome-docs, no PR; from `canopen`, the PRs 1-3 page) adds to `components/canopen.mdx` what PRs 7-9 add for YAML users: identity and device
 information, the SDO server, an object dictionary table, `nmt_startup`, `on_nmt_state_change`,
 `get_nmt_state()` / `set_nmt_state()`. The C++ APIs for other components (PR 4 profile API, PR 8 OD handlers,
-PR 9 PDO configuration) aren't documented there. Split per PR like the code when the PRs go out.
+PR 9 PDO configuration) aren't documented there. Split per PR like the code when the PRs go out. Gaps filled
+(2026-10-31): several nodes on one bus (loopback), the PDO and 0x1010 / 0x1011 rows, a "PDOs" section
+(SDO changes, save / load, storage), `sdo_block_size` one value per firmware, the intro list (raw frames, objects and
+PDOs of other components, no EMCY producer / SYNC / LSS / EDS), a CANopen link on the CAN Bus page.
 
 Entity commands (0x2002+16N, 2026-10-31): one write-only, RPDO-mappable sub per state with the same size, storage in
 the entity, run by the entity's `od_write()` when the write is complete (SDO, RPDO, `write_od()`). Semantics as the
@@ -816,3 +820,12 @@ Like for like at idle (without the inflate buffer, with `CO_new()`): ESP8266 ~7.
 - EDS export for third-party masters (generated from the runtime OD), later.
 - How to handle esphome/esphome#21522 (and #21533 on top of it): coordinate with its author, propose this
   component as its replacement, or build on it?
+- PDO parameter storage on ESP8266 (hub PR 5, `pdo_storage.cpp`): the stored PDO parameters go to the small flash
+  preference area (64 words, 128 with `esp8266: restore_from_flash: true`), 11 words per PDO (`PdoParams`, 44 bytes)
+  plus a checksum word per RX/TX preference and the 2-word marker: about 5 PDOs fit without `restore_from_flash`, 11
+  with it, minus other flash preferences (API key, `globals`, ...). If they don't fit, `make_preference()` returns an
+  empty object and `save` (0x1010) fails at runtime (log "Storing the PDO parameters failed", SDO abort `ODR_HW`);
+  the build doesn't warn, since the hub doesn't call `esp8266.const.reserve_preferences()` (the PDO count comes from
+  runtime `configure_tpdo/rpdo()`). Fix: counts in codegen, e.g. `enable_pdo(rpdos, tpdos)` reserving the three
+  preferences on ESP8266, or a hub helper the components call. Left out of the user docs for now (ESP8266 isn't a
+  priority, 2026-10-31).
