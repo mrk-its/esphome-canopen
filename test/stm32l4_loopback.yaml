@@ -1,0 +1,170 @@
+# PR 11 hardware test: two canopen nodes on one canbus (the nucleo's), loopback between them.
+# node_a (0x7e) and node_b (0x7d) monitor each other's heartbeat, read each other's OD over SDO (expedited and
+# segmented; node_a's server has no block transfer), node_b writes node_a's 0x1017, and node_a's send_frame() reaches
+# node_b's frame listener. The frames also go out on the real bus (node 0x01's heartbeat must still reach both).
+external_components:
+  - source:
+      type: local
+      path: ../../esphome/esphome/components
+    components: [canopen]
+
+esphome:
+  name: stm32l4-loopback
+  on_boot:
+    - lambda: |-
+        id(node_b).add_frame_listener(0x37E, 0x7FF, +[](void *, uint32_t can_id, const uint8_t *data, uint8_t len) {
+          ESP_LOGI("test", "node_b listener: 0x%03x, %u bytes, first %u", (unsigned) can_id, len, len ? data[0] : 0);
+        }, nullptr);
+        id(node_a).add_frame_listener(0x37E, 0x7FF, +[](void *, uint32_t, const uint8_t *, uint8_t) {
+          ESP_LOGE("test", "node_a got its own frame");
+        }, nullptr);
+    - delay: 5s
+    - lambda: |-
+        id(node_b).read_sdo<uint32_t>(0x7e, 0x1018, 1, +[](void *, const canopen::SDOReply &r) {
+          ESP_LOGI("test", "b reads a 0x1018:1: %s 0x%08x (expect 0x0000a11e)",
+                   LOG_STR_ARG(canopen::sdo_result_to_string(r.result)), (unsigned) r.value);
+        }, nullptr);
+        id(node_b).read_sdo_data(0x7e, 0x1008, 0, +[](void *, const canopen::SDOReply &r) {
+          ESP_LOGI("test", "b reads a 0x1008 (segmented): %s '%.*s' (expect 'loopback node a, segmented')",
+                   LOG_STR_ARG(canopen::sdo_result_to_string(r.result)), (int) r.len, (const char *) r.data);
+        }, nullptr);
+        id(node_a).read_sdo<uint16_t>(0x7d, 0x1017, 0, +[](void *, const canopen::SDOReply &r) {
+          ESP_LOGI("test", "a reads b 0x1017: %s %u (expect 1000)",
+                   LOG_STR_ARG(canopen::sdo_result_to_string(r.result)), (unsigned) r.value);
+        }, nullptr);
+        // a's heartbeat 1000 -> 2000 ms by b, read back by a locally (its own OD, no frames)
+        id(node_b).write_sdo<uint16_t>(0x7e, 0x1017, 0, 2000, +[](void *, const canopen::SDOReply &r) {
+          ESP_LOGI("test", "b writes a 0x1017 = 2000: %s", LOG_STR_ARG(canopen::sdo_result_to_string(r.result)));
+          id(node_a).read_sdo<uint16_t>(0x7e, 0x1017, 0, +[](void *, const canopen::SDOReply &r) {
+            ESP_LOGI("test", "a's own 0x1017: %u (expect 2000)", (unsigned) r.value);
+          }, nullptr);
+        }, nullptr);
+    - delay: 2s
+    - lambda: |-
+        static const uint8_t data[1] = {42};
+        ESP_LOGI("test", "a send_frame 0x37e: %s", YESNO(id(node_a).send_frame(0x37E, data, 1)));
+
+zephyr:
+  variant: STM32L4
+  # board: nucleo_l476rg/stm32l476xx
+  board: nucleo_l476rg
+  advanced:
+    runner: openocd
+    bootloader: mcuboot
+  # nucleo_l476rg has no MCUboot layout upstream, so carve the 1 MB flash into
+  # boot (64K) / slot0 / slot1 (464K each), keeping the board's 32K storage at 0xf8000.
+  overlays:
+    app: |
+      /delete-node/ &storage_partition;
+
+      &flash0 {
+          partitions {
+              boot_partition: partition@0 {
+                  label = "mcuboot";
+                  reg = <0x0 DT_SIZE_K(64)>;
+              };
+              slot0_partition: partition@10000 {
+                  label = "image-0";
+                  reg = <0x10000 0x74000>;
+              };
+              slot1_partition: partition@84000 {
+                  label = "image-1";
+                  reg = <0x84000 0x74000>;
+              };
+              storage_partition: partition@f8000 {
+                  label = "storage";
+                  reg = <0xf8000 DT_SIZE_K(32)>;
+              };
+          };
+      };
+
+      / {
+          chosen {
+              zephyr,code-partition = &slot0_partition;
+          };
+      };
+    mcuboot: |
+      /delete-node/ &storage_partition;
+
+      &flash0 {
+          partitions {
+              boot_partition: partition@0 {
+                  label = "mcuboot";
+                  reg = <0x0 DT_SIZE_K(64)>;
+              };
+              slot0_partition: partition@10000 {
+                  label = "image-0";
+                  reg = <0x10000 0x74000>;
+              };
+              slot1_partition: partition@84000 {
+                  label = "image-1";
+                  reg = <0x84000 0x74000>;
+              };
+              storage_partition: partition@f8000 {
+                  label = "storage";
+                  reg = <0xf8000 DT_SIZE_K(32)>;
+              };
+          };
+      };
+
+      / {
+          chosen {
+              zephyr,code-partition = &boot_partition;
+          };
+      };
+
+logger:
+  logs:
+    canbus: INFO
+
+canbus:
+  - platform: zephyr_can
+    id: can_bus
+    can_id: 0
+    bit_rate: 125kbps
+    rx_buffer_size: 64
+    tx_buffer_size: 32
+    rx_pin: PA11
+    tx_pin: PA12
+
+canopen:
+  - id: node_a
+    canbus_id: can_bus
+    node_id: 0x7e
+    heartbeat_interval: 1s
+    identity:
+      vendor_id: 0xA11E
+    device_name: loopback node a, segmented
+    heartbeat_clients:
+      - node_id: 0x7d
+        timeout: 3s
+      - node_id: 0x01
+        timeout: 7s
+    on_node_event:
+      - logger.log:
+          format: "a: node 0x%02x %s, %s"
+          args: [node_id, "LOG_STR_ARG(esphome::canopen::node_event_to_string(event))", "LOG_STR_ARG(esphome::canopen::nmt_state_to_string(state))"]
+  - id: node_b
+    canbus_id: can_bus
+    node_id: 0x7d
+    heartbeat_interval: 1s
+    heartbeat_clients:
+      - node_id: 0x7e
+        timeout: 3s
+      - node_id: 0x01
+        timeout: 7s
+    on_node_event:
+      - logger.log:
+          format: "b: node 0x%02x %s, %s"
+          args: [node_id, "LOG_STR_ARG(esphome::canopen::node_event_to_string(event))", "LOG_STR_ARG(esphome::canopen::nmt_state_to_string(state))"]
+
+script:
+  # never run: a canopen.sdo_write action compiles the SDO client in (the lambdas above use it)
+  - id: sdo_client_on
+    then:
+      - canopen.sdo_write:
+          id: node_b
+          node_id: 0x7e
+          index: 0x1017
+          value: 2000
+          size: 2

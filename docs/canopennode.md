@@ -486,8 +486,22 @@ What the hub still lacks for that (checked against `components_next`, 2026-10-30
    node, which sends back from its listener, recurses (user loops only). gtest `loopback_test.cpp` (boot-up seen by
    the other node only, frame listener / `send_frame()`, a refused frame not delivered, SDO upload of 0x1018:1 from
    the other node over the fake bus, a queued frame delivered when sent); Python: the ring per canbus, the duplicate
-   id. Builds ESP8266 (mapper), ESP32-C3 (esp-idf), Zephyr. Not on hardware (needs two `canopen:` nodes on one
-   board).
+   id. Builds ESP8266 (mapper), ESP32-C3 (esp-idf), Zephyr. Nucleo (2026-10-31, `test/stm32l4_loopback.yaml`: nodes
+   0x7e and 0x7d on the one canbus): each monitors the other (boot-up, online, operational), node 0x01 from the real
+   bus reaches both, expedited SDO reads both ways, a write from b to a (read back by a locally), a block upload of
+   a's 0x1008 by b (segmented, a without `sdo_block_size`), `send_frame()` from a to b's frame listener (a doesn't
+   get its own frame).
+   **SDO client fix found by it** (2026-10-31, `canopen-next`, to fold into PR 3): `read_sdo_data()` asked for a
+   block upload and `write_sdo_data()` for a block download above 32 bytes; a server without block transfer
+   (optional in CiA 301: the hub without `sdo_block_size`, many third-party devices) aborts that with 0x05040001
+   (`CO_SDO_AB_CMD`), and CANopenNode's client doesn't fall back. Now segmented only: `CO_CONFIG_SDO_CLI=0x0B`
+   (no client block code), `CO_CONFIG_FIFO=0x01` (no alt read / CRC, which only client block needs). Up to 1 KB, so
+   at most ~150 round trips; an opt-in block flag can come later if something needs it. gtest
+   `SdoBufferTransfersAreSegmented` (40-byte write and read between two local hubs, initiate 0x21 / 0x40 on the
+   wire); nucleo: the 0x1008 read from a server without block transfer works.
+   Also: `sdo_block_size` sets CANopenNode build flags, so it applies to every hub of the firmware. Validation now
+   rejects different values on two hubs, and `enable_sdo_block()` takes a hub's configured value over a
+   component's default (the mapper's 16), whatever the codegen order.
 9. **Codegen hooks:** `enable_sdo_server()`, `enable_pdo(tpdo=N, rpdo=M)`, and a defined point where other
    components add OD entries before the hub's `setup()` (from codegen / constructors, or a setup priority above
    `PROCESSOR`). **Done** (2026-10-31, `canopen-next`, a comment on `CANopenComponent` in `canopen.h`, to fold into
