@@ -1,4 +1,4 @@
-// Host test of components_next/canopen_entities/log_buffer.cpp (remote logs, OD 0x3100), built and run by
+// Host test of components/canopen_entities/log_buffer.cpp (remote logs, OD 0x3100), built and run by
 // test/test_logs.py. Uploads are read the way the mapper's od_read() serves them to CANopenNode's SDO server:
 // begin_upload() at the first read, then read() for the free buffer space, which may be more than is left.
 #include <algorithm>

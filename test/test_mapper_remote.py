@@ -1,4 +1,4 @@
-"""Tests for components_next/canopen_entities/remote.py (run: pytest test/, needs ESPHome for the YAML loader).
+"""Tests for components/canopen_entities/remote.py (run: pytest test/, needs ESPHome for the YAML loader).
 
 The modules are loaded without the package __init__.py, which needs the upstream canopen hub.
 """
@@ -13,7 +13,7 @@ pytest.importorskip("esphome")
 
 TEST_DIR = Path(__file__).parent
 _pkg = types.ModuleType("mapper_pkg")
-_pkg.__path__ = [str(TEST_DIR.parent / "components_next" / "canopen_entities")]
+_pkg.__path__ = [str(TEST_DIR.parent / "components" / "canopen_entities")]
 sys.modules["mapper_pkg"] = _pkg
 
 from mapper_pkg import layout, remote  # noqa: E402

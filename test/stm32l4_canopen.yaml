@@ -2,14 +2,14 @@ external_components:
   # - source: github://pr#12717
   #   components: [ds248x]
   # - source: github://mrk-its/esphome-canopen
-  # - source: ../components_next
+  # - source: ../components
   # canopen from the upstream PR branches (whatever is checked out in ../../esphome)
   - source:
       type: local
       path: ../../esphome/esphome/components
     components: [canopen]
   # entity mapper (step 7)
-  - source: ../components_next
+  - source: ../components
     components: [canopen_entities]
   # profile API hardware test (canopen_test_profile below)
   - source: external

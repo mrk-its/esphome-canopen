@@ -6,7 +6,7 @@ external_components:
       type: local
       path: ../../esphome/esphome/components
     components: [canopen]
-  - source: ../components_next
+  - source: ../components
     components: [canopen_entities]
 
 esphome:

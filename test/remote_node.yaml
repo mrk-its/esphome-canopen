@@ -1,5 +1,6 @@
-# Dimmer-like node referenced by config.yaml.template via `canopen: remote_nodes:`.
-# Only read (not built) by the test node: its TPDO layout is computed from this file.
+# Dimmer-like node in the old component's format (`canopen: entities:`, canopen-stack), the old-format fixture of
+# test_mapper_remote.py: canopen_entities' remote.py reads nodes that still run the old component. Only read (not
+# built); the old component itself is gone from this branch (it's on main).
 substitutions:
   dimmer_node_id: "0x36"
 

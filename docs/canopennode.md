@@ -24,6 +24,13 @@ Where to continue (2026-10-31):
 - **Upstream split:** "Upstream PRs" -> "New split": what `canopen-full` changed, the file -> PR map, the line counts
   (`scripts/pr_split_lines.py`), and the cutting steps.
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
+- **Repo layout** (2026-11-01, `feature/entity-mapper`): `components/` holds only `canopen_entities` (moved from
+  `components_next`); the old component (`components/canopen`, canopen-stack) and `components_next/canopen` (a stale
+  copy of the hub) are removed, with the tests and configs only they used (`test_od.py`, `test_frames.py` (the hub has
+  both tests), `test_remote.py`, `logs_test.cpp`, `esp32_canopen.yaml` / `esp8266_canopen.yaml`, the Docker build,
+  `examples/`, CI's build job). The old component stays on `main`; tag `main` (e.g. `v0.4.0`, the last tag `v0.3.1`
+  is from 2023) before this branch merges, so its users can pin it. User docs (README, `docs/configuration.md`, ...)
+  still describe the old component: rewrite next.
 
 The bullets below are the state of step 1 (2026-10-29), kept for the CANopenNode fork and port header details.
 - **esphome-canopen:**
@@ -50,7 +57,8 @@ The bullets below are the state of step 1 (2026-10-29), kept for the CANopenNode
       `canopen-next` and `components_next`);
     - branch `esphome-old-dce5a01`: the old all-in-one commit (library.json + port header + block-size patch), kept
       for reference.
-- **Port header** `components_next/canopen/canopennode_port/CO_driver_target.h` (moved out of the fork, 2026-10-29).
+- **Port header** `canopennode_port/CO_driver_target.h` (moved out of the fork, 2026-10-29; then in
+  `components_next/canopen`, now in the hub, `esphome/components/canopen/canopennode_port/` in `~/repos/esphome`).
   Project `-I` flags don't reach converted libraries on the native backends (only `-D`/`-W` do,
   `get_project_compile_flags()` in `esphome/framework_helpers.py`), so codegen adds the directory as a header-only
   package, one way per backend:
@@ -141,13 +149,13 @@ The bullets below are the state of step 1 (2026-10-29), kept for the CANopenNode
     `ENTRY_H1xxx` pointers (found with `OD_find`). Initialisation installs extensions on those entries, so the list
     must not be rebuilt afterwards.
   - Entries can't be added after init (canopen-stack allowed this until operational); that case is logged.
-- **Development tree:** `components_next/canopen` (the YAML key stays `canopen:`). It replaces `components/canopen`
-  once it matches it feature for feature. Until then the old component and its tests (`pytest test/`) are not
-  touched.
+- **Development tree:** first `components_next/canopen` here, then the hub in `~/repos/esphome` (upstream PR
+  branches, now `canopen-full`) plus `canopen_entities` here. Since 2026-11-01 `canopen_entities` is in `components/`
+  and the old component is gone from `feature/entity-mapper` (see "Current state").
 - **Test target:** `test/stm32l4_canopen.yaml` (Zephyr, nucleo_l476rg, MCUboot), built with
-  `../esphomeplatformzephyr/venv/bin/esphome` (version 2026.11.0-dev). Upstream build checks with the upstream `dev`
-  venv `~/repos/esphome-upstream-venv` (see CLAUDE.md "Testing"): `test/esp32_canopen.yaml` (`-s framework
-  arduino` for Arduino) and `test/esp8266_canopen.yaml`.
+  `../esphomeplatformzephyr/venv/bin/esphome` (version 2026.11.0-dev). Upstream build check with the upstream `dev`
+  venv `~/repos/esphome-upstream-venv` (see CLAUDE.md "Testing"): `test/esp8266_mapper.yaml`; the hub's own builds
+  are upstream's `tests/components/canopen/test.*.yaml`.
 
 ## CANopenNode facts the code depends on (checked in the source)
 - **Init order:**
@@ -272,7 +280,7 @@ entity mapper    (canopen_entities) ESPHome entities <-> 0x2000+, remote slots 0
 services         OTA (0x3000), remote logs (0x3100), device API (SDO client queue, NMT, HB, EMCY)
 node core        CANopenComponent: OD builder, NodeConfig (heartbeat, HB consumers, SDO clients, PDOs),
                  persistence (preferences), driver glue on ESPHome canbus
-CANopenNode      CANopen.c + 301/*  (fork: library.json only; port header in components_next/canopen/canopennode_port)
+CANopenNode      CANopen.c + 301/*  (fork: library.json + SDO block size patch; port header in the hub's canopennode_port/)
 ```
 - Only the node core (`canopen.cpp`, `od.cpp`, `driver_can.cpp`) includes CANopenNode headers.
 - Mapper and services use a neutral API: `OdType`, `OdHandler` with read/write on an offset stream, and
@@ -315,7 +323,8 @@ Each step is a commit on `feature/canopennode` (or its own `feature/...` branch)
    `0x4000+n`, `rpdo: {node, entity}`, `platform: canopen` entities reading other nodes, `canopen.<domain>.<action>`)
    stay, but in the entity mapper (`canopen_entities`), not in the `canopen` hub (decision 2026-10-30; replaces
    the 2026-10-29 decision to drop them).
-9. **Switch over:**
+9. **Switch over** (2026-11-01, `feature/entity-mapper`: the old component removed, `canopen_entities` in
+   `components/`; the hub stays in `~/repos/esphome`, so the first bullet became "the hub replaces it"):
    - `components_next/canopen` replaces `components/canopen`;
    - remove the canopen-stack code (`co_cmd`, `co_storage`, the old `driver_can`/`od`, the `CO_*` build flags,
      `cg.add_library("canopenstack")`);
@@ -342,7 +351,7 @@ mostly *adds files and blocks*, then cut the PR branches from it.
 **Where.** `~/repos/esphome`, branch `canopen-full`, created from `canopen-next` (`21ab50897e`, hub PRs 1-12 in 17
 commits on `upstream/dev` `b155e4ba0b`), plus the refactor as one commit, `e9f738ebf7` "[canopen] Split the hub by
 feature" (2026-10-31, not pushed). `canopen-next` stays as it was;
-`components_next/canopen_entities` and the test configs here build against whatever is checked out in
+`components/canopen_entities` and the test configs here build against whatever is checked out in
 `~/repos/esphome` (`test/stm32l4_*.yaml`, `test/esp8266_mapper.yaml`), so `canopen-full` replaces `canopen-next` as
 the hub branch (check it out there for those builds).
 
@@ -773,8 +782,8 @@ Open points for `canopen_entities` itself (not in the steps yet):
   tx/rx IDs need the pinned channels (device_api_canopennode.md, "Open points");
 - user migration: YAML changes from one `canopen:` block to `canopen:` + `canopen_entities:`; update
   `configuration.md` / `linking-nodes.md`;
-- until the hub is merged, where the mapper gets the hub from (the esphome fork branch as an external component, or
-  `components_next` here).
+- until the hub is merged, where the mapper gets the hub from: the esphome fork branch (mrk-its/esphome `canopen-full`,
+  push it first) as an external component, `components: [canopen]`.
 
 ## Size comparison with the old component (2026-10-31)
 Compile-only, equivalent configs: old `components/canopen` vs the hub (`canopen-next`) + `canopen_entities`, and a

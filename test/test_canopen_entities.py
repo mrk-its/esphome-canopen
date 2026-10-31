@@ -1,4 +1,4 @@
-"""Tests for components_next/canopen_entities (run: pytest test/).
+"""Tests for components/canopen_entities (run: pytest test/).
 
 Codegen and validation go through the ESPHome CLI of the upstream venv (`esphome compile --only-generate`,
 `esphome config`), with the canopen hub from an upstream checkout (branch canopen-next) as a local external
@@ -17,7 +17,7 @@ import pytest
 import yaml
 
 REPO = Path(__file__).parent.parent
-MAPPER = REPO / "components_next" / "canopen_entities"
+MAPPER = REPO / "components" / "canopen_entities"
 VENV = Path(os.environ.get("ESPHOME_UPSTREAM_VENV", Path.home() / "repos" / "esphome-upstream-venv"))
 HUB = Path(os.environ.get("ESPHOME_CANOPEN_HUB", Path.home() / "repos" / "esphome" / "esphome" / "components"))
 ESPHOME = VENV / "bin" / "esphome"
@@ -37,7 +37,7 @@ BASE = f"""
 external_components:
   - source: {{type: local, path: {HUB}}}
     components: [canopen]
-  - source: {{type: local, path: {REPO / "components_next"}}}
+  - source: {{type: local, path: {REPO / "components"}}}
     components: [canopen_entities]
 esphome:
   name: mapper-test
@@ -122,12 +122,6 @@ def config_error(tmp_path: Path, entities: list, extra: dict | None = None, **op
     result = run_esphome(tmp_path, "config")
     assert result.returncode != 0, "config unexpectedly valid"
     return result.stdout + result.stderr
-
-
-def test_layout_copy_identical():
-    """The mapper carries a copy of the old component's layout.py; they must not drift apart while both exist."""
-    old = REPO / "components" / "canopen" / "layout.py"
-    assert (MAPPER / "layout.py").read_bytes() == old.read_bytes()
 
 
 @needs_esphome

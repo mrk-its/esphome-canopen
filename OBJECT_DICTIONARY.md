@@ -1,8 +1,8 @@
 # Object Dictionary Layout
 
-Each ESPHome entity exposed via CANOpen is mapped to CANOpen Object Dictionary (OD), the mapping is defined in `canopen.entities` list in ESPHome config (yaml):
+Each ESPHome entity exposed via CANOpen is mapped to CANOpen Object Dictionary (OD), the mapping is defined in `canopen_entities.entities` list in ESPHome config (yaml; `canopen.entities` on the old canopen-stack component, same layout):
 ```
-canopen:
+canopen_entities:
   entities:
     - id: sensor1
       index: 2
@@ -185,7 +185,7 @@ States of entities with `tpdo` configured are mapped to TPDO with given number, 
 ### TPDO layout
 
 The TPDO layout (which states an entity has and where they are in the TPDO) is computed at build time from the
-YAML config (`components/canopen/layout.py`): states of `template_entities` first, then entities by index, each
+YAML config (`components/canopen_entities/layout.py`): states of `template_entities` first, then entities by index, each
 with its states in subindex order. A TPDO can carry at most 8 bytes.
 
 Light / cover capabilities come from the platform config (e.g. `cwww`, `monochromatic`, `time_based`,
@@ -230,7 +230,7 @@ sends unsolicited frames.
 
 ## Remote state slots
 
-Remote states a node reads (`platform: canopen` entities, toggle actions, see
+Remote states a node reads (`platform: canopen_entities` entities, `platform: canopen` on the old component, toggle actions, see
 [Linking nodes](docs/linking-nodes.md)) are received by RPDO into local objects outside the entity area, so
 can2mqtt doesn't see them:
 

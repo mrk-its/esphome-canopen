@@ -1,4 +1,4 @@
-"""Tests for components/canopen/layout.py (run: pytest test/)."""
+"""Tests for components/canopen_entities/layout.py (run: pytest test/)."""
 
 import importlib.util
 from pathlib import Path
@@ -7,7 +7,7 @@ import pytest
 
 _spec = importlib.util.spec_from_file_location(
     "canopen_layout",
-    Path(__file__).parent.parent / "components" / "canopen" / "layout.py",
+    Path(__file__).parent.parent / "components" / "canopen_entities" / "layout.py",
 )
 layout = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(layout)

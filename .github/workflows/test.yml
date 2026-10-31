@@ -14,31 +14,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        # test_remote.py validates against upstream ESPHome; test_logs.py needs a C++ compiler (runner's g++)
+        # test_mapper_remote.py needs ESPHome's YAML loader; test_logs.py a C++ compiler (runner's g++). The
+        # test_canopen_entities.py codegen tests need the canopen hub checkout (~/repos/esphome) and are skipped here.
+        # No build job: canopen_entities needs the hub from mrk-its/esphome (branch canopen-full, not pushed yet).
         run: pip install esphome pytest
       - name: Run tests
         run: pytest -v test/
-  build:
-    name: ${{ matrix.board }} ${{ matrix.framework_opts }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        framework:
-          - "{type: esp-idf}"
-          - "{type: arduino}"
-        board:
-          - esp32-c3-devkitm-1
-          - wt32-eth01
-          - esp32-s3-devkitc-1
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Configure
-        run: framework="${{matrix.framework}}" board=${{matrix.board}} envsubst < test/config.yaml.template > test/config.yaml
-      - name: Compile
-        uses: esphome/build-action@v6
-        id: esphome-build
-        with:
-          yaml-file: test/config.yaml
