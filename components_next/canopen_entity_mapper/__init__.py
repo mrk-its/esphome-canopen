@@ -14,16 +14,20 @@ from typing import Any
 from esphome import automation
 import esphome.codegen as cg
 from esphome.components import canopen
+from esphome.components.logger import LOG_LEVEL_SEVERITY, request_log_listener
 import esphome.config_validation as cv
 from esphome.const import (
+    CONF_BUFFER_SIZE,
     CONF_ID,
     CONF_INDEX,
+    CONF_LEVEL,
     CONF_MAX_VALUE,
     CONF_MIN_VALUE,
     CONF_NUMBER,
     CONF_OFFSET,
     CONF_SIZE,
     CONF_STATE,
+    CONF_TIMEOUT,
 )
 from esphome.core import CORE, Lambda
 from esphome.cpp_generator import MockObj
@@ -50,6 +54,8 @@ CONF_ENTITY = "entity"
 CONF_CMD = "cmd"
 CONF_TPDO_SIZE = "tpdo_size"
 CONF_MAPPER_ID = "canopen_entity_mapper_id"
+CONF_REMOTE_LOGS = "remote_logs"
+CONF_BLOCK_SIZE = "block_size"
 # remote state (node, entity, state) a `platform: canopen_entity_mapper` entity or a toggle action reads, set by
 # their validation; collected from the whole validated config by remote_state_slots()
 CONF_REMOTE_STATE = "_canopen_remote_state"
@@ -61,9 +67,17 @@ ESPHOME_VENDOR_ID = 0xA59A08F5
 ESPHOME_PRODUCT_CODE = 0x6BDFA1D9
 ESPHOME_REVISION = 1
 
+# SDO block size (download cap) when the hub doesn't set sdo_block_size, for OTA and remote logs: a download block
+# arrives back to back, so it must fit the CAN receive queue (e.g. zephyr_can rx_buffer_size)
+DEFAULT_SDO_BLOCK_SIZE = 16
+# frames per Log Data upload block without a software TX queue: the 3 TX mailboxes of bxCAN / FDCAN
+DEFAULT_LOG_BLOCK_SIZE = 3
+LOG_TIMEOUT_NEVER = "never"
+
 ns = cg.esphome_ns.namespace("canopen_entity_mapper")
 EntityMapper = ns.class_("EntityMapper", cg.Component)
 RemoteCommandAction = ns.class_("RemoteCommandAction", automation.Action)
+RemoteLogs = ns.class_("RemoteLogs", cg.Component)
 
 # entity C++ class -> layout domain; order matters only for classes inheriting from each other
 ENTITY_DOMAINS = [
@@ -160,6 +174,32 @@ ENTITY_SCHEMA = cv.Schema(
 )
 
 
+# remote logs (OD 0x3100, docs/remote-logs.md)
+REMOTE_LOGS_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(): cv.declare_id(RemoteLogs),
+        cv.Optional(CONF_BUFFER_SIZE, default=2048): cv.int_range(min=256, max=16384),
+        # the level from boot until a host subscribes
+        cv.Optional(CONF_LEVEL, default="INFO"): cv.one_of(
+            *LOG_LEVEL_SEVERITY, upper=True
+        ),
+        # logging turns off without a host poll for this long
+        cv.Optional(CONF_TIMEOUT, default="30s"): cv.Any(
+            cv.one_of(LOG_TIMEOUT_NEVER, lower=True),
+            cv.All(
+                cv.positive_time_period_milliseconds,
+                cv.Range(min=cv.TimePeriod(seconds=1), max=cv.TimePeriod(hours=1)),
+            ),
+        ),
+        # frames per SDO block of a Log Data upload, advertised in 0x3100:7: the node sends a block back to back, so
+        # it must fit the TX queue
+        cv.Optional(CONF_BLOCK_SIZE, default=DEFAULT_LOG_BLOCK_SIZE): cv.int_range(
+            min=1, max=127
+        ),
+    }
+).extend(cv.COMPONENT_SCHEMA)
+
+
 def validate_unique_indices(config: ConfigType) -> ConfigType:
     seen = set()
     for pos, entity in enumerate(config[CONF_ENTITIES]):
@@ -196,6 +236,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_REMOTE_NODES, default={}): cv.Schema(
                 {cv.string: cv.file_}
             ),
+            cv.Optional(CONF_REMOTE_LOGS): REMOTE_LOGS_SCHEMA,
         }
     ).extend(cv.COMPONENT_SCHEMA),
     validate_unique_indices,
@@ -304,7 +345,34 @@ def _final_validate(config: ConfigType) -> ConfigType:
         )
     except remote.PlanError as err:
         raise cv.Invalid(str(err)) from err
+    validate_remote_logs(full_config, config)
     return config
+
+
+def validate_remote_logs(
+    full_config: fv.FinalValidateConfig, config: ConfigType
+) -> None:
+    if (remote_logs := config.get(CONF_REMOTE_LOGS)) is None:
+        return
+    if "logger" not in full_config:
+        raise cv.Invalid(
+            f"'{CONF_REMOTE_LOGS}' requires the 'logger' component",
+            path=[CONF_REMOTE_LOGS],
+        )
+    level = remote_logs[CONF_LEVEL]
+    logger_level = full_config["logger"][CONF_LEVEL]
+    if LOG_LEVEL_SEVERITY.index(level) > LOG_LEVEL_SEVERITY.index(logger_level):
+        _LOGGER.warning(
+            "%s: level %s is more verbose than the logger level %s, those messages are compiled out",
+            CONF_REMOTE_LOGS,
+            level,
+            logger_level,
+        )
+    if remote_logs[CONF_TIMEOUT] == LOG_TIMEOUT_NEVER and level == "NONE":
+        _LOGGER.warning(
+            "%s: 'timeout: never' with 'level: NONE' never expires a host subscription",
+            CONF_REMOTE_LOGS,
+        )
 
 
 def validate_rpdo_sizes(
@@ -531,6 +599,35 @@ async def to_code(config: ConfigType) -> None:
                 pdo_mappings(remote.co_link_words(entries)),
             )
         )
+
+    if (remote_logs := config.get(CONF_REMOTE_LOGS)) is not None:
+        await remote_logs_to_code(remote_logs, hub, config[canopen.CONF_CANOPEN_ID])
+
+
+def enable_sdo_block(canopen_id: Any) -> None:
+    """SDO block transfer, with the hub's sdo_block_size or DEFAULT_SDO_BLOCK_SIZE."""
+    if canopen.CONF_SDO_BLOCK_SIZE not in hub_config(CORE.config, canopen_id):
+        canopen.enable_sdo_block(DEFAULT_SDO_BLOCK_SIZE)
+
+
+async def remote_logs_to_code(
+    config: ConfigType, hub: MockObj, canopen_id: Any
+) -> None:
+    # Log Data uploads are block uploads; their block size is the client's (0x3100:7), not the hub's download cap
+    enable_sdo_block(canopen_id)
+    request_log_listener()
+    cg.add_define("USE_CANOPEN_ENTITY_MAPPER_LOGS")
+    cg.add_define("CANOPEN_ENTITY_MAPPER_LOG_BUFFER_SIZE", config[CONF_BUFFER_SIZE])
+    var = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(var, config)
+    cg.add(var.set_default_level(LOG_LEVEL_SEVERITY.index(config[CONF_LEVEL])))
+    timeout = config[CONF_TIMEOUT]
+    if timeout != LOG_TIMEOUT_NEVER:
+        cg.add(var.set_timeout(timeout.total_milliseconds))
+    cg.add(var.set_block_size(config[CONF_BLOCK_SIZE]))
+    cg.add(var.set_canopen(hub))
+    # now, not in setup(): codegen runs before App.setup(), so the setup logs of all components are buffered
+    cg.add(var.start())
 
 
 # ---- links to other nodes: actions and `platform: canopen_entity_mapper` entities ----

@@ -56,6 +56,8 @@ canopen_entity_mapper:
   # links to another node (only read): remote state slots, platform entities, actions, rpdo
   remote_nodes:
     dimmer: remote_node.yaml
+  # remote logs (OD 0x3100), default block size 3
+  remote_logs: {}
   entities:
     - id: uptime_sensor
       index: 1

@@ -422,3 +422,39 @@ def test_invalid_raw_rpdo(tmp_path: Path, entities: list, message: str) -> None:
 )
 def test_invalid_remote(tmp_path, entities, extra, message):
     assert message in config_error(tmp_path, entities, extra, remote_nodes=REMOTE_NODES)
+
+
+@needs_esphome
+def test_codegen_remote_logs(tmp_path: Path) -> None:
+    remote_logs = {"level": "DEBUG", "timeout": "never", "block_size": 8, "buffer_size": 1024}
+    main_cpp, defines = generate(tmp_path, ENTITIES, {"logger": {}}, remote_logs=remote_logs)
+    assert "#define USE_CANOPEN_ENTITY_MAPPER_LOGS" in defines
+    assert "#define CANOPEN_ENTITY_MAPPER_LOG_BUFFER_SIZE 1024" in defines
+    # block transfer for the uploads, the default download cap (the hub has no sdo_block_size)
+    assert "#define CANOPEN_SDO_BLOCK_SIZE 16" in defines
+    logs = re.search(r"new\((\w+)\) canopen_entity_mapper::RemoteLogs\(\);", main_cpp).group(1)
+    assert f"{logs}->set_default_level(5);" in main_cpp  # DEBUG
+    assert f"{logs}->set_timeout(" not in main_cpp  # never: 0
+    assert f"{logs}->set_block_size(8);" in main_cpp
+    # the record before the hub's setup, the logger callback before App.setup()
+    assert main_cpp.index(f"{logs}->set_canopen(can_hub);") < main_cpp.index(f"{logs}->start();")
+    assert main_cpp.index(f"{logs}->start();") < main_cpp.index("App.setup();")
+
+    main_cpp, _ = generate(tmp_path, ENTITIES, {"logger": {}}, remote_logs={})
+    assert re.search(r"->set_default_level\(3\);", main_cpp)  # INFO
+    assert re.search(r"->set_timeout\(30000\);", main_cpp)
+    assert re.search(r"->set_block_size\(3\);", main_cpp)
+
+
+@needs_esphome
+@pytest.mark.parametrize(
+    "extra, remote_logs, message",
+    [
+        pytest.param({}, {}, "'remote_logs' requires the 'logger' component", id="no-logger"),
+        pytest.param({"logger": {}}, {"block_size": 128}, "value must be at most 127", id="block-size"),
+        pytest.param({"logger": {}}, {"timeout": "100ms"}, "remote_logs", id="timeout-short"),
+        pytest.param({"logger": {}}, {"level": "LOUD"}, "Unknown value 'LOUD'", id="level"),
+    ],
+)
+def test_invalid_remote_logs(tmp_path: Path, extra: dict, remote_logs: dict, message: str) -> None:
+    assert message in config_error(tmp_path, ENTITIES, extra, remote_logs=remote_logs)

@@ -545,6 +545,23 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   (node 0x37, old component): slots follow light5, `canopen.light.turn_off` turns it off, `test_switch` follows
   light4 by `rpdo:`, "Biuro toggle" button in HA. Not ported: `canopen.entity_cmd`, `template_entities` (open points
   below).
+- **Remote logs ported** (2026-10-31): `canopen_entity_mapper: remote_logs:` (was `canopen: remote_logs:`; same
+  options: `buffer_size`, `level`, `timeout`, `block_size`; an empty block is `remote_logs: {}`), OD 0x3100 unchanged
+  (can2mqtt unchanged). Split: `log_buffer.*` (ring buffer, level, keepalive, timeout; no CANopen / ESPHome code but
+  the log level macros and `ESPHOME_strcmp_P`) and `remote_logs.*` (`RemoteLogs`, a component and `OdObject`: the
+  record, the handler, the logger callback registered from codegen before `App.setup()`, `loop()` for the timeout,
+  enabled only while logging is on with a timeout). Log Data: the snapshot at the first read (`offset == 0`, the size
+  indication), each read copies at most the rest, PARTIAL until done; an empty buffer gives a zero-length upload,
+  which CANopenNode aborts. Changes: the `block_size <= sdo_block_transfer_size` check is gone (the hub's
+  `sdo_block_size` caps downloads only, uploads use the client's size and the 900-byte buffer takes 127 segments);
+  without `sdo_block_size` on the hub, block transfer is enabled with the mapper's `DEFAULT_SDO_BLOCK_SIZE` (16, shared
+  with OTA); the canbus / canopen tag filter uses `ESPHOME_strcmp_P` (the old `strcmp` read flash tags on ESP8266).
+  Tests: `test/logs/log_buffer_test.cpp` (in `test/test_logs.py`, next to the old one), `test_codegen_remote_logs` /
+  `test_invalid_remote_logs`. Builds: `test/esp8266_mapper.yaml`, `test/stm32l4_canopen.yaml` (`block_size: 16`,
+  tx queue 32). Nucleo against can2mqtt (2026-10-31, `test/stm32l4_biuro_switch.yaml`, level DEBUG, block size 16):
+  subscribed with AUTO, lines arrive in can2mqtt's log. can2mqtt logged node lines at their own level, so `[D]` lines
+  were hidden at its `--log-level INFO`: can2mqtt now logs lines below INFO at INFO. User docs (`docs/remote-logs.md`)
+  with the migration.
 - **OTA ported** (2026-10-31): `ota: - platform: canopen_entity_mapper` (`canopen_id`), OD 0x3000 as before (can2mqtt
   unchanged), one `OdObject` handler: the first chunk of :4 starts the backend (size from :2), the last one (a domain's
   stream size is 0 until the last chunk, then the total: CANopenNode doesn't pass the client's indicated size) sets

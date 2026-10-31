@@ -62,6 +62,11 @@ PR 10 store/restore next).
   requested by can2mqtt (3 if `:7` is missing). The node sends a whole block back to back, so it must fit the TX
   queue (not detected from the canbus platform). It must be <= `sdo_block_transfer_size`, which is the SDO buffer:
   download block size (OTA, RX side) and cap for upload blocks.
+- `canopen_entity_mapper` (CANopenNode) port: `canopen_entity_mapper: remote_logs:`, same options and OD. `log_buffer.*`
+  is the ring buffer / level / keepalive logic without OD glue (host test `test/logs/log_buffer_test.cpp`),
+  `remote_logs.*` the 0x3100 handler: the snapshot is taken at the first read (`offset == 0`), reads copy at most the
+  rest (CANopenNode asks for its free buffer space). Upload block size isn't capped by the hub's `sdo_block_size` (a
+  download cap; the 900-byte buffer takes 127 segments). Tag filter uses `ESPHOME_strcmp_P` (tags in flash on ESP8266).
 
 ## Platform notes
 - Upstream ESPHome compatibility: the component must load on upstream ESPHome (ESP32/ESP8266 users) as well

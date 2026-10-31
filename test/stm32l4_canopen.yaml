@@ -379,6 +379,11 @@ canopen_entity_mapper:
   # links to other nodes (docs/linking-nodes.md): dimmer4 is a real node on the bus (old component)
   remote_nodes:
     dimmer4: ../../zrodlana/esphome/dimmer4.yaml
+  # remote logs for can2mqtt (OD 0x3100): a block goes out back to back, zephyr_can tx_buffer_size 32 takes it plus
+  # the TPDOs and the heartbeat
+  remote_logs:
+    level: DEBUG
+    block_size: 16
   entities:
     - id: uptime_sensor
       index: 1
