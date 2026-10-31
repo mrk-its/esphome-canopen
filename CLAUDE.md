@@ -9,8 +9,8 @@ Port to CANopenNode (replacing canopen-stack), in progress: plan and handoff sta
 current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopennode.md`, done; step 3:
 `docs/sdo_server_canopennode.md`). Upstream PRs 1-3 as built and tested: `docs/upstream_prs_1-3.md`. Hub PRs 7+
 (generic CiA 301 for `canopen_entity_mapper`) are developed on branch `canopen-next` in `~/repos/esphome`
-("Hub for the entity mapper" in `docs/canopennode.md`; PRs 7-10 and 12 (SDO server, OD API, own PDOs,
-store/restore, SDO block transfer) done, PR 11 loopback next).
+("Hub for the entity mapper" in `docs/canopennode.md`; PRs 7-12 (SDO server, OD API, own PDOs, store/restore,
+loopback between local nodes, SDO block transfer) done).
 
 ## Workflow
 - Always do new features and fixes on a `feature/<short-name>` branch (created from the current branch,

@@ -250,9 +250,8 @@ Things to watch:
   - Keep the `FwImageWrite, N kB (P%)` log every KB (used to measure speed).
 - **NMT reset commands.** `CO_RESET_APP` → `App.safe_reboot()`. `CO_RESET_COMM` → log first; re-initialising
   (`CO_delete` + `CO_new`) comes later.
-- **Multiple `canopen:` instances on one bus.** The loopback of frames between local instances moves into
-  `CO_CANsend` (deliver to the other instances on the same `canbus`). The RX callbacks only buffer, so re-entrancy
-  is safe.
+- **Multiple `canopen:` instances on one bus.** The loopback of frames between local instances is in the hub's
+  `transmit()` (PR 11): the other instances only receive (buffer), their processing runs in their own `loop()`.
 - **Platform code from the old `canopen.cpp`:** ESP32 TWAI alerts, bus-off recovery and `get_can_status`. Move it
   later into the core, or better into a `canbus`-level helper.
 
@@ -476,7 +475,19 @@ What the hub still lacks for that (checked against `components_next`, 2026-10-30
    with OTA (can2mqtt uses block download only for firmware). Still open: YAML sizes for the server buffer and the
    client FIFO.
 8. **Loopback between local nodes** in the driver (`CO_CANsend` and `send_frame()` deliver to the other `canopen:`
-   nodes on the same canbus; was step 8).
+   nodes on the same canbus; was step 8). **Done, PR 11** (2026-10-31, `canopen-next`): codegen links the nodes of
+   each canbus into a ring (`set_next_local()`, config order; one pointer per node, no globals); validation rejects
+   two nodes with the same `node_id` on one canbus. `transmit()` (CANopenNode's driver and `send_frame()`) sends on
+   the canbus and, only once the platform has taken the frame, hands it to the other nodes' `receive_()`:
+   CANopenNode RX buffers, frame listeners, heartbeat / EMCY callbacks, **without** `process_()`, which runs in their
+   next `loop()`. So no node's CANopenNode processing runs inside another's (a reply can't arrive inside the
+   sender's `CO_CANsend`), at the cost of one loop per hop for local SDO. A frame queued in a TX buffer (platform
+   busy) is delivered when `CO_CANmodule_process` resends it. Not covered: a frame listener that sends to a local
+   node, which sends back from its listener, recurses (user loops only). gtest `loopback_test.cpp` (boot-up seen by
+   the other node only, frame listener / `send_frame()`, a refused frame not delivered, SDO upload of 0x1018:1 from
+   the other node over the fake bus, a queued frame delivered when sent); Python: the ring per canbus, the duplicate
+   id. Builds ESP8266 (mapper), ESP32-C3 (esp-idf), Zephyr. Not on hardware (needs two `canopen:` nodes on one
+   board).
 9. **Codegen hooks:** `enable_sdo_server()`, `enable_pdo(tpdo=N, rpdo=M)`, and a defined point where other
    components add OD entries before the hub's `setup()` (from codegen / constructors, or a setup priority above
    `PROCESSOR`). **Done** (2026-10-31, `canopen-next`, a comment on `CANopenComponent` in `canopen.h`, to fold into
@@ -500,7 +511,7 @@ Upstream PRs for it (estimates, not measured; independent of PRs 4-6, could go b
 | 8 | public OD API, `OdObject` handlers, `write_od()`, own NMT state and `nmt_startup`; done, `canopen-next` | ~240 (tests ~115) |
 | 9 | own PDOs (records, init, processing, `request_tpdo()`); done, `canopen-next` | ~170 (tests ~165) |
 | 10 | 0x1010/0x1011 store/restore (PDO parameters, preferences); done, `canopen-next` | ~105 (tests ~110) |
-| 11 | loopback between local nodes | ~100 |
+| 11 | loopback between local nodes; done, `canopen-next` | ~55 (tests ~180) |
 | 12 | SDO server block transfer, `sdo_block_size`; done, `canopen-next` (the size cap needs the fork's patch upstream) | ~40 (tests ~150) |
 
 PRs 7-9 are the minimum for the mapper against can2mqtt; 10-12 for full parity.
