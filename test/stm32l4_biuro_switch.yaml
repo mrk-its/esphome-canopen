@@ -121,18 +121,24 @@ canopen:
   canbus_id: can_bus
   node_id: 0x7f
   heartbeat_interval: 5s
-  sdo_block_size: 32
+  sdo_block_size: 60
 
 ota:
   - platform: canopen_entity_mapper
 
+# confirms the new MCUboot image after a good boot (1 min, or an orderly reboot); without it the image is rolled
+# back at the next reset
 safe_mode:
-  disabled: true
 
 canopen_entity_mapper:
   canopen_id: can_gate
   remote_nodes:
     dimmer4: ../../zrodlana/esphome/dimmer4.yaml
+  # remote logs for can2mqtt (OD 0x3100): a log block goes out back to back, tx_buffer_size 32 takes it plus the
+  # TPDOs and the heartbeat
+  remote_logs:
+    level: DEBUG
+    block_size: 16
 
 output:
   - platform: gpio
@@ -149,4 +155,5 @@ binary_sensor:
     filters:
       - delayed_on_off: 20ms
     on_press:
+      - logger.log: "B1 pressed"
       - canopen.light.toggle: {node: dimmer4, entity: light5}  # biuro
