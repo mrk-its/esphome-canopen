@@ -545,6 +545,15 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   (node 0x37, old component): slots follow light5, `canopen.light.turn_off` turns it off, `test_switch` follows
   light4 by `rpdo:`, "Biuro toggle" button in HA. Not ported: the raw `rpdo: {node_id, tpdo, offset, cmd}` form,
   `canopen.entity_cmd`, `template_entities` (open points below).
+- **OTA ported** (2026-10-31): `ota: - platform: canopen_entity_mapper` (`canopen_id`), OD 0x3000 as before (can2mqtt
+  unchanged), one `OdObject` handler: the first chunk of :4 starts the backend (size from :2), the last one (a domain's
+  stream size is 0 until the last chunk, then the total: CANopenNode doesn't pass the client's indicated size) sets
+  the MD5; backend `end()` and the reboot deferred to `loop()` (1 s each, the loop disabled otherwise). OTA state
+  listeners (`on_begin` / `on_progress` / ...), `reboot: false`. Needs SDO block transfer: the hub's
+  `sdo_block_size`, else 16. Compression (miniz) off on stm32 / zephyr, `miniz.c` filtered out there. Nucleo
+  (`test/stm32l4_biuro_switch.yaml`, block size 32, rx queue 64): 114 kB from can2mqtt in ~50 s (~2.3 KB/s), MD5 OK,
+  MCUboot swap, new version running. Open: image confirmation with `safe_mode: disabled` (check it survives a
+  reboot), speed with bigger blocks / a bigger server buffer.
 - **MPDO for the OD writer (own step, changes the wire protocol, needs can2mqtt and all nodes updated):** today
   `0x500 + target` is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7 frame whose first byte equals another
   node's id is applied there as an OD write, and the ID has several producers. Proposal: the CiA 301 MPDO format

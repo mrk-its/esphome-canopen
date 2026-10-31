@@ -80,3 +80,7 @@ button:
     on_press:
       - canopen.light.toggle: {node: dimmer, entity: light_hall}
       - canopen.number.set: {node: dimmer, entity: setpoint, value: 21.5}
+
+# CAN OTA (zlib-compressed images: miniz)
+ota:
+  - platform: canopen_entity_mapper

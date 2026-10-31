@@ -1,5 +1,6 @@
 # Nucleo as a wall switch on the canopen hub + canopen_entity_mapper: the user button B1 toggles dimmer4's light5
-# ("biuro", node 0x37 on the old component) with canopen.light.toggle; the green LED blinks on CAN traffic. Build / flash
+# ("biuro", node 0x37 on the old component) with canopen.light.toggle; the green LED blinks on CAN traffic; CAN OTA
+# from can2mqtt (upload .esphome/build/stm32l4-biuro-switch/.west_build/zephyr/zephyr/zephyr.signed.bin). Build / flash
 # with the esphomeplatformzephyr venv:
 #   ../esphomeplatformzephyr/venv/bin/esphome run test/stm32l4_biuro_switch.yaml
 # (same board and partition layout as stm32l4_canopen.yaml, which has the hardware tests)
@@ -88,6 +89,7 @@ zephyr:
 logger:
   logs:
     canbus: INFO
+    script: INFO
 
 canbus:
   - platform: zephyr_can
@@ -96,6 +98,9 @@ canbus:
     bit_rate: 125kbps
     rx_pin: PA11
     tx_pin: PA12
+    # an SDO block (OTA) arrives back to back: room for sdo_block_size frames
+    rx_buffer_size: 64
+    tx_buffer_size: 32
     # every received frame blinks the LED
     on_frame:
       can_id: 0
@@ -116,6 +121,13 @@ canopen:
   canbus_id: can_bus
   node_id: 0x7f
   heartbeat_interval: 5s
+  sdo_block_size: 32
+
+ota:
+  - platform: canopen_entity_mapper
+
+safe_mode:
+  disabled: true
 
 canopen_entity_mapper:
   canopen_id: can_gate
