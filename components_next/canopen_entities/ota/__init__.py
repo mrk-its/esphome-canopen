@@ -1,4 +1,4 @@
-"""`ota: - platform: canopen_entity_mapper`: CAN OTA through OD 0x3000 (can2mqtt's firmware upload).
+"""`ota: - platform: canopen_entities`: CAN OTA through OD 0x3000 (can2mqtt's firmware upload).
 
 Needs SDO block transfer in the hub: the hub's `sdo_block_size`, or DEFAULT_SDO_BLOCK_SIZE when it isn't set.
 """
@@ -63,7 +63,7 @@ def _final_validate(config: ConfigType) -> ConfigType:
     safe_mode = fv.full_config.get().get("safe_mode") or {}
     if getattr(CORE, "is_zephyr", False) and safe_mode.get(CONF_DISABLED, False):
         _LOGGER.warning(
-            "ota canopen_entity_mapper: 'safe_mode: disabled: true' leaves updated images unconfirmed, "
+            "ota canopen_entities: 'safe_mode: disabled: true' leaves updated images unconfirmed, "
             "MCUboot rolls them back at the next reset; enable safe_mode"
         )
     return config

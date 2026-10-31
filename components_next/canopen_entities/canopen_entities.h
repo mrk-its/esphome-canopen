@@ -32,7 +32,7 @@
 #include "esphome/components/alarm_control_panel/alarm_control_panel.h"
 #endif
 
-namespace esphome::canopen_entity_mapper {
+namespace esphome::canopen_entities {
 
 // Entity type codes (0x2001:N bits 0..7), see OBJECT_DICTIONARY.md
 enum EntityType : uint8_t {
@@ -144,7 +144,7 @@ class MappedEntity : public canopen::OdObject {
 };
 
 // A remote state slot (OD 0x4000 + n, sub 1): a state of another node's entity, written by an RPDO from that node's
-// TPDO (docs/linking-nodes.md). Read by `platform: canopen_entity_mapper` entities and toggle actions.
+// TPDO (docs/linking-nodes.md). Read by `platform: canopen_entities` entities and toggle actions.
 class RemoteSlot : public canopen::OdObject {
  public:
   uint32_t value{0};  // little endian, size bytes used
@@ -160,9 +160,9 @@ class RemoteSlot : public canopen::OdObject {
   }
 };
 
-class EntityMapper : public Component {
+class CANopenEntities : public Component {
  public:
-  explicit EntityMapper(canopen::CANopenComponent *hub) : hub_(hub) {}
+  explicit CANopenEntities(canopen::CANopenComponent *hub) : hub_(hub) {}
 
   void set_layout_hash(uint32_t hash) { this->layout_hash_ = hash; }
   // our node id (the hub's, from codegen)
@@ -176,8 +176,8 @@ class EntityMapper : public Component {
   // a received OD writer frame (data / len of a 0x500..0x57F frame); public for tests
   void handle_od_writer_frame(const uint8_t *data, uint8_t len);
 
-#ifdef CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS
-  // remote state slots (CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS, all exist from the start, so listeners can be added in
+#ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
+  // remote state slots (CANOPEN_ENTITIES_REMOTE_SLOTS, all exist from the start, so listeners can be added in
   // any order): the size of slot n, from codegen; the RPDOs filling them are the hub's
   void add_remote_state(uint8_t n, uint8_t size) {
     if (n < this->slots_.size())
@@ -223,7 +223,7 @@ class EntityMapper : public Component {
   // too: TPDO 7 is reserved while the OD writer is on)
   static constexpr uint32_t OD_WRITER_COB_ID = 0x500;
   static void on_od_writer_frame(void *context, uint32_t can_id, const uint8_t *data, uint8_t len) {
-    static_cast<EntityMapper *>(context)->handle_od_writer_frame(data, len);
+    static_cast<CANopenEntities *>(context)->handle_od_writer_frame(data, len);
   }
 #ifdef USE_LIGHT
   // light values reach the mapper through a listener object
@@ -240,10 +240,10 @@ class EntityMapper : public Component {
   canopen::CANopenComponent *hub_;
   uint8_t node_id_{0};
   bool od_writer_{false};
-  // CANOPEN_ENTITY_MAPPER_ENTITIES: from codegen, the number of entities
-  StaticVector<MappedEntity, CANOPEN_ENTITY_MAPPER_ENTITIES> entities_;
-#ifdef CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS
-  std::array<RemoteSlot, CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS> slots_{};
+  // CANOPEN_ENTITIES_ENTITIES: from codegen, the number of entities
+  StaticVector<MappedEntity, CANOPEN_ENTITIES_ENTITIES> entities_;
+#ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
+  std::array<RemoteSlot, CANOPEN_ENTITIES_REMOTE_SLOTS> slots_{};
 #endif
   // 0x2001: entity types, sub N = type of entity N
   uint8_t types_highest_{0};
@@ -264,7 +264,7 @@ enum RemoteCmdEncoding : uint8_t {
 uint32_t encode_remote_cmd(uint8_t encoding, float value, uint8_t size, float min_value, float max_value);
 
 // canopen.<domain>.<action>: writes one or more commands of a remote node's entity with the OD writer
-template<typename... Ts> class RemoteCommandAction : public Action<Ts...>, public Parented<EntityMapper> {
+template<typename... Ts> class RemoteCommandAction : public Action<Ts...>, public Parented<CANopenEntities> {
  public:
   static constexpr size_t MAX_WRITES = 3;  // MAX_WRITES in __init__.py
 
@@ -301,4 +301,4 @@ template<typename... Ts> class RemoteCommandAction : public Action<Ts...>, publi
   uint8_t entity_index_{0};
 };
 
-}  // namespace esphome::canopen_entity_mapper
+}  // namespace esphome::canopen_entities

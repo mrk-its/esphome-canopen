@@ -1,4 +1,4 @@
-"""`text_sensor: - platform: canopen_entity_mapper`: cover / alarm state or on / off of a remote node's entity."""
+"""`text_sensor: - platform: canopen_entities`: cover / alarm state or on / off of a remote node's entity."""
 
 from esphome.components import text_sensor
 import esphome.config_validation as cv
@@ -12,7 +12,7 @@ from . import (
     validate_remote_state,
 )
 
-DEPENDENCIES = ["canopen_entity_mapper"]
+DEPENDENCIES = ["canopen_entities"]
 
 CONFIG_SCHEMA = cv.All(
     text_sensor.text_sensor_schema(RemoteTextSensor).extend(REMOTE_STATE_SCHEMA),

@@ -1,4 +1,4 @@
-# ESP8266 build check for canopen_entity_mapper on the upstream canopen hub (~/repos/esphome, branch canopen-next),
+# ESP8266 build check for canopen_entities on the upstream canopen hub (~/repos/esphome, branch canopen-next),
 # with upstream ESPHome (dev venv): ~/repos/esphome-upstream-venv/bin/esphome compile test/esp8266_mapper.yaml
 
 external_components:
@@ -7,7 +7,7 @@ external_components:
       path: ../../esphome/esphome/components
     components: [canopen]
   - source: ../components_next
-    components: [canopen_entity_mapper]
+    components: [canopen_entities]
 
 esphome:
   name: esp8266-mapper
@@ -51,7 +51,7 @@ switch:
     name: Test switch
     optimistic: true
 
-canopen_entity_mapper:
+canopen_entities:
   canopen_id: can_hub
   # links to another node (only read): remote state slots, platform entities, actions, rpdo
   remote_nodes:
@@ -71,7 +71,7 @@ canopen_entity_mapper:
       rpdo: {node: dimmer, entity: relay}
 
 text_sensor:
-  - platform: canopen_entity_mapper
+  - platform: canopen_entities
     id: hall_cover
     node: dimmer
     entity: cover_hall
@@ -85,4 +85,4 @@ button:
 
 # CAN OTA (zlib-compressed images: miniz)
 ota:
-  - platform: canopen_entity_mapper
+  - platform: canopen_entities

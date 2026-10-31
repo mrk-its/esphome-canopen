@@ -2,13 +2,13 @@
 
 #include "esphome/core/defines.h"
 
-#include "entity_mapper.h"
+#include "canopen_entities.h"
 
 #ifdef USE_TEXT_SENSOR
 #include "esphome/components/text_sensor/text_sensor.h"
 #endif
 
-namespace esphome::canopen_entity_mapper {
+namespace esphome::canopen_entities {
 
 // kind of a remote state, KIND_CODES in layout.py
 enum RemoteStateKind : uint8_t {
@@ -32,18 +32,18 @@ struct RemoteStateFormat {
   const char *name(uint32_t raw) const;
 };
 
-// `platform: canopen_entity_mapper` entities: show a remote state slot (EntityMapper::add_remote_state())
+// `platform: canopen_entities` entities: show a remote state slot (CANopenEntities::add_remote_state())
 #ifdef USE_BINARY_SENSOR
 class RemoteBinarySensor : public binary_sensor::BinarySensor {
  public:
-  void attach(EntityMapper *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value, float max_value);
+  void attach(CANopenEntities *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value, float max_value);
 };
 #endif
 
 #ifdef USE_SENSOR
 class RemoteSensor : public sensor::Sensor {
  public:
-  void attach(EntityMapper *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value, float max_value);
+  void attach(CANopenEntities *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value, float max_value);
 
  protected:
   RemoteStateFormat format_;
@@ -53,7 +53,7 @@ class RemoteSensor : public sensor::Sensor {
 #ifdef USE_TEXT_SENSOR
 class RemoteTextSensor : public text_sensor::TextSensor {
  public:
-  void attach(EntityMapper *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value, float max_value);
+  void attach(CANopenEntities *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value, float max_value);
 
  protected:
   void publish_raw_(uint32_t raw);
@@ -61,4 +61,4 @@ class RemoteTextSensor : public text_sensor::TextSensor {
 };
 #endif
 
-}  // namespace esphome::canopen_entity_mapper
+}  // namespace esphome::canopen_entities

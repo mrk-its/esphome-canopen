@@ -1,4 +1,4 @@
-"""`binary_sensor: - platform: canopen_entity_mapper`: on / off state of a remote node's entity."""
+"""`binary_sensor: - platform: canopen_entities`: on / off state of a remote node's entity."""
 
 from esphome.components import binary_sensor
 import esphome.config_validation as cv
@@ -12,7 +12,7 @@ from . import (
     validate_remote_state,
 )
 
-DEPENDENCIES = ["canopen_entity_mapper"]
+DEPENDENCIES = ["canopen_entities"]
 
 CONFIG_SCHEMA = cv.All(
     binary_sensor.binary_sensor_schema(RemoteBinarySensor).extend(REMOTE_STATE_SCHEMA),

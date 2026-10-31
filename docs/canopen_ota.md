@@ -1,6 +1,6 @@
 # CAN OTA in the hub (CiA 302-3 program download)
 
-Plan (2026-11-01, nothing implemented): move OTA out of `canopen_entity_mapper` into the `canopen` hub, as
+Plan (2026-11-01, nothing implemented): move OTA out of `canopen_entities` into the `canopen` hub, as
 `ota: - platform: canopen`, on the standard program download objects of CiA 302-3 (`0x1F50` / `0x1F51` / `0x1F56` /
 `0x1F57`) instead of our manufacturer-specific `0x3000`. Context: [canopennode.md](canopennode.md) (the port, the
 upstream split), the current protocol in CLAUDE.md ("CAN OTA flow") and [ota.md](ota.md) (user docs).
@@ -8,7 +8,7 @@ upstream split), the current protocol in CLAUDE.md ("CAN OTA flow") and [ota.md]
 ## Why
 
 - `0x2000`-`0x5FFF` is the manufacturer-specific area: by convention it belongs to the device application, here
-  `canopen_entity_mapper` (entities at `0x2000+`, OTA `0x3000`, layout hash `0x3002`, logs `0x3100`, remote state
+  `canopen_entities` (entities at `0x2000+`, OTA `0x3000`, layout hash `0x3002`, logs `0x3100`, remote state
   slots `0x4000+`). The hub is a generic CiA 301 node that other components (profiles, user objects) add their own
   objects to, in the same area: a fixed `0x3000` in the hub would be a reservation every one of them has to avoid.
 - OD collisions are only found at boot (`od.finalize()`: "OD 0x%04x added twice", setup fails), not in config
@@ -17,7 +17,7 @@ upstream split), the current protocol in CLAUDE.md ("CAN OTA flow") and [ota.md]
   CAN (e.g. a node that only drives a CiA 402 drive).
 - A standard upload path is easier to accept upstream than a private OD layout, and any CiA 302-3 capable tool can
   use it.
-- Side effect: the mapper loses OTA, which removes the odd `ota: - platform: canopen_entity_mapper` (and the same
+- Side effect: the mapper loses OTA, which removes the odd `ota: - platform: canopen_entities` (and the same
   oddity under a new mapper name, see the naming discussion: `canopen_entities` preferred).
 
 ## CiA 302-3 program download

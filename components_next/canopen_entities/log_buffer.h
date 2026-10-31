@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace esphome::canopen_entity_mapper {
+namespace esphome::canopen_entities {
 
 // Remote logs (OD 0x3100, OBJECT_DICTIONARY.md) without the OD glue: a ring buffer of log lines, the level the host
 // subscribed with and its keepalive. The host consumes the lines with uploads of Log Data (begin_upload(), read()).
@@ -63,4 +63,4 @@ class LogBuffer {
   uint8_t level_{0};
 };
 
-}  // namespace esphome::canopen_entity_mapper
+}  // namespace esphome::canopen_entities

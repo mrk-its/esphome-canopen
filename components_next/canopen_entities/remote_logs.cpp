@@ -1,6 +1,6 @@
 #include "remote_logs.h"
 
-#ifdef USE_CANOPEN_ENTITY_MAPPER_LOGS
+#ifdef USE_CANOPEN_ENTITIES_LOGS
 
 #include <cinttypes>
 
@@ -8,9 +8,9 @@
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 
-namespace esphome::canopen_entity_mapper {
+namespace esphome::canopen_entities {
 
-ESPHOME_LOG_TAG(TAG, "canopen_entity_mapper.logs");
+ESPHOME_LOG_TAG(TAG, "canopen_entities.logs");
 
 using canopen::OD_READ;
 using canopen::OD_READ_WRITE;
@@ -117,6 +117,6 @@ OdResult RemoteLogs::od_write(canopen::OdStream stream, const void *buf, size_t 
   return OdResult::OD_RESULT_OK;
 }
 
-}  // namespace esphome::canopen_entity_mapper
+}  // namespace esphome::canopen_entities
 
-#endif  // USE_CANOPEN_ENTITY_MAPPER_LOGS
+#endif  // USE_CANOPEN_ENTITIES_LOGS

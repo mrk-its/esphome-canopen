@@ -2,7 +2,7 @@
 
 #include "esphome/core/defines.h"
 
-#ifdef USE_CANOPEN_ENTITY_MAPPER_LOGS
+#ifdef USE_CANOPEN_ENTITIES_LOGS
 
 #include <array>
 
@@ -10,9 +10,9 @@
 #include "esphome/core/component.h"
 #include "log_buffer.h"
 
-namespace esphome::canopen_entity_mapper {
+namespace esphome::canopen_entities {
 
-// Remote logs (`canopen_entity_mapper: remote_logs:`), OD 0x3100 as can2mqtt reads it (OBJECT_DICTIONARY.md,
+// Remote logs (`canopen_entities: remote_logs:`), OD 0x3100 as can2mqtt reads it (OBJECT_DICTIONARY.md,
 // docs/remote-logs.md):
 //   :1 Log Data (domain, an upload consumes it), :2 Log Pending, :3 Log Level (RW, the host's subscription),
 //   :4 Log Dropped, :5 default level, :6 timeout (ms, 0 = never), :7 SDO block size for Log Data uploads
@@ -41,7 +41,7 @@ class RemoteLogs : public Component, public canopen::OdObject {
  protected:
   void update_loop_();
 
-  std::array<uint8_t, CANOPEN_ENTITY_MAPPER_LOG_BUFFER_SIZE> storage_{};
+  std::array<uint8_t, CANOPEN_ENTITIES_LOG_BUFFER_SIZE> storage_{};
   LogBuffer buffer_;
 
   // OD 0x3100 storage; :2 to :4 are copied from buffer_ when read
@@ -54,6 +54,6 @@ class RemoteLogs : public Component, public canopen::OdObject {
   uint8_t block_size_{3};
 };
 
-}  // namespace esphome::canopen_entity_mapper
+}  // namespace esphome::canopen_entities
 
-#endif  // USE_CANOPEN_ENTITY_MAPPER_LOGS
+#endif  // USE_CANOPEN_ENTITIES_LOGS

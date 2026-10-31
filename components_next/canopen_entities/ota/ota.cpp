@@ -9,9 +9,9 @@
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 
-namespace esphome::canopen_entity_mapper {
+namespace esphome::canopen_entities {
 
-ESPHOME_LOG_TAG(TAG, "canopen_entity_mapper.ota");
+ESPHOME_LOG_TAG(TAG, "canopen_entities.ota");
 
 using canopen::OD_READ;
 using canopen::OD_READ_WRITE;
@@ -249,4 +249,4 @@ void CanopenOTAComponent::loop() {
   }
 }
 
-}  // namespace esphome::canopen_entity_mapper
+}  // namespace esphome::canopen_entities

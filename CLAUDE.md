@@ -8,7 +8,7 @@ User docs: README.md is the overview / quick start only; the option reference li
 Port to CANopenNode (replacing canopen-stack), in progress: plan and handoff state in `docs/canopennode.md`,
 current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopennode.md`, done; step 3:
 `docs/sdo_server_canopennode.md`). Upstream PRs 1-3 as built and tested: `docs/upstream_prs_1-3.md`. Hub PRs 7+
-(generic CiA 301 for `canopen_entity_mapper`) are developed on branch `canopen-next` in `~/repos/esphome`
+(generic CiA 301 for `canopen_entities`) are developed on branch `canopen-next` in `~/repos/esphome`
 ("Hub for the entity mapper" in `docs/canopennode.md`; PRs 7-12 (SDO server, OD API, own PDOs, store/restore,
 loopback between local nodes, SDO block transfer) done).
 Upstream PRs are being re-split (the old `canopen-1..4` branches / `docs/upstream_prs_1-3.md` are superseded): the hub
@@ -67,7 +67,7 @@ of the mapper's `0x3000`: `docs/canopen_ota.md`.
   requested by can2mqtt (3 if `:7` is missing). The node sends a whole block back to back, so it must fit the TX
   queue (not detected from the canbus platform). It must be <= `sdo_block_transfer_size`, which is the SDO buffer:
   download block size (OTA, RX side) and cap for upload blocks.
-- `canopen_entity_mapper` (CANopenNode) port: `canopen_entity_mapper: remote_logs:`, same options and OD. `log_buffer.*`
+- `canopen_entities` (CANopenNode) port: `canopen_entities: remote_logs:`, same options and OD. `log_buffer.*`
   is the ring buffer / level / keepalive logic without OD glue (host test `test/logs/log_buffer_test.cpp`),
   `remote_logs.*` the 0x3100 handler: the snapshot is taken at the first read (`offset == 0`), reads copy at most the
   rest (CANopenNode asks for its free buffer space). Upload block size isn't capped by the hub's `sdo_block_size` (a

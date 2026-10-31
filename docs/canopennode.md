@@ -1,7 +1,7 @@
 # Porting esphome-canopen to CANopenNode
 
 Status (2026-10-31): the hub (upstream `canopen` component, CANopenNode) is done for the entity mapper (hub PRs 1-12
-on `canopen-next` in `~/repos/esphome`); `canopen_entity_mapper` is ported (this repo, branch `feature/entity-mapper`,
+on `canopen-next` in `~/repos/esphome`); `canopen_entities` is ported (this repo, branch `feature/entity-mapper`,
 see "Hub for the entity mapper"). **Next:** cut the upstream PRs again from the refactored hub, see "Upstream PRs",
 "New split" (branch `canopen-full`, refactor committed as `e9f738ebf7`).
 
@@ -266,7 +266,7 @@ Things to watch:
 
 ## Layers (target)
 ```
-entity mapper    (canopen_entity_mapper) ESPHome entities <-> 0x2000+, remote slots 0x4000+, template_entities,
+entity mapper    (canopen_entities) ESPHome entities <-> 0x2000+, remote slots 0x4000+, template_entities,
                  remote states (rpdo: {node, entity}, platform: canopen), canopen.<domain>.<action>,
                  OD writer, layout hash   (layout.py, remote.py unchanged)
 services         OTA (0x3000), remote logs (0x3100), device API (SDO client queue, NMT, HB, EMCY)
@@ -313,14 +313,14 @@ Each step is a commit on `feature/canopennode` (or its own `feature/...` branch)
 8. **Commands from the host:** the OD writer (COB-ID `0x500 + node`, data `[node, sub, idx_lo, idx_hi, value...]`,
    written through the OD IO so handlers fire), loopback between local instances. The remote states (RPDO slots
    `0x4000+n`, `rpdo: {node, entity}`, `platform: canopen` entities reading other nodes, `canopen.<domain>.<action>`)
-   stay, but in the entity mapper (`canopen_entity_mapper`), not in the `canopen` hub (decision 2026-10-30; replaces
+   stay, but in the entity mapper (`canopen_entities`), not in the `canopen` hub (decision 2026-10-30; replaces
    the 2026-10-29 decision to drop them).
 9. **Switch over:**
    - `components_next/canopen` replaces `components/canopen`;
    - remove the canopen-stack code (`co_cmd`, `co_storage`, the old `driver_can`/`od`, the `CO_*` build flags,
      `cg.add_library("canopenstack")`);
    - the remote-state code (`remote.py`, `remote_entities.*`, the `platform: canopen` entity files) moves to
-     `canopen_entity_mapper`;
+     `canopen_entities`;
    - update CLAUDE.md and `docs/`;
    - check that `CANOPENNODE_SOURCE` points at the current fork commit (or CANopenNode upstream, if it took the
      `library.json`);
@@ -342,7 +342,7 @@ mostly *adds files and blocks*, then cut the PR branches from it.
 **Where.** `~/repos/esphome`, branch `canopen-full`, created from `canopen-next` (`21ab50897e`, hub PRs 1-12 in 17
 commits on `upstream/dev` `b155e4ba0b`), plus the refactor as one commit, `e9f738ebf7` "[canopen] Split the hub by
 feature" (2026-10-31, not pushed). `canopen-next` stays as it was;
-`components_next/canopen_entity_mapper` and the test configs here build against whatever is checked out in
+`components_next/canopen_entities` and the test configs here build against whatever is checked out in
 `~/repos/esphome` (`test/stm32l4_*.yaml`, `test/esp8266_mapper.yaml`), so `canopen-full` replaces `canopen-next` as
 the hub branch (check it out there for those builds).
 
@@ -520,13 +520,13 @@ callback refactors):
     and kept.
   - Mapper: no string copies (metadata strings are read from the entity by the handler on each upload: name and
     device class from flash on ESP8266, unit, state class), entities in a `StaticVector` sized by codegen
-    (`CANOPEN_ENTITY_MAPPER_ENTITIES`), states in `std::array`, callbacks capturing only the entity pointer,
+    (`CANOPEN_ENTITIES_ENTITIES`), states in `std::array`, callbacks capturing only the entity pointer,
     `static constexpr`, `ESPHOME_LOG_TAG`, concatenated namespace, Python type hints. stm32l4 flash -2.8 KB.
 
 ## Hub for the entity mapper
 Target split (2026-10-30): the `canopen` hub (generic CiA 301) goes upstream; everything specific to esphome-canopen
-and can2mqtt stays here as the external component `canopen_entity_mapper` (named `esphome_entity_mapper` until
-2026-10-31), which refers to a hub with `canopen_id`:
+and can2mqtt stays here as the external component `canopen_entities` (named `esphome_entity_mapper` until
+2026-10-31, then `canopen_entity_mapper` until 2026-11-01), which refers to a hub with `canopen_id`:
 entities (0x2000+16n), TPDO layout and hash (0x3002), remote states (0x4000+n, `rpdo: {node, entity}`,
 `platform: canopen`, `canopen.<domain>.<action>`), the OD writer, OTA (0x3000), remote logs (0x3100), and the
 ESPHome identity values and version string.
@@ -685,7 +685,7 @@ local SDO writes (`test/stm32l4_canopen.yaml`). CANopenNode quirk: the *local* S
 anyway (`CO_SDOclientUpload()` sets the write-only abort but then reads and overwrites the result); the SDO server
 checks the access correctly.
 
-Mapper tests: `test/test_entity_mapper.py` (in `pytest test/`). It runs codegen and validation through the upstream
+Mapper tests: `test/test_canopen_entities.py` (in `pytest test/`). It runs codegen and validation through the upstream
 venv's CLI (`esphome compile --only-generate`, `esphome config`) with the hub from `~/repos/esphome` as a local external
 component (`$ESPHOME_UPSTREAM_VENV`, `$ESPHOME_CANOPEN_HUB`; skipped without them). It checks: one entity of every
 domain to the `add_*()` calls in index order; the 8 `configure_tpdo()` calls (COB-IDs, mappings, the empty ones
@@ -693,7 +693,7 @@ disabled); the layout hash; the identity after the hub's default; the version st
 the validation errors (duplicate index, unsupported domain, TPDO over 8 bytes, caps, size, ranges). It also checks
 that `layout.py` is identical to the old component's copy. ESP8266 build check: `test/esp8266_mapper.yaml`.
 
-Open points for `canopen_entity_mapper` itself (not in the steps yet):
+Open points for `canopen_entities` itself (not in the steps yet):
 - number commands through `make_call()` (own step, after the port): today a number command only publishes the value
   (old component's behaviour), so a template number's `set_action`, `min_value` / `max_value` / step checks and
   restore don't run. `number->make_call().set_value(v).perform()` instead; the state then comes back through the
@@ -707,21 +707,21 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   bad index, short) and a real frame to dimmer4 (node 0x37, old component) turning light5 off, state read back over
   SDO.
 - **Remote states ported** (2026-10-31): `remote_nodes` on the mapper (`remote.py` reads both formats: old
-  `canopen: entities` and hub `canopen:` + `canopen_entity_mapper: entities`, plus the target's OD writer flag),
+  `canopen: entities` and hub `canopen:` + `canopen_entities: entities`, plus the target's OD writer flag),
   `rpdo: {node, entity, state, cmd}` on entities, remote state slots 0x4000+n (`RemoteSlot`, an `OdObject`, in a
   fixed `std::array` so listeners can attach before the slot sizes are set), `binary_sensor` / `sensor` /
-  `text_sensor` **`platform: canopen_entity_mapper`** (was `platform: canopen`: a platform module must live in the
+  `text_sensor` **`platform: canopen_entities`** (was `platform: canopen`: a platform module must live in the
   component's directory, and `canopen` is now the upstream hub), and the `canopen.<domain>.<action>` actions (names
   kept; `RemoteCommandAction` with at most 3 writes, sent with `send_od_write()`; an action to a node with the OD
   writer off is rejected). RPDOs through the hub's `configure_rpdo()`, one per remote (node, TPDO), mapping the
   remote TPDO's **full length** (CANopenNode reports a longer frame with an EMCY): gaps and the tail are single
   dummy entries (index 0x0005, sub 0, any length); the plan (`remote.rpdo_plan()`, ESPHome-free) rejects overlaps
   (a state in a slot and in an `rpdo:`), more than 8 entries. No 4-RPDO limit any more (hub: 32). Tests:
-  `test/test_mapper_remote.py`, codegen / errors in `test/test_entity_mapper.py`; nucleo against the real dimmer4
+  `test/test_mapper_remote.py`, codegen / errors in `test/test_canopen_entities.py`; nucleo against the real dimmer4
   (node 0x37, old component): slots follow light5, `canopen.light.turn_off` turns it off, `test_switch` follows
   light4 by `rpdo:`, "Biuro toggle" button in HA. Not ported: `canopen.entity_cmd`, `template_entities` (open points
   below).
-- **Remote logs ported** (2026-10-31): `canopen_entity_mapper: remote_logs:` (was `canopen: remote_logs:`; same
+- **Remote logs ported** (2026-10-31): `canopen_entities: remote_logs:` (was `canopen: remote_logs:`; same
   options: `buffer_size`, `level`, `timeout`, `block_size`; an empty block is `remote_logs: {}`), OD 0x3100 unchanged
   (can2mqtt unchanged). Split: `log_buffer.*` (ring buffer, level, keepalive, timeout; no CANopen / ESPHome code but
   the log level macros and `ESPHOME_strcmp_P`) and `remote_logs.*` (`RemoteLogs`, a component and `OdObject`: the
@@ -738,7 +738,7 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   subscribed with AUTO, lines arrive in can2mqtt's log. can2mqtt logged node lines at their own level, so `[D]` lines
   were hidden at its `--log-level INFO`: can2mqtt now logs lines below INFO at INFO. User docs (`docs/remote-logs.md`)
   with the migration.
-- **OTA ported** (2026-10-31): `ota: - platform: canopen_entity_mapper` (`canopen_id`), OD 0x3000 as before (can2mqtt
+- **OTA ported** (2026-10-31): `ota: - platform: canopen_entities` (`canopen_id`), OD 0x3000 as before (can2mqtt
   unchanged), one `OdObject` handler: the first chunk of :4 starts the backend (size from :2), the last one (a domain's
   stream size is 0 until the last chunk, then the total: CANopenNode doesn't pass the client's indicated size) sets
   the MD5; backend `end()` and the reboot deferred to `loop()` (1 s each, the loop disabled otherwise). OTA state
@@ -766,22 +766,22 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   gives the size too; different sizes are an error. Stricter than the old component: the command must be 1 byte
   (was any size), `node_id` 1..127, `tpdo` 0..7, `offset` 0..7. Document it with the user migration
   (`configuration.md`, "RPDO schema"). Tests: `test_rpdo_plan_raw*` in `test/test_mapper_remote.py`,
-  `test_codegen_raw_rpdo` / `test_invalid_raw_rpdo` in `test/test_entity_mapper.py`. Not on hardware yet.
+  `test_codegen_raw_rpdo` / `test_invalid_raw_rpdo` in `test/test_canopen_entities.py`. Not on hardware yet.
 - `template_entities` (custom OD entries with typed command triggers, states, metadata);
 - `canopen.entity_cmd` (a command to another node's entity, on `write_sdo` or the OD writer frame);
 - `csdo:` and its lambda API (`setup_csdo`, `csdo_recv`, `csdo_send_*`): map onto the hub's SDO client; custom
   tx/rx IDs need the pinned channels (device_api_canopennode.md, "Open points");
-- user migration: YAML changes from one `canopen:` block to `canopen:` + `canopen_entity_mapper:`; update
+- user migration: YAML changes from one `canopen:` block to `canopen:` + `canopen_entities:`; update
   `configuration.md` / `linking-nodes.md`;
 - until the hub is merged, where the mapper gets the hub from (the esphome fork branch as an external component, or
   `components_next` here).
 
 ## Size comparison with the old component (2026-10-31)
-Compile-only, equivalent configs: old `components/canopen` vs the hub (`canopen-next`) + `canopen_entity_mapper`, and a
+Compile-only, equivalent configs: old `components/canopen` vs the hub (`canopen-next`) + `canopen_entities`, and a
 baseline without CANopen **and without OTA** (so both deltas include the platform's OTA backend).
 - ESP8266 (d1_mini + mcp2515) and ESP32-C3 (esp-idf), upstream venv: the `test/esp8266_mapper.yaml` content (3
   entities, `remote_nodes`, one `rpdo` link, `remote_logs: {}`, two remote actions, a `platform: canopen` /
-  `canopen_entity_mapper` text sensor, OTA); old with `sdo_block_transfer_size: 16` (= the mapper's default).
+  `canopen_entities` text sensor, OTA); old with `sdo_block_transfer_size: 16` (= the mapper's default).
 - STM32L4 (Zephyr, fork venv): `test/stm32l4_biuro_switch.yaml` (no entities, dimmer4 remote, `remote_logs` DEBUG /
   block 16, block size 60, MCUboot OTA, `safe_mode`); old with `entities: []`, `sdo_block_transfer_size: 60`.
 

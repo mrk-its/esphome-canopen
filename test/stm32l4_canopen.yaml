@@ -10,7 +10,7 @@ external_components:
     components: [canopen]
   # entity mapper (step 7)
   - source: ../components_next
-    components: [canopen_entity_mapper]
+    components: [canopen_entities]
   # profile API hardware test (canopen_test_profile below)
   - source: external
 
@@ -250,7 +250,7 @@ script:
 #       - output.turn_off: led_output
 
 sensor:
-  - platform: canopen_entity_mapper
+  - platform: canopen_entities
     id: biuro_brightness
     name: "Biuro brightness (remote)"
     node: dimmer4
@@ -360,7 +360,7 @@ interval:
 # entity mapper (step 7): exposed to can2mqtt (ESPHome identity, entity layout, TPDOs)
 binary_sensor:
   # remote states of dimmer4 light5 (biuro), from a remote state slot
-  - platform: canopen_entity_mapper
+  - platform: canopen_entities
     id: biuro_state
     name: "Biuro (remote)"
     node: dimmer4
@@ -373,7 +373,7 @@ binary_sensor:
     id: test_binary
     name: "Test binary"
 
-canopen_entity_mapper:
+canopen_entities:
   id: mapper
   canopen_id: can_gate
   # links to other nodes (docs/linking-nodes.md): dimmer4 is a real node on the bus (old component)
@@ -452,7 +452,7 @@ alarm_control_panel:
     name: "Test alarm"
 
 text_sensor:
-  - platform: canopen_entity_mapper
+  - platform: canopen_entities
     id: biuro_text
     node: dimmer4
     entity: light5

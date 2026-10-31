@@ -1,10 +1,10 @@
-"""Remote CANopen nodes, described by their own ESPHome YAML (`canopen_entity_mapper: remote_nodes:`).
+"""Remote CANopen nodes, described by their own ESPHome YAML (`canopen_entities: remote_nodes:`).
 
 The remote YAML is not validated: only the pre-validation passes ESPHome runs
 (packages, substitutions, !extend / !remove) are applied, then its node id and
 exposed entities and the configs of those entities are read raw. That is enough
 for layout.py to compute the remote node's TPDO layout. Two formats: a node on
-the canopen hub (`canopen: node_id` + `canopen_entity_mapper: entities`) and a
+the canopen hub (`canopen: node_id` + `canopen_entities: entities`) and a
 node on the old canopen-stack component (`canopen: node_id, entities`).
 
 Also the RPDO plan of a node (rpdo_plan()): ESPHome-free, for the tests.
@@ -128,7 +128,7 @@ def _normalize_node_config(canopen):
     return canopen
 
 
-MAPPER_KEY = "canopen_entity_mapper"
+MAPPER_KEY = "canopen_entities"
 
 
 def _single(config, key, path):

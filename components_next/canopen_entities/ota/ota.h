@@ -10,9 +10,9 @@
 #include "miniz.h"
 #endif
 
-namespace esphome::canopen_entity_mapper {
+namespace esphome::canopen_entities {
 
-// CAN OTA (`ota: - platform: canopen_entity_mapper`): firmware download into OD 0x3000 by SDO block transfer, as
+// CAN OTA (`ota: - platform: canopen_entities`): firmware download into OD 0x3000 by SDO block transfer, as
 // can2mqtt's firmware_upload() does it (OBJECT_DICTIONARY.md):
 //   :1 command (ignored), :2 image size, :3 MD5 (16 bytes, of the uncompressed image), :4 image data (domain),
 //   :5 flags (bit 0: the node expects zlib-compressed data)
@@ -65,4 +65,4 @@ class CanopenOTAComponent : public ota::OTAComponent, public canopen::OdObject {
 #endif
 };
 
-}  // namespace esphome::canopen_entity_mapper
+}  // namespace esphome::canopen_entities

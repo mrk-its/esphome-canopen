@@ -6,7 +6,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/progmem.h"
 
-namespace esphome::canopen_entity_mapper {
+namespace esphome::canopen_entities {
 
 static constexpr char DROP_MARKER_PREFIX[] = "[W][canopen.logs]: ";
 static constexpr char DROP_MARKER_SUFFIX[] = " messages dropped";
@@ -102,4 +102,4 @@ size_t LogBuffer::read(uint8_t *out, size_t count) {
   return n;
 }
 
-}  // namespace esphome::canopen_entity_mapper
+}  // namespace esphome::canopen_entities

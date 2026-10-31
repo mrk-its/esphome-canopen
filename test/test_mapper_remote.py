@@ -1,4 +1,4 @@
-"""Tests for components_next/canopen_entity_mapper/remote.py (run: pytest test/, needs ESPHome for the YAML loader).
+"""Tests for components_next/canopen_entities/remote.py (run: pytest test/, needs ESPHome for the YAML loader).
 
 The modules are loaded without the package __init__.py, which needs the upstream canopen hub.
 """
@@ -13,7 +13,7 @@ pytest.importorskip("esphome")
 
 TEST_DIR = Path(__file__).parent
 _pkg = types.ModuleType("mapper_pkg")
-_pkg.__path__ = [str(TEST_DIR.parent / "components_next" / "canopen_entity_mapper")]
+_pkg.__path__ = [str(TEST_DIR.parent / "components_next" / "canopen_entities")]
 sys.modules["mapper_pkg"] = _pkg
 
 from mapper_pkg import layout, remote  # noqa: E402
@@ -27,7 +27,7 @@ def old_node():
 
 @pytest.fixture
 def new_node():
-    """The same entities on the canopen hub + canopen_entity_mapper, node 0x38, OD writer off."""
+    """The same entities on the canopen hub + canopen_entities, node 0x38, OD writer off."""
     return remote.get_remote_node("dimmer2", TEST_DIR / "mapper" / "remote_node_mapper.yaml")
 
 
@@ -42,7 +42,7 @@ def test_both_formats(old_node, new_node):
 
 def test_node_section_errors(tmp_path):
     with pytest.raises(remote.RemoteError, match="no 'canopen:' section"):
-        remote.node_section({"canopen_entity_mapper": {"entities": []}}, "x.yaml")
+        remote.node_section({"canopen_entities": {"entities": []}}, "x.yaml")
     with pytest.raises(remote.RemoteError, match="exactly one 'canopen:'"):
         remote.node_section({"canopen": [{"node_id": 1}, {"node_id": 2}]}, "x.yaml")
     node, od_writer = remote.node_section({"canopen": {"node_id": 5, "pdo_od_writer": "false"}}, "x.yaml")

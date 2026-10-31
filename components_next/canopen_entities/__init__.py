@@ -3,7 +3,7 @@
 Sits on top of the `canopen` hub (`canopen_id`): entity metadata, states and commands at 0x2000 + 16 * N, TPDOs
 computed by layout.py, the layout hash at 0x3002, the ESPHome identity can2mqtt checks, the OD writer, and links to
 other nodes (`remote_nodes`, docs/linking-nodes.md): remote state slots at 0x4000 + n and entity commands filled by
-RPDOs from the other nodes' TPDOs, `platform: canopen_entity_mapper` entities and `canopen.<domain>.<action>` actions.
+RPDOs from the other nodes' TPDOs, `platform: canopen_entities` entities and `canopen.<domain>.<action>` actions.
 """
 
 from collections.abc import Iterable
@@ -53,10 +53,10 @@ CONF_NODE = "node"
 CONF_ENTITY = "entity"
 CONF_CMD = "cmd"
 CONF_TPDO_SIZE = "tpdo_size"
-CONF_MAPPER_ID = "canopen_entity_mapper_id"
+CONF_MAPPER_ID = "canopen_entities_id"
 CONF_REMOTE_LOGS = "remote_logs"
 CONF_BLOCK_SIZE = "block_size"
-# remote state (node, entity, state) a `platform: canopen_entity_mapper` entity or a toggle action reads, set by
+# remote state (node, entity, state) a `platform: canopen_entities` entity or a toggle action reads, set by
 # their validation; collected from the whole validated config by remote_state_slots()
 CONF_REMOTE_STATE = "_canopen_remote_state"
 # the OD writer listens on 0x500..0x57F, which are the TPDO 7 COB-IDs (0x500 + node) of all nodes
@@ -74,8 +74,8 @@ DEFAULT_SDO_BLOCK_SIZE = 16
 DEFAULT_LOG_BLOCK_SIZE = 3
 LOG_TIMEOUT_NEVER = "never"
 
-ns = cg.esphome_ns.namespace("canopen_entity_mapper")
-EntityMapper = ns.class_("EntityMapper", cg.Component)
+ns = cg.esphome_ns.namespace("canopen_entities")
+CANopenEntities = ns.class_("CANopenEntities", cg.Component)
 RemoteCommandAction = ns.class_("RemoteCommandAction", automation.Action)
 RemoteLogs = ns.class_("RemoteLogs", cg.Component)
 
@@ -227,7 +227,7 @@ def validate_od_writer_tpdo(config: ConfigType) -> ConfigType:
 CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
-            cv.GenerateID(): cv.declare_id(EntityMapper),
+            cv.GenerateID(): cv.declare_id(CANopenEntities),
             cv.GenerateID(canopen.CONF_CANOPEN_ID): cv.use_id(canopen.CANopenComponent),
             cv.Optional(CONF_ENTITIES, default=[]): cv.ensure_list(ENTITY_SCHEMA),
             # node-to-node commands (OBJECT_DICTIONARY.md "OD writer"); reserves TPDO 7
@@ -404,7 +404,7 @@ def validate_rpdo_sizes(
 def validate_remote_entities(
     full_config: fv.FinalValidateConfig, config: ConfigType
 ) -> None:
-    """`platform: canopen_entity_mapper` entities may be exposed (for debugging), but get their state from a slot."""
+    """`platform: canopen_entities` entities may be exposed (for debugging), but get their state from a slot."""
     remote_ids = {
         str(declared_id.id)
         for declared_id, _ in full_config.declare_ids
@@ -521,7 +521,7 @@ async def to_code(config: ConfigType) -> None:
     cg.add(hub.set_software_version(cg.RawExpression(f"version_str_{node_id} + 18")))
 
     # the mapper keeps its entities in a StaticVector of this size
-    cg.add_define("CANOPEN_ENTITY_MAPPER_ENTITIES", max(1, len(config[CONF_ENTITIES])))
+    cg.add_define("CANOPEN_ENTITIES_ENTITIES", max(1, len(config[CONF_ENTITIES])))
     var = cg.new_Pvariable(config[CONF_ID], hub)
     await cg.register_component(var, config)
     cg.add(var.set_node_id(node_id))
@@ -577,7 +577,7 @@ async def to_code(config: ConfigType) -> None:
     # remote state slots and the RPDOs from the remote nodes' TPDOs (slots and entity `rpdo:`)
     slots = resolve_remote_slots(CORE.config, config)
     if slots:
-        cg.add_define("CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS", len(slots))
+        cg.add_define("CANOPEN_ENTITIES_REMOTE_SLOTS", len(slots))
     for n, state in slots:
         _LOGGER.info(
             "CANopen node 0x%02x remote state slot %d (0x%04x): %s %s.%s",
@@ -616,8 +616,8 @@ async def remote_logs_to_code(
     # Log Data uploads are block uploads; their block size is the client's (0x3100:7), not the hub's download cap
     enable_sdo_block(canopen_id)
     request_log_listener()
-    cg.add_define("USE_CANOPEN_ENTITY_MAPPER_LOGS")
-    cg.add_define("CANOPEN_ENTITY_MAPPER_LOG_BUFFER_SIZE", config[CONF_BUFFER_SIZE])
+    cg.add_define("USE_CANOPEN_ENTITIES_LOGS")
+    cg.add_define("CANOPEN_ENTITIES_LOG_BUFFER_SIZE", config[CONF_BUFFER_SIZE])
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     cg.add(var.set_default_level(LOG_LEVEL_SEVERITY.index(config[CONF_LEVEL])))
@@ -630,19 +630,19 @@ async def remote_logs_to_code(
     cg.add(var.start())
 
 
-# ---- links to other nodes: actions and `platform: canopen_entity_mapper` entities ----
+# ---- links to other nodes: actions and `platform: canopen_entities` entities ----
 
 
 def _raw_remote_node(node: str) -> remote.RemoteNode:
     """A remote node of the local raw config (packages and substitutions applied, not validated yet), available
     while actions and platforms are validated."""
-    mapper = (CORE.raw_config or {}).get("canopen_entity_mapper") or {}
+    mapper = (CORE.raw_config or {}).get("canopen_entities") or {}
     if isinstance(mapper, list):
         mapper = mapper[0] if mapper else {}
     return _remote_node(mapper.get(CONF_REMOTE_NODES) or {}, node)
 
 
-# RemoteCommandAction write encodings, see RemoteCmdEncoding in entity_mapper.h
+# RemoteCommandAction write encodings, see RemoteCmdEncoding in canopen_entities.h
 ENC_RAW = 0
 ENC_PERCENTAGE = 1
 ENC_COLOR_TEMP = 2
@@ -658,7 +658,7 @@ MAX_WRITES = 3
 
 REMOTE_ACTION_SCHEMA = cv.Schema(
     {
-        cv.GenerateID(): cv.use_id(EntityMapper),
+        cv.GenerateID(): cv.use_id(CANopenEntities),
         cv.Required(CONF_NODE): cv.string,
         cv.Exclusive(CONF_ENTITY, "remote_entity"): cv.string,
         cv.Exclusive(CONF_INDEX, "remote_entity"): cv.int_,
@@ -890,7 +890,7 @@ _remote_action(
 )
 
 
-# `platform: canopen_entity_mapper` binary_sensor / sensor / text_sensor (binary_sensor.py, ...)
+# `platform: canopen_entities` binary_sensor / sensor / text_sensor (binary_sensor.py, ...)
 RemoteBinarySensor = ns.class_(
     "RemoteBinarySensor",
     cg.esphome_ns.namespace("binary_sensor").class_("BinarySensor"),
@@ -905,7 +905,7 @@ REMOTE_ENTITY_CLASSES = (RemoteBinarySensor, RemoteSensor, RemoteTextSensor)
 
 REMOTE_STATE_SCHEMA = cv.Schema(
     {
-        cv.GenerateID(CONF_MAPPER_ID): cv.use_id(EntityMapper),
+        cv.GenerateID(CONF_MAPPER_ID): cv.use_id(CANopenEntities),
         cv.Required(CONF_NODE): cv.string,
         cv.Required(CONF_ENTITY): cv.string,
         cv.Optional(CONF_STATE): cv.string,
@@ -914,7 +914,7 @@ REMOTE_STATE_SCHEMA = cv.Schema(
 
 
 def validate_remote_state(platform: str, kinds: list[str]):
-    """Resolve the remote state of a `platform: canopen_entity_mapper` entity and check its kind."""
+    """Resolve the remote state of a `platform: canopen_entities` entity and check its kind."""
 
     def validator(config: ConfigType) -> ConfigType:
         node = _raw_remote_node(config[CONF_NODE])
@@ -938,7 +938,7 @@ def validate_remote_state(platform: str, kinds: list[str]):
 
 
 async def attach_remote_state(var: MockObj, config: ConfigType) -> None:
-    """Subscribe a `platform: canopen_entity_mapper` entity to its remote state slot."""
+    """Subscribe a `platform: canopen_entities` entity to its remote state slot."""
     mapper = await cg.get_variable(config[CONF_MAPPER_ID])
     n = remote_state_slot(CORE.config, config[CONF_REMOTE_STATE])
     state = config["_remote"]

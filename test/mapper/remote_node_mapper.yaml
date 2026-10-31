@@ -1,4 +1,4 @@
-# remote_node.yaml in the canopen hub + canopen_entity_mapper format (test_mapper_remote.py, test_entity_mapper.py),
+# remote_node.yaml in the canopen hub + canopen_entities format (test_mapper_remote.py, test_canopen_entities.py),
 # with the OD writer off. Only read (not built): its TPDO layout is computed from this file.
 substitutions:
   dimmer_node_id: "0x38"
@@ -26,7 +26,7 @@ canopen:
   canbus_id: can_bus
   node_id: ${dimmer_node_id}
 
-canopen_entity_mapper:
+canopen_entities:
   od_writer: false
   entities:
     - index: 1

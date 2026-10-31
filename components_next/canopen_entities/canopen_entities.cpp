@@ -1,4 +1,4 @@
-#include "entity_mapper.h"
+#include "canopen_entities.h"
 
 #include <algorithm>
 #include <cmath>
@@ -8,9 +8,9 @@
 #include "esphome/core/log.h"
 #include "esphome/core/progmem.h"
 
-namespace esphome::canopen_entity_mapper {
+namespace esphome::canopen_entities {
 
-ESPHOME_LOG_TAG(TAG, "canopen_entity_mapper");
+ESPHOME_LOG_TAG(TAG, "canopen_entities");
 
 using canopen::OD_READ;
 using canopen::OD_RPDO;
@@ -241,7 +241,7 @@ void MappedEntity::set_state(uint8_t sub, uint32_t value) {
   this->hub_->request_tpdo(this->states_index(), sub);
 }
 
-MappedEntity *EntityMapper::add_entity_(EntityBase *entity, uint8_t index, uint32_t type) {
+MappedEntity *CANopenEntities::add_entity_(EntityBase *entity, uint8_t index, uint32_t type) {
   if (this->entities_.size() == this->entities_.capacity()) {
     ESP_LOGE(TAG, "Entity %u: no room", index);
     return nullptr;
@@ -254,7 +254,7 @@ MappedEntity *EntityMapper::add_entity_(EntityBase *entity, uint8_t index, uint3
 }
 
 #ifdef USE_SENSOR
-void EntityMapper::add_sensor(sensor::Sensor *sensor, uint8_t index, uint8_t size, float min_value,
+void CANopenEntities::add_sensor(sensor::Sensor *sensor, uint8_t index, uint8_t size, float min_value,
                               float max_value) {
   uint32_t type = size == 1   ? ENTITY_TYPE_SENSOR_UINT8
                   : size == 2 ? ENTITY_TYPE_SENSOR_UINT16
@@ -272,7 +272,7 @@ void EntityMapper::add_sensor(sensor::Sensor *sensor, uint8_t index, uint8_t siz
 #endif
 
 #ifdef USE_BINARY_SENSOR
-void EntityMapper::add_binary_sensor(binary_sensor::BinarySensor *sensor, uint8_t index) {
+void CANopenEntities::add_binary_sensor(binary_sensor::BinarySensor *sensor, uint8_t index) {
   MappedEntity *entity = this->add_entity_(sensor, index, ENTITY_TYPE_BINARY_SENSOR);
   if (entity == nullptr)
     return;
@@ -282,7 +282,7 @@ void EntityMapper::add_binary_sensor(binary_sensor::BinarySensor *sensor, uint8_
 #endif
 
 #ifdef USE_NUMBER
-void EntityMapper::add_number(number::Number *number, uint8_t index, uint8_t size, float min_value,
+void CANopenEntities::add_number(number::Number *number, uint8_t index, uint8_t size, float min_value,
                               float max_value) {
   uint32_t type = size == 1   ? ENTITY_TYPE_NUMBER_UINT8
                   : size == 2 ? ENTITY_TYPE_NUMBER_UINT16
@@ -299,7 +299,7 @@ void EntityMapper::add_number(number::Number *number, uint8_t index, uint8_t siz
 #endif
 
 #ifdef USE_SWITCH
-void EntityMapper::add_switch(switch_::Switch *sw, uint8_t index) {
+void CANopenEntities::add_switch(switch_::Switch *sw, uint8_t index) {
   MappedEntity *entity = this->add_entity_(sw, index, ENTITY_TYPE_SWITCH);
   if (entity == nullptr)
     return;
@@ -309,7 +309,7 @@ void EntityMapper::add_switch(switch_::Switch *sw, uint8_t index) {
 #endif
 
 #ifdef USE_LIGHT
-void EntityMapper::add_light(light::LightState *light, uint8_t index, uint32_t caps) {
+void CANopenEntities::add_light(light::LightState *light, uint8_t index, uint32_t caps) {
   // version 1: caps in bits 16..23
   MappedEntity *entity = this->add_entity_(light, index, ENTITY_TYPE_LIGHT | (1 << 8) | (caps << 16));
   if (entity == nullptr)
@@ -370,7 +370,7 @@ static uint32_t cover_state(cover::Cover *cover) {
   }
 }
 
-void EntityMapper::add_cover(cover::Cover *cover, uint8_t index, uint32_t caps) {
+void CANopenEntities::add_cover(cover::Cover *cover, uint8_t index, uint32_t caps) {
   MappedEntity *entity = this->add_entity_(cover, index, ENTITY_TYPE_COVER | (1 << 8) | (caps << 16));
   if (entity == nullptr)
     return;
@@ -424,7 +424,7 @@ void MappedEntity::cover_command_(uint8_t sub, uint32_t value) {
 #endif
 
 #ifdef USE_ALARM_CONTROL_PANEL
-void EntityMapper::add_alarm(alarm_control_panel::AlarmControlPanel *alarm, uint8_t index) {
+void CANopenEntities::add_alarm(alarm_control_panel::AlarmControlPanel *alarm, uint8_t index) {
   MappedEntity *entity = this->add_entity_(alarm, index, ENTITY_TYPE_ALARM);
   if (entity == nullptr)
     return;
@@ -464,7 +464,7 @@ void MappedEntity::alarm_command_(uint32_t value) {
 }
 #endif
 
-bool EntityMapper::send_od_write(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size) {
+bool CANopenEntities::send_od_write(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size) {
   if (size == 0 || size > 4 || node_id == 0 || node_id > 127)
     return false;
   uint8_t data[8] = {node_id, sub, uint8_t(index), uint8_t(index >> 8),
@@ -474,7 +474,7 @@ bool EntityMapper::send_od_write(uint8_t node_id, uint16_t index, uint8_t sub, u
   return this->hub_->send_frame(OD_WRITER_COB_ID + node_id, data, 4 + size);
 }
 
-void EntityMapper::handle_od_writer_frame(const uint8_t *data, uint8_t len) {
+void CANopenEntities::handle_od_writer_frame(const uint8_t *data, uint8_t len) {
   if (len < 5 || data[0] != this->node_id_)
     return;
   uint8_t sub = data[1];
@@ -505,11 +505,11 @@ uint32_t encode_remote_cmd(uint8_t encoding, float value, uint8_t size, float mi
   }
 }
 
-void EntityMapper::setup() {
+void CANopenEntities::setup() {
   if (this->od_writer_)
     this->hub_->add_frame_listener(OD_WRITER_COB_ID, 0x780, on_od_writer_frame, this);
   auto &od = this->hub_->get_od();
-#ifdef CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS
+#ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
   for (size_t n = 0; n < this->slots_.size(); n++) {
     RemoteSlot &slot = this->slots_[n];
     uint16_t index = remote_slot_index(n);
@@ -529,11 +529,11 @@ void EntityMapper::setup() {
   od.add_record(0x3002, {{0, OD_READ, &this->layout_highest_, 1}, {1, OD_READ, &this->layout_hash_, 4}});
 }
 
-void EntityMapper::dump_config() {
-  ESP_LOGCONFIG(TAG, "ESPHome entity mapper:");
+void CANopenEntities::dump_config() {
+  ESP_LOGCONFIG(TAG, "CANopen entities:");
   ESP_LOGCONFIG(TAG, "  TPDO layout hash: %08" PRIx32, this->layout_hash_);
   ESP_LOGCONFIG(TAG, "  OD writer: %s", YESNO(this->od_writer_));
-#ifdef CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS
+#ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
   for (size_t n = 0; n < this->slots_.size(); n++)
     ESP_LOGCONFIG(TAG, "  Remote state slot %u (0x%04x): %u B", (unsigned) n, remote_slot_index(n), this->slots_[n].size);
 #endif
@@ -542,4 +542,4 @@ void EntityMapper::dump_config() {
   }
 }
 
-}  // namespace esphome::canopen_entity_mapper
+}  // namespace esphome::canopen_entities

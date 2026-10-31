@@ -1,4 +1,4 @@
-"""Tests for components_next/canopen_entity_mapper (run: pytest test/).
+"""Tests for components_next/canopen_entities (run: pytest test/).
 
 Codegen and validation go through the ESPHome CLI of the upstream venv (`esphome compile --only-generate`,
 `esphome config`), with the canopen hub from an upstream checkout (branch canopen-next) as a local external
@@ -17,7 +17,7 @@ import pytest
 import yaml
 
 REPO = Path(__file__).parent.parent
-MAPPER = REPO / "components_next" / "canopen_entity_mapper"
+MAPPER = REPO / "components_next" / "canopen_entities"
 VENV = Path(os.environ.get("ESPHOME_UPSTREAM_VENV", Path.home() / "repos" / "esphome-upstream-venv"))
 HUB = Path(os.environ.get("ESPHOME_CANOPEN_HUB", Path.home() / "repos" / "esphome" / "esphome" / "components"))
 ESPHOME = VENV / "bin" / "esphome"
@@ -38,7 +38,7 @@ external_components:
   - source: {{type: local, path: {HUB}}}
     components: [canopen]
   - source: {{type: local, path: {REPO / "components_next"}}}
-    components: [canopen_entity_mapper]
+    components: [canopen_entities]
 esphome:
   name: mapper-test
 esp8266:
@@ -87,7 +87,7 @@ ENTITIES = [
 def write_config(tmp_path: Path, entities: list, extra: dict | None = None, **options) -> Path:
     """BASE with the mapper (entities, options) and `extra` merged in (lists are extended)."""
     config = yaml.safe_load(BASE)
-    config["canopen_entity_mapper"] = {"canopen_id": "can_hub", "entities": entities, **options}
+    config["canopen_entities"] = {"canopen_id": "can_hub", "entities": entities, **options}
     for key, value in (extra or {}).items():
         if isinstance(value, list):
             config[key] = config.get(key, []) + value
@@ -178,7 +178,7 @@ def test_codegen(tmp_path):
     positions = [main_cpp.index(f"{mapper}{call};") for call in calls]
     assert positions == sorted(positions)
     # the entity StaticVector
-    assert "#define CANOPEN_ENTITY_MAPPER_ENTITIES 8" in defines
+    assert "#define CANOPEN_ENTITIES_ENTITIES 8" in defines
     # the hub's node id, the OD writer on by default
     assert f"{mapper}set_node_id({NODE_ID});" in main_cpp
     assert f"{mapper}enable_od_writer();" in main_cpp
@@ -199,7 +199,7 @@ def test_codegen_no_entities(tmp_path):
     for tpdo in range(layout.TPDO_COUNT):
         assert f"can_hub->configure_tpdo({tpdo}, {layout.tpdo_cob_id(tpdo, NODE_ID)}, {{}});" in main_cpp
     assert "->add_" not in main_cpp.split("set_layout_hash")[1]
-    assert "#define CANOPEN_ENTITY_MAPPER_ENTITIES 1" in defines
+    assert "#define CANOPEN_ENTITIES_ENTITIES 1" in defines
 
 
 @needs_esphome
@@ -249,13 +249,13 @@ def test_invalid(tmp_path, entities, message):
 REMOTE_NODES = {
     # old component (canopen: entities), node 0x36, OD writer on
     "dimmer": str(REPO / "test" / "remote_node.yaml"),
-    # canopen hub + canopen_entity_mapper, node 0x38, OD writer off
+    # canopen hub + canopen_entities, node 0x38, OD writer off
     "dimmer2": str(REPO / "test" / "mapper" / "remote_node_mapper.yaml"),
 }
 
 
 def remote_entity(platform: str, entity_id: str, node: str, entity: str, state: str | None = None) -> dict:
-    conf = {"platform": "canopen_entity_mapper", "id": entity_id, "node": node, "entity": entity}
+    conf = {"platform": "canopen_entities", "id": entity_id, "node": node, "entity": entity}
     if state is not None:
         conf["state"] = state
     return {platform: [conf]}
@@ -282,7 +282,7 @@ def test_codegen_remote(tmp_path):
     mapper = re.search(r"(\w+)->set_layout_hash\(", main_cpp).group(1)
 
     # slots sorted by (node, entity, state): cover_hall.state, light_hall.state, light_table.brightness
-    assert "#define CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS 3" in defines
+    assert "#define CANOPEN_ENTITIES_REMOTE_SLOTS 3" in defines
     for n in range(3):
         assert f"{mapper}->add_remote_state({n}, 1);" in main_cpp
     assert f"cover_text->attach({mapper}, 0, 3, 1, 0.0f, 0.0f);" in main_cpp  # kind 3: cover state
@@ -428,11 +428,11 @@ def test_invalid_remote(tmp_path, entities, extra, message):
 def test_codegen_remote_logs(tmp_path: Path) -> None:
     remote_logs = {"level": "DEBUG", "timeout": "never", "block_size": 8, "buffer_size": 1024}
     main_cpp, defines = generate(tmp_path, ENTITIES, {"logger": {}}, remote_logs=remote_logs)
-    assert "#define USE_CANOPEN_ENTITY_MAPPER_LOGS" in defines
-    assert "#define CANOPEN_ENTITY_MAPPER_LOG_BUFFER_SIZE 1024" in defines
+    assert "#define USE_CANOPEN_ENTITIES_LOGS" in defines
+    assert "#define CANOPEN_ENTITIES_LOG_BUFFER_SIZE 1024" in defines
     # block transfer for the uploads, the default download cap (the hub has no sdo_block_size)
     assert "#define CANOPEN_SDO_BLOCK_SIZE 16" in defines
-    logs = re.search(r"new\((\w+)\) canopen_entity_mapper::RemoteLogs\(\);", main_cpp).group(1)
+    logs = re.search(r"new\((\w+)\) canopen_entities::RemoteLogs\(\);", main_cpp).group(1)
     assert f"{logs}->set_default_level(5);" in main_cpp  # DEBUG
     assert f"{logs}->set_timeout(" not in main_cpp  # never: 0
     assert f"{logs}->set_block_size(8);" in main_cpp

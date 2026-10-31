@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace esphome::canopen_entity_mapper {
+namespace esphome::canopen_entities {
 
 static const char *const COVER_STATES[] = {"open", "opening", "closed", "closing"};
 static const char *const ALARM_STATES[] = {
@@ -45,14 +45,14 @@ const char *RemoteStateFormat::name(uint32_t raw) const {
 }
 
 #ifdef USE_BINARY_SENSOR
-void RemoteBinarySensor::attach(EntityMapper *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value,
+void RemoteBinarySensor::attach(CANopenEntities *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value,
                                 float max_value) {
   mapper->add_remote_state_listener(slot, [this](uint32_t raw) { this->publish_state(raw != 0); });
 }
 #endif
 
 #ifdef USE_SENSOR
-void RemoteSensor::attach(EntityMapper *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value,
+void RemoteSensor::attach(CANopenEntities *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value,
                           float max_value) {
   this->format_ = {kind, size, min_value, max_value};
   mapper->add_remote_state_listener(slot, [this](uint32_t raw) { this->publish_state(this->format_.decode(raw)); });
@@ -60,7 +60,7 @@ void RemoteSensor::attach(EntityMapper *mapper, uint8_t slot, uint8_t kind, uint
 #endif
 
 #ifdef USE_TEXT_SENSOR
-void RemoteTextSensor::attach(EntityMapper *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value,
+void RemoteTextSensor::attach(CANopenEntities *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value,
                               float max_value) {
   this->format_ = {kind, size, min_value, max_value};
   mapper->add_remote_state_listener(slot, [this](uint32_t raw) { this->publish_raw_(raw); });
@@ -78,4 +78,4 @@ void RemoteTextSensor::publish_raw_(uint32_t raw) {
 }
 #endif
 
-}  // namespace esphome::canopen_entity_mapper
+}  // namespace esphome::canopen_entities

@@ -1,4 +1,4 @@
-"""`sensor: - platform: canopen_entity_mapper`: state of a remote node's entity, see remote_state_slots().
+"""`sensor: - platform: canopen_entities`: state of a remote node's entity, see remote_state_slots().
 
 Booleans are 0 / 1, percentages 0..1, color temperatures in mireds, cover / alarm
 states their codes (OBJECT_DICTIONARY.md), sensor / number values decoded.
@@ -16,7 +16,7 @@ from . import (
     validate_remote_state,
 )
 
-DEPENDENCIES = ["canopen_entity_mapper"]
+DEPENDENCIES = ["canopen_entities"]
 
 CONFIG_SCHEMA = cv.All(
     sensor.sensor_schema(RemoteSensor).extend(REMOTE_STATE_SCHEMA),

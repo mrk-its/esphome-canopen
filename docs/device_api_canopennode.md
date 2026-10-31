@@ -24,7 +24,7 @@ Decisions taken (with the user, 2026-10-29):
   (its own step, after this one).
 - The remote states (`platform: canopen` entities reading other esphome-canopen nodes, `0x4000+n` slots,
   `canopen.<domain>.<action>`) aren't part of the `canopen` hub; they move to the entity mapper
-  (`canopen_entity_mapper`, decision 2026-10-30). No SDO-polled sensor for now.
+  (`canopen_entities`, decision 2026-10-30). No SDO-polled sensor for now.
 - This step comes before the SDO server step ([sdo_server_canopennode.md](sdo_server_canopennode.md), now step 3);
   it's tested against node 0x01 on the bus, no host bridge needed.
 
