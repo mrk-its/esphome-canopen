@@ -451,8 +451,17 @@ What the hub still lacks for that (checked against `components_next`, 2026-10-30
      (`CO_xPDO_DEFAULT_CANID_COUNT = 4`). The old component's TPDO 4-7 on 0x200/0x300/0x400/0x500 + node (the RPDO
      defaults) work as full COB-IDs; SDO writes to them are allowed (not restricted IDs).
 5. **Store/restore** (0x1010/0x1011 "save"/"load" into preferences): the host changes the RPDO config and it must
-   survive a reboot. An upstream hub uses its own preferences key, so saved configs (`canopen_comm_state_v2`) are lost
-   unless the mapper migrates them (to decide).
+   survive a reboot. **Done, PR 10** (2026-10-31, `canopen-next`): CANopenNode's `CO_storage` (`CO_CONFIG_STORAGE`
+   from `enable_pdo()`) with one entry, the PDO parameters (RPDO and TPDO records), on 0x1010 / 0x1011 sub 1 (all)
+   and 2 (communication); only with PDOs and preferences. "save" stores the records as they are (`PdoParams` vectors
+   as bytes) plus a validity marker, then `sync()`; boot loads them before the PDO init (into copies: a failed load
+   keeps the defaults); "load" clears only the marker (the defaults apply from the next boot, CiA 301; the old
+   component's `global_preferences->reset()` wiped every component's preferences). The preference key hashes the
+   codegen defaults and the node id, so a firmware with other PDO defaults ignores a stored set. All platforms (the
+   old component: ESP32 only). Old saved configs (`canopen_comm_state_v2`) are not migrated: the host saves again.
+   Tests: gtest `tests/components/canopen/storage_test.cpp` (save, reboot, wrong signature, restore, sub 1, other
+   defaults); builds ESP8266, ESP32-C3 (esp-idf), Zephyr; nucleo: save survives a reset, restore brings the defaults
+   back after one (TPDO 6 event timer, temporary test interval).
 6. **Own NMT state.** **Done, PR 8**: `get_nmt_state()`, `set_nmt_state()` (no NMT master needed),
    `on_nmt_state_change`, `nmt_startup: operational | pre_operational` (default operational). Tracked in `process_()`
    (CANopenNode's change callback has no context pointer).
@@ -470,7 +479,13 @@ What the hub still lacks for that (checked against `components_next`, 2026-10-30
    nodes on the same canbus; was step 8).
 9. **Codegen hooks:** `enable_sdo_server()`, `enable_pdo(tpdo=N, rpdo=M)`, and a defined point where other
    components add OD entries before the hub's `setup()` (from codegen / constructors, or a setup priority above
-   `PROCESSOR`).
+   `PROCESSOR`). **Done** (2026-10-31, `canopen-next`, a comment on `CANopenComponent` in `canopen.h`, to fold into
+   PR 8): no `enable_sdo_server()` (the server is always on, PR 7) and no PDO counts in codegen (`enable_pdo()`
+   only compiles the PDO code; the records follow the `configure_*()` calls at runtime). The contract: build-time
+   parts by the `enable_*()` codegen helpers; OD entries / handlers, `configure_tpdo/rpdo()`, `monitor_node()`,
+   identity from codegen setters (run in `main()` before `App.setup()`; OTA, remote logs) or from a `setup()` with
+   priority above `PROCESSOR` (the mapper: `PROCESSOR + 1`); later calls log an error and are ignored (already
+   in the code, `CanopenOD.AfterFinalize` tests the OD side).
 
 Not needed in the hub: raw frames and monitoring exist already (OD writer = frame listener, remote commands =
 `send_frame()` / `write_sdo()`, `monitor_node()`); ESP32 TWAI alerts / bus-off recovery / `get_can_status` belong in
@@ -484,7 +499,7 @@ Upstream PRs for it (estimates, not measured; independent of PRs 4-6, could go b
 | 7 | SDO server, device info / identity, `add_string()`; done, `canopen-next` ([sdo_server_canopennode.md](sdo_server_canopennode.md)) | ~100 (tests ~85) |
 | 8 | public OD API, `OdObject` handlers, `write_od()`, own NMT state and `nmt_startup`; done, `canopen-next` | ~240 (tests ~115) |
 | 9 | own PDOs (records, init, processing, `request_tpdo()`); done, `canopen-next` | ~170 (tests ~165) |
-| 10 | 0x1010/0x1011 store/restore | ~200 |
+| 10 | 0x1010/0x1011 store/restore (PDO parameters, preferences); done, `canopen-next` | ~105 (tests ~110) |
 | 11 | loopback between local nodes | ~100 |
 | 12 | SDO server block transfer, `sdo_block_size`; done, `canopen-next` (the size cap needs the fork's patch upstream) | ~40 (tests ~150) |
 
