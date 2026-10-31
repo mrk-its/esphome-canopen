@@ -288,6 +288,8 @@ canopen:
   node_id: 0x7f
   heartbeat_interval: 1s
   hardware_version: nucleo_l476rg
+  # SDO server block transfer (CAN OTA, log uploads): rx_buffer_size 64 takes a whole block
+  sdo_block_size: 32
   # PR 8: start pre-operational, then switch ourselves to operational (no NMT master needed)
   nmt_startup: pre_operational
   on_nmt_state_change:

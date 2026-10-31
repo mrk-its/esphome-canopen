@@ -456,9 +456,16 @@ What the hub still lacks for that (checked against `components_next`, 2026-10-30
 6. **Own NMT state.** **Done, PR 8**: `get_nmt_state()`, `set_nmt_state()` (no NMT master needed),
    `on_nmt_state_change`, `nmt_startup: operational | pre_operational` (default operational). Tracked in `process_()`
    (CANopenNode's change callback has no context pointer).
-7. **SDO block size** (`sdo_block_transfer_size`, see "Block size"): needed for OTA and log uploads. Needs
-   `CO_CONFIG_SDO_SRV_BLKSIZE` in CANopenNode upstream first, then a hub option. Ideally also YAML sizes for the
-   server buffer (900) and client FIFO (1000).
+7. **SDO block size** (`sdo_block_transfer_size`, see "Block size"): needed for OTA and log uploads. **Done, PR 12**
+   (2026-10-31, `canopen-next`): hub option `sdo_block_size` (1..127, unset = segmented only, 32-byte buffer) and
+   codegen helper `enable_sdo_block(block_size)`: `CO_CONFIG_SDO_SRV` segmented | block, buffer 900 (CANopenNode's
+   minimum for block), `CO_CONFIG_SDO_SRV_BLKSIZE` (caps the announced download block size; needs the fork's patch,
+   upstream CANopenNode ignores it and announces up to 127), CRC16. Uploads use the client's block size (CANopenNode
+   doesn't cap them: remote logs' `block_size` is advertised in 0x3100:7 as before). Unit test: a hand-played block
+   download client on the fake canbus (announced size, 300 bytes in 3 blocks into a domain handler, CRC; a wrong CRC
+   aborts with 0x05040004). Zephyr: the flags reach `CO_SDOserver.c` (compile_commands). Not on hardware yet: comes
+   with OTA (can2mqtt uses block download only for firmware). Still open: YAML sizes for the server buffer and the
+   client FIFO.
 8. **Loopback between local nodes** in the driver (`CO_CANsend` and `send_frame()` deliver to the other `canopen:`
    nodes on the same canbus; was step 8).
 9. **Codegen hooks:** `enable_sdo_server()`, `enable_pdo(tpdo=N, rpdo=M)`, and a defined point where other
@@ -479,7 +486,7 @@ Upstream PRs for it (estimates, not measured; independent of PRs 4-6, could go b
 | 9 | own PDOs (records, init, processing, `request_tpdo()`); done, `canopen-next` | ~170 (tests ~165) |
 | 10 | 0x1010/0x1011 store/restore | ~200 |
 | 11 | loopback between local nodes | ~100 |
-| 12 | block size option (after a CANopenNode upstream PR) | ~30 |
+| 12 | SDO server block transfer, `sdo_block_size`; done, `canopen-next` (the size cap needs the fork's patch upstream) | ~40 (tests ~150) |
 
 PRs 7-9 are the minimum for the mapper against can2mqtt; 10-12 for full parity.
 
