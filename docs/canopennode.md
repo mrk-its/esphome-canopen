@@ -1,6 +1,9 @@
 # Porting esphome-canopen to CANopenNode
 
-Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_canopennode.md).
+Status (2026-10-31): the hub (upstream `canopen` component, CANopenNode) is done for the entity mapper (hub PRs 1-12
+on `canopen-next` in `~/repos/esphome`); `canopen_entity_mapper` is ported (this repo, branch `feature/entity-mapper`,
+see "Hub for the entity mapper"). **Next:** cut the upstream PRs again from the refactored hub, see "Upstream PRs",
+"New split" (branch `canopen-full`, refactor committed as `e9f738ebf7`).
 
 ## Goals
 - Replace canopen-stack (`cg.add_library("canopenstack", None, "https://github.com/mrk-its/canopen-stack#test")`)
@@ -17,6 +20,12 @@ Status: plan. The first step is detailed in [minimal_canopennode.md](minimal_can
   services use a stack-neutral API, but there is no runtime choice of backend.
 
 ## Current state (handoff)
+Where to continue (2026-10-31):
+- **Upstream split:** "Upstream PRs" -> "New split": what `canopen-full` changed, the file -> PR map, the line counts
+  (`scripts/pr_split_lines.py`), and the cutting steps.
+- **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
+
+The bullets below are the state of step 1 (2026-10-29), kept for the CANopenNode fork and port header details.
 - **esphome-canopen:**
   - branch `feature/canopennode`, created from `main` at `8696ae8`;
   - test config: `test/stm32l4_canopen.yaml`.
@@ -323,7 +332,126 @@ lines of production code, without tests/docs). All PRs target `dev`, so a chaine
 until the parent is merged (as #21533 does with #21522): the chain is reviewed serially, so the first PR should go
 out early and the next ones are prepared here meanwhile.
 
-Split (revised 2026-10-29: the first version of PR 1, ~1050 production lines, was too big for a first PR):
+### New split (2026-10-31, branch `canopen-full`) — current plan
+**Why.** The old split (tables further down) followed the order the work was done in: every PR edited the same
+functions (`setup()` mixed every feature, 7 `#ifdef` blocks), so a fix in one PR had to be rebased through all later
+ones. None of the old branches (`canopen-1-node` .. `canopen-4-profile`) was opened as an upstream PR (only pushed to
+mrk-its/esphome), so the split is redone from the finished tree: refactor the hub by feature first, so that each PR
+mostly *adds files and blocks*, then cut the PR branches from it.
+
+**Where.** `~/repos/esphome`, branch `canopen-full`, created from `canopen-next` (`21ab50897e`, hub PRs 1-12 in 17
+commits on `upstream/dev` `b155e4ba0b`), plus the refactor as one commit, `e9f738ebf7` "[canopen] Split the hub by
+feature" (2026-10-31, not pushed). `canopen-next` stays as it was;
+`components_next/canopen_entity_mapper` and the test configs here build against whatever is checked out in
+`~/repos/esphome` (`test/stm32l4_*.yaml`, `test/esp8266_mapper.yaml`), so `canopen-full` replaces `canopen-next` as
+the hub branch (check it out there for those builds).
+
+**The refactor** (no behaviour change; function bodies moved verbatim):
+- `setup()` in `canopen.cpp` is a fixed sequence of per-feature hooks: `add_*_od_()` (OD entries) -> `od.finalize()`
+  -> `config_*_(cfg)` (`CO_config_t` counts / entries) -> `CO_new` / `CO_CANinit` -> `init_pdo_storage_()` ->
+  `CO_CANopenInit` -> `init_*_()`. Optional features are `#ifdef USE_CANOPEN_*` around their hook calls. A PR adds
+  its file plus one hook call per phase.
+- `canopen.h` stays one class; its public and protected parts are grouped by feature under banners
+  `// --- <Feature> (<file>) ---` (members of optional features inside their `#ifdef`).
+- `receive_()` (driver) hands frames to CANopenNode, then to `dispatch_frame_()` (frames.cpp: listeners,
+  heartbeat / EMCY callbacks); the loopback is the `next_local_` loop in `transmit()`.
+- The OD handler API is split from the basic runtime OD: `od_handler.h` / `od_handler.cpp`; `ObjectDictionary` keeps
+  `set_object()`, `write()`, `set_extension_()` and the trampolines in `// --- Handlers ---` blocks, plus 5 extension
+  lines in `PendingEntry` / `finalize()` (PR 1 cut drops them: `extension` always 0, `ext` nullptr).
+- `to_nmt_state()` is no longer `static` (used by `node_monitor.cpp`).
+- Not split: `types.h` (one block per type, the PR 2 types are its last block), `__init__.py` (contiguous blocks;
+  the shared `CONFIG_SCHEMA` / `to_code()` / `_final_validate` get single lines per PR), `od_test.cpp`,
+  `loopback_test.cpp` (tests of several PRs, cut by `TEST`).
+- Checked: `script/cpp_unit_test.py canopen` (34 tests), `script/test_build_components.py -c canopen -t <target>`
+  for esp32-idf, esp32-ard, esp8266-ard, rp2040-ard (no warnings), the mapper on ESP8266 / ESP32-C3 (upstream venv)
+  and STM32L4 (fork venv). Cost: flash +0.4-0.6 KB (hooks no longer inlined into `setup()`), RAM +8 B. clang-tidy not
+  run (needs `test/upstream_tidy_setup.diff`).
+- When adding code to the hub from now on: put it in its feature's file and banner block, keep `setup()` /
+  `process_()` / `dump_config()` to one hook call per feature, so the cut stays mechanical.
+
+**Files** (`esphome/components/canopen/`):
+
+| File | PR | Content |
+|---|---|---|
+| `canopen.cpp` | 1 | setup sequence, 0x1001 / 0x1014 / 0x1017, `CO_new` / `CO_CANopenInit`, `process_()`, own NMT state, `dump_config()` |
+| `driver_can.cpp` | 1 | CANopenNode CAN driver (`CO_CAN*`), `set_canbus()`, `on_frame_()`, `receive_()`, `transmit()` (+ loopback: 2) |
+| `device_info.cpp` | 1 | 0x1000, 0x1008-0x100A, 0x1018, SDO server 0x1200 |
+| `od.h` / `od.cpp` | 1 | runtime OD (`add_var/array/record/string`, `finalize()`, `find()`); `// --- Handlers ---` blocks: 4 |
+| `types.h` | 1 | `NMTState`; `NodeEvent`, `FrameCallback`, `Emergency`, decoders: 2; `NMTCommand`, SDO types: 3; `PdoMapping`: 5 |
+| `canopennode_port/CO_driver_target.h` | 1 | port header (`CO_CONFIG_*` defaults; features switch parts on with build flags in `enable_*()`) |
+| `__init__.py` | 1 | schema / codegen; blocks of PRs 2-6 (see below) |
+| `node_monitor.cpp` | 2 | 0x1016, `monitor_node()`, HB consumer callbacks, node events, `get_node_state()` / `is_node_online()` |
+| `frames.cpp` | 2 | frame listeners, `send_frame()`, `dispatch_frame_()` (heartbeat / EMCY callbacks) |
+| `sdo_client.cpp` | 3 | SDO client, 0x1280 |
+| `nmt_master.cpp` | 3 | `send_nmt()` |
+| `automation.h` | 3 | `SDOWriteAction` |
+| `od_handler.h` / `od_handler.cpp` | 4 | `OdResult`, `OdStream`, `OdObject`; `set_extension_()`, `write()` |
+| `canopen_node.h` / `canopen_node.cpp` | 4 | `CANopenNode` base class (profile API) |
+| `pdo.cpp` | 5 | `configure_tpdo/rpdo()`, 0x1400-0x1A00 records, `CO_CANopenInitPDO`, processing, `request_tpdo()` |
+| `pdo_storage.cpp` | 5 | 0x1010 / 0x1011, load / store / restore in preferences |
+
+`__init__.py` beyond PR 1: PR 2 `HB_CLIENT_SCHEMA`, `validate_heartbeat_clients`, `heartbeat_clients` /
+`on_node_event` / `on_heartbeat` / `on_emcy` (schema, `CALLBACK_AUTOMATIONS`, `to_code()`), `KEY_LOCAL_NODES` and the
+local ring in `to_code()`, the duplicate node id check in `_final_validate`; PR 3 `_enable_once`,
+`enable_sdo_client()`, `enable_nmt_master()`, `NMT_COMMANDS`, `response_timeout`, the `canopen.sdo_write` /
+`canopen.nmt` actions; PR 4 `CANOPEN_NODE_SCHEMA`, `final_validate_canopen_node`, `register_node()`, the
+`CANopenNode` class; PR 5 `enable_pdo()`; PR 6 `enable_sdo_block()`, `SDO_BLOCK_BUFFER_SIZE`, `sdo_block_size`
+(schema, `to_code()`, the firmware-wide check in `_final_validate`). `_enable_once` comes with the first `enable_*()`
+helper in the chain (PR 3).
+
+**Line counts** (`scripts/pr_split_lines.py`, see below; non-blank lines, comments included, all `.cpp`, `.h`
+including the port header, and `__init__.py`; 2433 in all):
+
+| PR | Content | .cpp | .h | .py | Total | Comment-only | Tests (non-blank) |
+|---|---|---|---|---|---|---|---|
+| 1 | Node core: library, port header, driver, basic OD, NMT + HB producer, SDO server, identity / device info | 393 | 327 | 157 | **877** | 110 | 272: `common.yaml` + `test.*.yaml` 130, `fake_canbus.h` 45, `od_test` 75, `__init__.py` 22 |
+| 2 | Node monitoring, raw frames, heartbeat/EMCY triggers, loopback | 162 | 100 | 70 | **332** | 37 | 141: `frames_test` 59, `loopback_test` 82 |
+| 3 | SDO client, NMT master, `canopen.sdo_write` / `canopen.nmt` | 281 | 163 | 115 | **559** | 36 | 102: `loopback_test` (SDO tests) 77, `sdo_reply_test` 25 |
+| 4 | OD handler API (`OdObject`, `OdStream`, `write_od()`) + profile API (`CANopenNode`, `register_node()`) | 70 | 181 | 37 | **288** | 47 | 216: `canopen_node_test` 108, `od_test` (handler tests) 108 |
+| 5 | Own PDOs + store/restore 0x1010/0x1011 | 243 | 77 | 10 | **330** | 37 | 202: `pdo_test` 103, `storage_test` 99 |
+| 6 | SDO server block transfer (`sdo_block_size`) | 3 | 0 | 44 | **47** | 6 | 230: `sdo_block_test` |
+
+Dependencies (why this order): 2 uses 1's NMT strings and frame path; 3's actions and local SDO transfers use the OD
+(1) and the loopback (2, `loopback_test` SDO tests); 4's `CANopenNode` forwards the SDO client / NMT master (3); 5
+maps OD entries with handlers (4, `request_tpdo(index, sub)` uses the extension); 6's test downloads into an
+`OdObject` (4). `cia402` (old PRs 5 / 6, on top of #21533) is a separate chain on PR 4.
+
+Notes:
+- PR 1 is under the ~1000-line limit (~770 without comment-only lines). If it's still too much: identity / device
+  info (`device_info.cpp` without 0x1200, ~70) can move to PR 2.
+- PR 6 is small: fold it into PR 5, or keep it separate, since its download size cap needs CANopenNode's
+  `CO_CONFIG_SDO_SRV_BLKSIZE` patch (fork branch `sdo-srv-blksize`), which upstream CANopenNode doesn't have yet.
+
+**Line count script:** `scripts/pr_split_lines.py [<esphome>/esphome/components/canopen]` (default
+`~/repos/esphome/...`) prints the table above and the tests per PR. It classifies lines by markers, not line numbers
+(whole files, the banners, `#ifdef USE_CANOPEN_*` blocks, keyword lines, `types.h` declarations, `__init__.py`
+block names and keywords; rules at the top of the script), so it survives edits; `--annotate <file>` prints a file
+with the PR of every line. Add new files / blocks to its tables. Accuracy: a few lines.
+
+**Cutting the branches** (next steps, in order):
+1. Done: the refactor is committed on `canopen-full` (`e9f738ebf7`); keep it checked out in `~/repos/esphome` for the
+   mapper builds here. Push it to mrk-its/esphome when wanted.
+2. Branches `canopen-pr1-node` .. `canopen-pr6-sdo-block` from `upstream/dev`, stacked, one commit each. For PR N:
+   take `esphome/components/canopen/` and `tests/components/canopen/` from `canopen-full`, delete the files of PRs
+   > N, and remove the lines of PRs > N from the shared files (`--annotate` shows them: hook calls and
+   `#ifdef` blocks in `canopen.cpp`, banner blocks in `canopen.h` / `od.h`, the `types.h` blocks, the `__init__.py`
+   blocks and lines, `dispatch_frame_()` / the `next_local_` loop in `driver_can.cpp`, the extension lines in
+   `od.*`); trim the tests the same way (test `__init__.py` enables only the `enable_*()` of PRs <= N; `common.yaml`
+   only the options of PRs <= N; `TEST`s by the table above). The last branch must equal `canopen-full`
+   (`git diff canopen-pr6-sdo-block canopen-full -- esphome/components/canopen tests/components/canopen` empty).
+3. Each branch on its own: `script/cpp_unit_test.py canopen`, `script/test_build_components.py -c canopen -t
+   <target>` for the four targets, clang-tidy (`test/upstream_tidy_setup.diff`; the tidy setup for upstream CI is
+   still an open decision, see "Upstream conventions"), and the line count (`scripts/pr_split_lines.py` on the
+   branch's tree: PR N's own lines are the "PR N" row).
+4. Docs: re-split `~/repos/esphome-docs` (branches `canopen`, `canopen-next`) the same way, one page section per PR.
+5. Then: delete the old `canopen-1-node` .. `canopen-4-profile` branches on mrk-its/esphome (ask first), replace
+   `docs/upstream_prs_1-3.md` with a description of the new branches, update CLAUDE.md, and before PR 1 goes out the
+   open points of "Before PR 1" below (#21522, library source, CI boilerplate).
+
+### Old split (superseded)
+Kept for the history of what each part contained; the branches below are not used any more.
+
+Old split (revised 2026-10-29: the first version of PR 1, ~1050 production lines, was too big for a first PR):
 
 | PR | Content | Lines |
 |---|---|---|
@@ -340,7 +468,7 @@ Branches, tests and results of PRs 1-3: [upstream_prs_1-3.md](upstream_prs_1-3.m
 pushed, not in `components_next` yet): [cia402.md](cia402.md), "PR 4". Each branch is cut from
 `components_next/canopen` (the full, hardware-tested tree) in `~/repos/esphome`; later branches stack on it.
 
-Before PR 1:
+### Before PR 1 (applies to the new split too)
 - **Library source:** no `file://` path. Stock CANopenNode can't be used as is: it has no `library.json`, and the
   Zephyr and native ESP-IDF backends of ESPHome require a manifest (`esphome/platformio/library.py`, only the `host`
   backend accepts manifest-less libraries; plain PlatformIO builds would work). Done (2026-10-29): packaging-only
@@ -638,6 +766,36 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   `configuration.md` / `linking-nodes.md`;
 - until the hub is merged, where the mapper gets the hub from (the esphome fork branch as an external component, or
   `components_next` here).
+
+## Size comparison with the old component (2026-10-31)
+Compile-only, equivalent configs: old `components/canopen` vs the hub (`canopen-next`) + `canopen_entity_mapper`, and a
+baseline without CANopen **and without OTA** (so both deltas include the platform's OTA backend).
+- ESP8266 (d1_mini + mcp2515) and ESP32-C3 (esp-idf), upstream venv: the `test/esp8266_mapper.yaml` content (3
+  entities, `remote_nodes`, one `rpdo` link, `remote_logs: {}`, two remote actions, a `platform: canopen` /
+  `canopen_entity_mapper` text sensor, OTA); old with `sdo_block_transfer_size: 16` (= the mapper's default).
+- STM32L4 (Zephyr, fork venv): `test/stm32l4_biuro_switch.yaml` (no entities, dimmer4 remote, `remote_logs` DEBUG /
+  block 16, block size 60, MCUboot OTA, `safe_mode`); old with `entities: []`, `sdo_block_transfer_size: 60`.
+
+| Target | Baseline flash / RAM | Old: Δflash / ΔRAM | New: Δflash / ΔRAM (static) | Flash new - old |
+|---|---|---|---|---|
+| ESP8266 | 273.9 KB / 28.5 KB | +49.1 KB / +15.3 KB | +50.3 KB / +4.8 KB | +1.2 KB |
+| ESP32-C3 | 213.7 KB / 52.0 KB | +53.1 KB / +13.8 KB | +51.7 KB / +3.4 KB | -1.3 KB |
+| STM32L4 (app image) | 82.3 KB / 18.7 KB | +35.3 KB / +5.5 KB | +38.3 KB / +2.9 KB | +3.0 KB |
+
+Flash is at parity. The static RAM numbers are not comparable:
+- 8 KB of the old ESP RAM is the OTA inflate buffer (`CanopenOTAComponent`, static); the mapper allocates it when an
+  OTA starts (idle -8 KB, same peak). Compression is off on STM32, so not there.
+- CANopenNode allocates in `CO_new()` (heap, not in the build report). Measured with a 32-bit host build of
+  `CANopen.c` with the STM32 build's `-DCO_CONFIG_*` flags (1 RPDO, 8 TPDOs, no HB consumer): **4948 bytes** (5140
+  with the SDO client). Of that, a PDO object is 380 bytes (9 = ~3.4 KB) and the SDO server 1016 bytes (the
+  900-byte block buffer).
+- Not measured (needs free heap on a running device): the hub's runtime OD / PDO vectors, the old component's vectors
+  and `new` entities.
+
+Like for like at idle (without the inflate buffer, with `CO_new()`): ESP8266 ~7.3 KB old vs ~10 KB new, STM32L4
+~5.5 KB vs ~7.8 KB, i.e. the new one is ~2.5 KB larger plus the OD vectors. Cheapest saving: the mapper configures all
+8 TPDOs even when empty (all of them in the biuro config); trailing unused TPDOs could be left out
+(`CO_CANopenInitPDO()` only needs contiguous records from the first), ~380 bytes each.
 
 ## Verification for each step
 - `../esphomeplatformzephyr/venv/bin/esphome config test/stm32l4_canopen.yaml`, then `compile`.
