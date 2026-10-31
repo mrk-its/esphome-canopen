@@ -14,6 +14,7 @@ import re
 import subprocess
 
 import pytest
+import yaml
 
 REPO = Path(__file__).parent.parent
 MAPPER = REPO / "components_next" / "canopen_entity_mapper"
@@ -83,11 +84,18 @@ ENTITIES = [
 ]
 
 
-def write_config(tmp_path: Path, entities: list, **options) -> Path:
+def write_config(tmp_path: Path, entities: list, extra: dict | None = None, **options) -> Path:
+    """BASE with the mapper (entities, options) and `extra` merged in (lists are extended)."""
+    config = yaml.safe_load(BASE)
+    config["canopen_entity_mapper"] = {"canopen_id": "can_hub", "entities": entities, **options}
+    for key, value in (extra or {}).items():
+        if isinstance(value, list):
+            config[key] = config.get(key, []) + value
+        else:
+            config[key] = value
     path = tmp_path / "node.yaml"
     # JSON is YAML (flow style)
-    mapper = {"canopen_id": "can_hub", "entities": entities, **options}
-    path.write_text(BASE + f"canopen_entity_mapper: {json.dumps(mapper)}\n", encoding="utf-8")
+    path.write_text(json.dumps(config, indent=1), encoding="utf-8")
     return path
 
 
@@ -97,9 +105,9 @@ def run_esphome(tmp_path: Path, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def generate(tmp_path: Path, entities: list, **options) -> tuple[str, str]:
+def generate(tmp_path: Path, entities: list, extra: dict | None = None, **options) -> tuple[str, str]:
     """(main.cpp, defines.h) of the config."""
-    write_config(tmp_path, entities, **options)
+    write_config(tmp_path, entities, extra, **options)
     result = run_esphome(tmp_path, "compile", "--only-generate")
     assert result.returncode == 0, result.stdout + result.stderr
     src = tmp_path / ".esphome" / "build" / "mapper-test" / "src"
@@ -108,9 +116,9 @@ def generate(tmp_path: Path, entities: list, **options) -> tuple[str, str]:
     )
 
 
-def config_error(tmp_path: Path, entities: list) -> str:
+def config_error(tmp_path: Path, entities: list, extra: dict | None = None, **options) -> str:
     """The output of `esphome config` for an invalid config."""
-    write_config(tmp_path, entities)
+    write_config(tmp_path, entities, extra, **options)
     result = run_esphome(tmp_path, "config")
     assert result.returncode != 0, "config unexpectedly valid"
     return result.stdout + result.stderr
@@ -234,3 +242,122 @@ def test_codegen_no_entities(tmp_path):
 )
 def test_invalid(tmp_path, entities, message):
     assert message in config_error(tmp_path, entities)
+
+
+# ---- links to other nodes (remote_nodes) ----
+
+REMOTE_NODES = {
+    # old component (canopen: entities), node 0x36, OD writer on
+    "dimmer": str(REPO / "test" / "remote_node.yaml"),
+    # canopen hub + canopen_entity_mapper, node 0x38, OD writer off
+    "dimmer2": str(REPO / "test" / "mapper" / "remote_node_mapper.yaml"),
+}
+
+
+def remote_entity(platform: str, entity_id: str, node: str, entity: str, state: str | None = None) -> dict:
+    conf = {"platform": "canopen_entity_mapper", "id": entity_id, "node": node, "entity": entity}
+    if state is not None:
+        conf["state"] = state
+    return {platform: [conf]}
+
+
+def button(*actions: dict) -> dict:
+    return {"button": [{"platform": "template", "id": "btn", "name": "Btn", "on_press": list(actions)}]}
+
+
+@needs_esphome
+def test_codegen_remote(tmp_path):
+    extra = {
+        **remote_entity("binary_sensor", "hall_on", "dimmer", "light_hall"),
+        **remote_entity("sensor", "table_brightness", "dimmer", "light_table", "brightness"),
+        **remote_entity("text_sensor", "cover_text", "dimmer", "cover_hall"),
+        **button(
+            {"canopen.light.toggle": {"node": "dimmer", "entity": "light_hall"}},
+            {"canopen.light.turn_on": {"node": "dimmer", "entity": "light_table", "brightness": "50%"}},
+            {"canopen.number.set": {"node": "dimmer", "entity": "setpoint", "value": 20}},
+        ),
+    }
+    entities = [{"id": "relay", "index": 4, "tpdo": 1, "rpdo": [{"node": "dimmer", "entity": "relay"}]}]
+    main_cpp, defines = generate(tmp_path, entities, extra, remote_nodes=REMOTE_NODES)
+    mapper = re.search(r"(\w+)->set_layout_hash\(", main_cpp).group(1)
+
+    # slots sorted by (node, entity, state): cover_hall.state, light_hall.state, light_table.brightness
+    assert "#define CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS 3" in defines
+    for n in range(3):
+        assert f"{mapper}->add_remote_state({n}, 1);" in main_cpp
+    assert f"cover_text->attach({mapper}, 0, 3, 1, 0.0f, 0.0f);" in main_cpp  # kind 3: cover state
+    assert f"hall_on->attach({mapper}, 1, 0, 1, 0.0f, 0.0f);" in main_cpp
+    assert f"table_brightness->attach({mapper}, 2, 1, 1, 0.0f, 0.0f);" in main_cpp
+
+    # one RPDO per remote TPDO, the TPDO's full length: TPDO 0 (hall 3 B + table 2 B), TPDO 3 (6 B)
+    cob0, cob3 = layout.tpdo_cob_id(0, 0x36), layout.tpdo_cob_id(3, 0x36)
+    # hall.state -> slot 1, hall brightness / color_temp + table.state as one dummy, table.brightness -> slot 2
+    assert f"can_hub->configure_rpdo(0, {cob0}, {{{{0x4001, 1, 8}}, {{0x0005, 0, 24}}, {{0x4002, 1, 8}}}});" in main_cpp
+    # cover_hall.state (offset 0) -> slot 0; relay.state (offset 5) into our relay's command 1 (0x2002 + 16 * 4)
+    assert f"can_hub->configure_rpdo(1, {cob3}, {{{{0x4000, 1, 8}}, {{0x0005, 0, 32}}, {{0x2042, 1, 8}}}});" in main_cpp
+
+    # actions: the target, the writes (cmd, size, encoding, min, max, value); the toggle reads slot 1
+    assert main_cpp.count("->set_target(54, 1);") == 1  # light_hall
+    assert "get_remote_state(1); return s ? 0.0f : 1.0f;" in main_cpp
+    def write(cmd: int, size: int, encoding: int, min_value: str, max_value: str, value: str) -> bool:
+        """add_write(); constant values are generated as lambdas"""
+        args = f"{cmd}, {size}, {encoding}, {min_value}, {max_value}, "
+        return re.search(rf"->add_write\({re.escape(args)}\[\]\(\) -> float \{{\s*return {re.escape(value)};", main_cpp)
+
+    # turn_on: brightness (cmd 1, percentage), then state 1 (brightness alone doesn't switch a light on)
+    assert "->set_target(54, 2);" in main_cpp
+    assert write(1, 1, 1, "0.0f", "0.0f", "0.5f") and write(0, 1, 0, "0.0f", "0.0f", "1")
+    # number.set on a scaled UINT8 (10..30)
+    assert "->set_target(54, 7);" in main_cpp and write(0, 1, 3, "10", "30", "20.0f")
+
+
+@needs_esphome
+@pytest.mark.parametrize(
+    "entities, extra, message",
+    [
+        pytest.param(
+            [],
+            remote_entity("sensor", "x", "nowhere", "light_hall"),
+            "Unknown node 'nowhere', add it to 'remote_nodes'",
+            id="unknown-node",
+        ),
+        pytest.param(
+            [],
+            remote_entity("binary_sensor", "x", "dimmer", "temperature"),
+            "binary_sensor can't show dimmer temperature.value (value), supported: bool",
+            id="platform-kind",
+        ),
+        pytest.param(
+            [],
+            remote_entity("sensor", "x", "dimmer", "pump"),
+            "dimmer entity 'pump' is not sent in any TPDO",
+            id="remote-not-in-tpdo",
+        ),
+        pytest.param(
+            [],
+            button({"canopen.cover.open": {"node": "dimmer", "entity": "light_hall"}}),
+            "canopen.cover.open: dimmer 'light_hall' is a light, expected cover",
+            id="action-domain",
+        ),
+        pytest.param(
+            [],
+            button({"canopen.light.turn_off": {"node": "dimmer2", "entity": "light_hall"}}),
+            "canopen.light.turn_off: dimmer2 has the OD writer off",
+            id="action-od-writer-off",
+        ),
+        pytest.param(
+            [{"id": "relay", "index": 4, "rpdo": [{"node": "dimmer", "entity": "temperature"}]}],
+            {},
+            "dimmer temperature.value is 4 B, but 'relay' command 0 (state) is 1 B",
+            id="rpdo-size",
+        ),
+        pytest.param(
+            [{"id": "relay", "index": 4, "rpdo": [{"node": "dimmer", "entity": "light_hall"}]}],
+            remote_entity("binary_sensor", "x", "dimmer", "light_hall"),
+            "dimmer light_hall.state (remote state slot 0) overlaps dimmer light_hall.state (rpdo of 'relay')",
+            id="slot-and-rpdo",
+        ),
+    ],
+)
+def test_invalid_remote(tmp_path, entities, extra, message):
+    assert message in config_error(tmp_path, entities, extra, remote_nodes=REMOTE_NODES)

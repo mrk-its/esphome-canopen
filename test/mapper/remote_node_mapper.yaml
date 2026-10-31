@@ -1,0 +1,132 @@
+# remote_node.yaml in the canopen hub + canopen_entity_mapper format (test_mapper_remote.py, test_entity_mapper.py),
+# with the OD writer off. Only read (not built): its TPDO layout is computed from this file.
+substitutions:
+  dimmer_node_id: "0x38"
+
+external_components:
+  - source: ../components
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+esphome:
+  name: "test-remote-node"
+
+canbus:
+  platform: esp32_can
+  id: can_bus
+  can_id: 1
+  bit_rate: 125kbps
+  rx_pin: GPIO5
+  tx_pin: GPIO4
+
+canopen:
+  canbus_id: can_bus
+  node_id: ${dimmer_node_id}
+
+canopen_entity_mapper:
+  od_writer: false
+  entities:
+    - index: 1
+      id: light_hall       # cwww: state, brightness, color_temp
+      tpdo: 0
+    - index: 2
+      id: light_table      # monochromatic: state, brightness
+      tpdo: 0
+    - index: 3
+      id: light_mudroom
+      tpdo: 1
+    - index: 4
+      id: temperature      # REAL32
+      tpdo: 2
+    - index: 5
+      id: cover_hall       # state, position, tilt
+      tpdo: 3
+    - index: 6
+      id: alarm_house
+      tpdo: 3
+    - index: 7
+      id: setpoint         # scaled UINT8
+      size: 1
+      min_value: 10
+      max_value: 30
+      tpdo: 3
+    - index: 8
+      id: relay
+      tpdo: 3
+    - index: 9
+      id: pump             # no tpdo: commands only
+
+output:
+  - platform: template
+    id: out1
+    type: float
+    write_action:
+      - lambda: ''
+  - platform: template
+    id: out2
+    type: float
+    write_action:
+      - lambda: ''
+
+light:
+  - platform: cwww
+    id: light_hall
+    name: "Hall"
+    cold_white: out1
+    warm_white: out2
+    cold_white_color_temperature: 6000 K
+    warm_white_color_temperature: 2000 K
+  - platform: monochromatic
+    id: light_table
+    name: "Table"
+    output: out1
+  - platform: cwww
+    id: light_mudroom
+    name: "Mudroom"
+    cold_white: out1
+    warm_white: out2
+    cold_white_color_temperature: 6000 K
+    warm_white_color_temperature: 2000 K
+
+sensor:
+  - platform: template
+    id: temperature
+    name: "Temperature"
+    lambda: 'return 21.5;'
+
+cover:
+  - platform: template
+    id: cover_hall
+    name: "Hall cover"
+    optimistic: true
+    has_position: true
+    tilt_action:
+      - lambda: ''
+
+alarm_control_panel:
+  - platform: template
+    id: alarm_house
+    name: "House"
+    codes: ["1234"]
+
+number:
+  - platform: template
+    id: setpoint
+    name: "Setpoint"
+    min_value: 10
+    max_value: 30
+    step: 0.5
+    optimistic: true
+
+switch:
+  - platform: template
+    id: relay
+    name: "Relay"
+    optimistic: true
+  - platform: template
+    id: pump
+    name: "Pump"
+    optimistic: true

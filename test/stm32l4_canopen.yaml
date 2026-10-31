@@ -104,15 +104,17 @@ esphome:
         bool local = id(mapper).send_od_write(0x7f, 0x2072, 1, 0, 1);  // light off, written directly
         ESP_LOGI("test", "OD writer: switch %s (expect OFF), send_od_write to us %s, light %s (expect OFF)",
                  ONOFF(id(test_switch).state), YESNO(local), ONOFF(id(test_light).remote_values.is_on()));
-        // a real one over the bus: dimmer4 (node 0x37, old component) light5 "biuro" off (0x2052:1 = 0)
-        bool sent = id(mapper).send_od_write(0x37, 0x2052, 1, 0, 1);
-        ESP_LOGI("test", "OD writer: dimmer4 light5 (biuro) off sent: %s", YESNO(sent));
+    # a real one over the bus with a remote action: dimmer4 (node 0x37, old component) light5 "biuro" off
+    - canopen.light.turn_off: {node: dimmer4, entity: light5}
     - delay: 1s
     - lambda: |-
         id(can_gate).read_sdo<uint8_t>(0x37, 0x2051, 1, +[](void *, const canopen::SDOReply &r) {
           ESP_LOGI("test", "dimmer4 light5 (biuro) state 0x2051:1: %s %u (expect 0)",
                    LOG_STR_ARG(canopen::sdo_result_to_string(r.result)), (unsigned) r.value);
         }, nullptr);
+        ESP_LOGI("test", "remote states: biuro %s, brightness %.2f, text '%s'; test_switch (rpdo from light4) %s",
+                 ONOFF(id(biuro_state).state), id(biuro_brightness).state, id(biuro_text).state.c_str(),
+                 ONOFF(id(test_switch).state));
     - lambda: od_handler_test::run(0x7f);
 
 zephyr:
@@ -248,6 +250,12 @@ script:
 #       - output.turn_off: led_output
 
 sensor:
+  - platform: canopen_entity_mapper
+    id: biuro_brightness
+    name: "Biuro brightness (remote)"
+    node: dimmer4
+    entity: light5
+    state: brightness
   - platform: uptime
     id: uptime_sensor
     name: "Uptime"
@@ -349,6 +357,16 @@ interval:
 
 # entity mapper (step 7): exposed to can2mqtt (ESPHome identity, entity layout, TPDOs)
 binary_sensor:
+  # remote states of dimmer4 light5 (biuro), from a remote state slot
+  - platform: canopen_entity_mapper
+    id: biuro_state
+    name: "Biuro (remote)"
+    node: dimmer4
+    entity: light5
+    on_state:
+      - logger.log:
+          format: "remote: biuro %s"
+          args: ["ONOFF(x)"]
   - platform: template
     id: test_binary
     name: "Test binary"
@@ -356,6 +374,9 @@ binary_sensor:
 canopen_entity_mapper:
   id: mapper
   canopen_id: can_gate
+  # links to other nodes (docs/linking-nodes.md): dimmer4 is a real node on the bus (old component)
+  remote_nodes:
+    dimmer4: ../../zrodlana/esphome/dimmer4.yaml
   entities:
     - id: uptime_sensor
       index: 1
@@ -372,6 +393,8 @@ canopen_entity_mapper:
     - id: test_switch
       index: 4
       tpdo: 1
+      # follows dimmer4's light4: its state into our switch command (a state can't be in a slot and an rpdo)
+      rpdo: {node: dimmer4, entity: light4}
     - id: test_number
       index: 5
       size: 2
@@ -420,3 +443,16 @@ alarm_control_panel:
   - platform: template
     id: test_alarm
     name: "Test alarm"
+
+text_sensor:
+  - platform: canopen_entity_mapper
+    id: biuro_text
+    node: dimmer4
+    entity: light5
+
+button:
+  # toggles dimmer4 light5 (biuro) from Home Assistant: reads the remote state from its slot
+  - platform: template
+    name: "Biuro toggle"
+    on_press:
+      - canopen.light.toggle: {node: dimmer4, entity: light5}

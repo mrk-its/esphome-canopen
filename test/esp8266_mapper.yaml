@@ -53,6 +53,9 @@ switch:
 
 canopen_entity_mapper:
   canopen_id: can_hub
+  # links to another node (only read): remote state slots, platform entities, actions, rpdo
+  remote_nodes:
+    dimmer: remote_node.yaml
   entities:
     - id: uptime_sensor
       index: 1
@@ -63,3 +66,17 @@ canopen_entity_mapper:
     - id: test_switch
       index: 3
       tpdo: 0
+      rpdo: {node: dimmer, entity: relay}
+
+text_sensor:
+  - platform: canopen_entity_mapper
+    id: hall_cover
+    node: dimmer
+    entity: cover_hall
+
+button:
+  - platform: template
+    name: Hall toggle
+    on_press:
+      - canopen.light.toggle: {node: dimmer, entity: light_hall}
+      - canopen.number.set: {node: dimmer, entity: setpoint, value: 21.5}

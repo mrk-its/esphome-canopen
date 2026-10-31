@@ -4,6 +4,7 @@
 #include <span>
 
 #include "esphome/components/canopen/canopen.h"
+#include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
 #include "esphome/core/entity_base.h"
@@ -142,6 +143,23 @@ class MappedEntity : public canopen::OdObject {
   float max_value_{0.0f};
 };
 
+// A remote state slot (OD 0x4000 + n, sub 1): a state of another node's entity, written by an RPDO from that node's
+// TPDO (docs/linking-nodes.md). Read by `platform: canopen_entity_mapper` entities and toggle actions.
+class RemoteSlot : public canopen::OdObject {
+ public:
+  uint32_t value{0};  // little endian, size bytes used
+  uint8_t size{1};
+  uint8_t highest{1};
+  LazyCallbackManager<void(uint32_t)> listeners;
+
+  canopen::OdResult od_write(canopen::OdStream stream, const void *buf, size_t count, size_t *done) {
+    auto ret = stream.write_original(buf, count, done);
+    if (ret == canopen::OdResult::OD_RESULT_OK && stream.sub() == 1)
+      this->listeners.call(this->value);
+    return ret;
+  }
+};
+
 class EntityMapper : public Component {
  public:
   explicit EntityMapper(canopen::CANopenComponent *hub) : hub_(hub) {}
@@ -157,6 +175,21 @@ class EntityMapper : public Component {
   bool send_od_write(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size);
   // a received OD writer frame (data / len of a 0x500..0x57F frame); public for tests
   void handle_od_writer_frame(const uint8_t *data, uint8_t len);
+
+#ifdef CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS
+  // remote state slots (CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS, all exist from the start, so listeners can be added in
+  // any order): the size of slot n, from codegen; the RPDOs filling them are the hub's
+  void add_remote_state(uint8_t n, uint8_t size) {
+    if (n < this->slots_.size())
+      this->slots_[n].size = size;
+  }
+  uint32_t get_remote_state(uint8_t n) const { return n < this->slots_.size() ? this->slots_[n].value : 0; }
+  // callback(raw value) on every write of the slot (each RPDO frame)
+  template<typename F> void add_remote_state_listener(uint8_t n, F &&callback) {
+    if (n < this->slots_.size())
+      this->slots_[n].listeners.add(std::forward<F>(callback));
+  }
+#endif
 #ifdef USE_SENSOR
   void add_sensor(sensor::Sensor *sensor, uint8_t index, uint8_t size, float min_value, float max_value);
 #endif
@@ -209,11 +242,63 @@ class EntityMapper : public Component {
   bool od_writer_{false};
   // CANOPEN_ENTITY_MAPPER_ENTITIES: from codegen, the number of entities
   StaticVector<MappedEntity, CANOPEN_ENTITY_MAPPER_ENTITIES> entities_;
+#ifdef CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS
+  std::array<RemoteSlot, CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS> slots_{};
+#endif
   // 0x2001: entity types, sub N = type of entity N
   uint8_t types_highest_{0};
   // 0x3002: TPDO layout hash (layout.py)
   uint8_t layout_highest_{1};
   uint32_t layout_hash_{0};
+};
+
+// how RemoteCommandAction encodes a command value (ENC_* in __init__.py)
+enum RemoteCmdEncoding : uint8_t {
+  REMOTE_CMD_RAW = 0,
+  REMOTE_CMD_PERCENTAGE = 1,
+  REMOTE_CMD_COLOR_TEMP = 2,
+  REMOTE_CMD_SCALED = 3,
+  REMOTE_CMD_REAL32 = 4,
+};
+
+uint32_t encode_remote_cmd(uint8_t encoding, float value, uint8_t size, float min_value, float max_value);
+
+// canopen.<domain>.<action>: writes one or more commands of a remote node's entity with the OD writer
+template<typename... Ts> class RemoteCommandAction : public Action<Ts...>, public Parented<EntityMapper> {
+ public:
+  static constexpr size_t MAX_WRITES = 3;  // MAX_WRITES in __init__.py
+
+  void set_target(uint8_t node_id, uint8_t entity_index) {
+    this->node_id_ = node_id;
+    this->entity_index_ = entity_index;
+  }
+  void add_write(uint8_t cmd, uint8_t size, uint8_t encoding, float min_value, float max_value,
+                 TemplatableValue<float, Ts...> value) {
+    if (this->count_ < MAX_WRITES)
+      this->writes_[this->count_++] = {cmd, size, encoding, min_value, max_value, value};
+  }
+
+  void play(const Ts &...x) override {
+    for (uint8_t i = 0; i < this->count_; i++) {
+      const Write &w = this->writes_[i];
+      uint32_t raw = encode_remote_cmd(w.encoding, w.value.value(x...), w.size, w.min_value, w.max_value);
+      this->parent_->send_od_write(this->node_id_, 0x2002 + 0x10 * this->entity_index_, w.cmd + 1, raw, w.size);
+    }
+  }
+
+ protected:
+  struct Write {
+    uint8_t cmd;
+    uint8_t size;
+    uint8_t encoding;
+    float min_value;
+    float max_value;
+    TemplatableValue<float, Ts...> value;
+  };
+  std::array<Write, MAX_WRITES> writes_{};
+  uint8_t count_{0};
+  uint8_t node_id_{0};
+  uint8_t entity_index_{0};
 };
 
 }  // namespace esphome::canopen_entity_mapper

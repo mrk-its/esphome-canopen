@@ -19,6 +19,8 @@ using canopen::OD_WRITE;
 using canopen::OdResult;
 using RecordSub = canopen::ObjectDictionary::RecordSub;
 
+static constexpr uint16_t remote_slot_index(size_t n) { return 0x4000 + n; }
+
 // metadata subindices, see OBJECT_DICTIONARY.md
 static constexpr uint8_t META_NAME = 1;
 static constexpr uint8_t META_DEVICE_CLASS = 2;
@@ -485,10 +487,36 @@ void EntityMapper::handle_od_writer_frame(const uint8_t *data, uint8_t len) {
   }
 }
 
+uint32_t encode_remote_cmd(uint8_t encoding, float value, uint8_t size, float min_value, float max_value) {
+  switch (encoding) {
+    case REMOTE_CMD_PERCENTAGE:
+      return percentage_to_wire(value);
+    case REMOTE_CMD_COLOR_TEMP:
+      return color_temp_to_wire(value);
+    case REMOTE_CMD_SCALED:
+      return scale_to_wire(value, min_value, max_value, size == 1 ? 255 : 65535);
+    case REMOTE_CMD_REAL32: {
+      uint32_t raw;
+      std::memcpy(&raw, &value, sizeof(raw));
+      return raw;
+    }
+    default:
+      return static_cast<uint32_t>(value);
+  }
+}
+
 void EntityMapper::setup() {
   if (this->od_writer_)
     this->hub_->add_frame_listener(OD_WRITER_COB_ID, 0x780, on_od_writer_frame, this);
   auto &od = this->hub_->get_od();
+#ifdef CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS
+  for (size_t n = 0; n < this->slots_.size(); n++) {
+    RemoteSlot &slot = this->slots_[n];
+    uint16_t index = remote_slot_index(n);
+    od.add_record(index, {{0, OD_READ, &slot.highest, 1}, {1, OD_READ | OD_RPDO, &slot.value, slot.size}});
+    od.set_object(index, &slot);
+  }
+#endif
   // 0x2001: one allocation, freed when the OD has copied it
   std::vector<RecordSub> types;
   types.reserve(this->entities_.size() + 1);
@@ -505,6 +533,10 @@ void EntityMapper::dump_config() {
   ESP_LOGCONFIG(TAG, "ESPHome entity mapper:");
   ESP_LOGCONFIG(TAG, "  TPDO layout hash: %08" PRIx32, this->layout_hash_);
   ESP_LOGCONFIG(TAG, "  OD writer: %s", YESNO(this->od_writer_));
+#ifdef CANOPEN_ENTITY_MAPPER_REMOTE_SLOTS
+  for (size_t n = 0; n < this->slots_.size(); n++)
+    ESP_LOGCONFIG(TAG, "  Remote state slot %u (0x%04x): %u B", (unsigned) n, remote_slot_index(n), this->slots_[n].size);
+#endif
   for (auto &entity : this->entities_) {
     ESP_LOGCONFIG(TAG, "  Entity %u: type %" PRIu32, entity.get_index(), entity.get_type());
   }

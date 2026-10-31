@@ -523,6 +523,21 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   from codegen (`set_node_id()`, the hub has no getter). Tested on the nucleo: injected frames (own id, other id,
   bad index, short) and a real frame to dimmer4 (node 0x37, old component) turning light5 off, state read back over
   SDO.
+- **Remote states ported** (2026-10-31): `remote_nodes` on the mapper (`remote.py` reads both formats: old
+  `canopen: entities` and hub `canopen:` + `canopen_entity_mapper: entities`, plus the target's OD writer flag),
+  `rpdo: {node, entity, state, cmd}` on entities, remote state slots 0x4000+n (`RemoteSlot`, an `OdObject`, in a
+  fixed `std::array` so listeners can attach before the slot sizes are set), `binary_sensor` / `sensor` /
+  `text_sensor` **`platform: canopen_entity_mapper`** (was `platform: canopen`: a platform module must live in the
+  component's directory, and `canopen` is now the upstream hub), and the `canopen.<domain>.<action>` actions (names
+  kept; `RemoteCommandAction` with at most 3 writes, sent with `send_od_write()`; an action to a node with the OD
+  writer off is rejected). RPDOs through the hub's `configure_rpdo()`, one per remote (node, TPDO), mapping the
+  remote TPDO's **full length** (CANopenNode reports a longer frame with an EMCY): gaps and the tail are single
+  dummy entries (index 0x0005, sub 0, any length); the plan (`remote.rpdo_plan()`, ESPHome-free) rejects overlaps
+  (a state in a slot and in an `rpdo:`), more than 8 entries. No 4-RPDO limit any more (hub: 32). Tests:
+  `test/test_mapper_remote.py`, codegen / errors in `test/test_entity_mapper.py`; nucleo against the real dimmer4
+  (node 0x37, old component): slots follow light5, `canopen.light.turn_off` turns it off, `test_switch` follows
+  light4 by `rpdo:`, "Biuro toggle" button in HA. Not ported: the raw `rpdo: {node_id, tpdo, offset, cmd}` form,
+  `canopen.entity_cmd`, `template_entities` (open points below).
 - **MPDO for the OD writer (own step, changes the wire protocol, needs can2mqtt and all nodes updated):** today
   `0x500 + target` is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7 frame whose first byte equals another
   node's id is applied there as an OD write, and the ID has several producers. Proposal: the CiA 301 MPDO format
