@@ -3,18 +3,23 @@
 Needs SDO block transfer in the hub: the hub's `sdo_block_size`, or DEFAULT_SDO_BLOCK_SIZE when it isn't set.
 """
 
+import logging
+
 import esphome.codegen as cg
 from esphome.components import canopen
 from esphome.components.ota import BASE_OTA_SCHEMA, OTAComponent, ota_to_code
 import esphome.config_validation as cv
-from esphome.const import CONF_ID
+from esphome.const import CONF_DISABLED, CONF_ID
 from esphome.core import CORE
+import esphome.final_validate as fv
 from esphome.types import ConfigType
 
 from .. import enable_sdo_block, ns
 
 CODEOWNERS = ["@mrk-its"]
 DEPENDENCIES = ["canopen"]
+
+_LOGGER = logging.getLogger(__name__)
 
 CONF_REBOOT = "reboot"
 
@@ -50,6 +55,21 @@ CONFIG_SCHEMA = cv.All(
     .extend(cv.COMPONENT_SCHEMA),
     _validate_swap_method,
 )
+
+
+def _final_validate(config: ConfigType) -> ConfigType:
+    """On Zephyr the backend installs a test upgrade, which MCUboot keeps only once the image is confirmed, and
+    safe_mode is what confirms it (after a good boot): without it every update is rolled back at the next reset."""
+    safe_mode = fv.full_config.get().get("safe_mode") or {}
+    if getattr(CORE, "is_zephyr", False) and safe_mode.get(CONF_DISABLED, False):
+        _LOGGER.warning(
+            "ota canopen_entity_mapper: 'safe_mode: disabled: true' leaves updated images unconfirmed, "
+            "MCUboot rolls them back at the next reset; enable safe_mode"
+        )
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = _final_validate
 
 
 def _compression() -> bool:

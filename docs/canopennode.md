@@ -569,8 +569,11 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   listeners (`on_begin` / `on_progress` / ...), `reboot: false`. Needs SDO block transfer: the hub's
   `sdo_block_size`, else 16. Compression (miniz) off on stm32 / zephyr, `miniz.c` filtered out there. Nucleo
   (`test/stm32l4_biuro_switch.yaml`, block size 32, rx queue 64): 114 kB from can2mqtt in ~50 s (~2.3 KB/s), MD5 OK,
-  MCUboot swap, new version running. Open: image confirmation with `safe_mode: disabled` (check it survives a
-  reboot), speed with bigger blocks / a bigger server buffer.
+  MCUboot swap, new version running. Image confirmation (2026-10-31, nucleo, two CAN OTAs from can2mqtt): the image boots as a test upgrade
+  (MCUboot `Swap type: revert` armed), `safe_mode` confirms it 60 s after boot ("Boot seems successful"), then it
+  survives a reset (`Swap type: none`); an image reset before the confirmation is reverted by MCUboot, the previous
+  one boots again. With `safe_mode: disabled: true` nothing confirms, so the OTA platform warns on Zephyr. Open:
+  speed with bigger blocks / a bigger server buffer.
 - **MPDO for the OD writer (own step, changes the wire protocol, needs can2mqtt and all nodes updated):** today
   `0x500 + target` is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7 frame whose first byte equals another
   node's id is applied there as an OD write, and the ID has several producers. Proposal: the CiA 301 MPDO format
