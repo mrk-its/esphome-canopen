@@ -300,10 +300,11 @@ class PlanError(Exception):
 def rpdo_plan(sources):
     """RPDOs of a node: [(node_id, tpdo, [(od index, subindex, bits)])], one per remote (node_id, tpdo).
 
-    `sources`: dicts with node_id, tpdo, offset, size (bytes), tpdo_size (bytes the remote TPDO has), a
-    target: `slot` (remote state slot n) or `entity_index` + `cmd` (a local entity command), and a
-    `label` for errors. Entries are sorted by offset; gaps and the rest of the remote TPDO are dummy
-    entries, so the RPDO has the TPDO's length (CANopenNode reports longer frames with an EMCY).
+    `sources`: dicts with node_id, tpdo, offset, size (bytes), tpdo_size (bytes the remote TPDO has, None if
+    unknown: raw `rpdo:` entries without `tpdo_size`), a target: `slot` (remote state slot n) or
+    `entity_index` + `cmd` (a local entity command), and a `label` for errors. Entries are sorted by offset;
+    gaps and the rest of the remote TPDO are dummy entries, so the RPDO has the TPDO's length (CANopenNode
+    reports longer frames with an EMCY). With no known tpdo_size the RPDO ends at the last mapped byte.
     """
     groups = {}
     for source in sources:
@@ -335,7 +336,21 @@ def rpdo_plan(sources):
                 )
             offset = source["offset"] + source["size"]
             prev = source
-        tpdo_size = group[0]["tpdo_size"]
+        sizes = {s["tpdo_size"] for s in group if s["tpdo_size"] is not None}
+        if len(sizes) > 1:
+            labels = ", ".join(
+                f"{s['label']}: {s['tpdo_size']} B"
+                for s in group
+                if s["tpdo_size"] is not None
+            )
+            raise PlanError(
+                f"TPDO {tpdo} of node 0x{node_id:02x} has different sizes: {labels}"
+            )
+        tpdo_size = sizes.pop() if sizes else offset
+        if tpdo_size < offset:
+            raise PlanError(
+                f"{prev['label']} is outside the {tpdo_size} B TPDO {tpdo} of node 0x{node_id:02x}"
+            )
         if tpdo_size > offset:
             entries.append((DUMMY_INDEX, 0, (tpdo_size - offset) * 8))
         if len(entries) > RPDO_MAX_ENTRIES:

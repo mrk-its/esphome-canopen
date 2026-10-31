@@ -543,8 +543,8 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   (a state in a slot and in an `rpdo:`), more than 8 entries. No 4-RPDO limit any more (hub: 32). Tests:
   `test/test_mapper_remote.py`, codegen / errors in `test/test_entity_mapper.py`; nucleo against the real dimmer4
   (node 0x37, old component): slots follow light5, `canopen.light.turn_off` turns it off, `test_switch` follows
-  light4 by `rpdo:`, "Biuro toggle" button in HA. Not ported: the raw `rpdo: {node_id, tpdo, offset, cmd}` form,
-  `canopen.entity_cmd`, `template_entities` (open points below).
+  light4 by `rpdo:`, "Biuro toggle" button in HA. Not ported: `canopen.entity_cmd`, `template_entities` (open points
+  below).
 - **OTA ported** (2026-10-31): `ota: - platform: canopen_entity_mapper` (`canopen_id`), OD 0x3000 as before (can2mqtt
   unchanged), one `OdObject` handler: the first chunk of :4 starts the backend (size from :2), the last one (a domain's
   stream size is 0 until the last chunk, then the total: CANopenNode doesn't pass the client's indicated size) sets
@@ -561,7 +561,15 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   **sender's** TPDO 7 (`0x500 + sender`), TPDO 7 reserved in `layout.py`; can2mqtt needs a node id of its own if
   it sends them. Alternatives: extended 29-bit IDs, or `0x680 + sender` (only senders up to 0x5F). Needs a
   migration (accept both formats for a while).
-- raw RPDO linking (`rpdo: {node_id, tpdo, offset, cmd}`, `add_rpdo_node` / `add_rpdo_entity_cmd`, `linking-nodes.md`);
+- **Raw RPDO linking ported** (2026-10-31): `rpdo: {node_id, tpdo, offset, cmd, tpdo_size}` on mapper entities, one
+  byte at `offset` of the remote TPDO into command `cmd`, a source of the same `remote.rpdo_plan()` as the named form
+  (grouped with named entries and slots of the same node / TPDO, overlaps rejected). New: optional `tpdo_size` (1..8),
+  the remote TPDO's length, which the RPDO then maps in full; unset, the RPDO ends at the last mapped byte and a longer
+  frame is still processed, but CANopenNode sets `CO_EM_RPDO_WRONG_LENGTH` (one EMCY). A named entry of the same TPDO
+  gives the size too; different sizes are an error. Stricter than the old component: the command must be 1 byte
+  (was any size), `node_id` 1..127, `tpdo` 0..7, `offset` 0..7. Document it with the user migration
+  (`configuration.md`, "RPDO schema"). Tests: `test_rpdo_plan_raw*` in `test/test_mapper_remote.py`,
+  `test_codegen_raw_rpdo` / `test_invalid_raw_rpdo` in `test/test_entity_mapper.py`. Not on hardware yet.
 - `template_entities` (custom OD entries with typed command triggers, states, metadata);
 - `canopen.entity_cmd` (a command to another node's entity, on `write_sdo` or the OD writer frame);
 - `csdo:` and its lambda API (`setup_csdo`, `csdo_recv`, `csdo_send_*`): map onto the hub's SDO client; custom

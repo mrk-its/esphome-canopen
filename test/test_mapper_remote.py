@@ -90,8 +90,35 @@ def test_rpdo_plan_errors(old_node):
             [_source(old_node, "light_hall", slot=0), _source(old_node, "light_hall", entity_index=1, cmd=0)]
         )
     # TPDO 3 has 6 one-byte states: all of them plus gaps would fit, but not 9 entries
-    many = [dict(_source(old_node, "relay", slot=n), offset=n, size=1, tpdo_size=8) for n in range(8)]
-    many.append(dict(many[0], offset=8, slot=8))
-    many[-1]["tpdo_size"] = 9
+    many = [dict(_source(old_node, "relay", slot=n), offset=n, size=1, tpdo_size=9) for n in range(9)]
     with pytest.raises(remote.PlanError, match="needs 9 mapping entries"):
         remote.rpdo_plan(many)
+
+
+def _raw(node_id: int, tpdo: int, offset: int, tpdo_size: int | None = None, **target: int) -> dict:
+    """A raw `rpdo: {node_id, tpdo, offset}` source: one byte, the TPDO's size only if given."""
+    label = f"node 0x{node_id:02x} TPDO {tpdo} offset {offset}"
+    return {"node_id": node_id, "tpdo": tpdo, "offset": offset, "size": 1, "tpdo_size": tpdo_size, "label": label, **target}
+
+
+def test_rpdo_plan_raw(old_node: remote.RemoteNode) -> None:
+    # unknown TPDO size: the RPDO ends at the last mapped byte
+    assert remote.rpdo_plan([_raw(0x40, 1, 2, entity_index=1, cmd=0), _raw(0x40, 1, 0, entity_index=2, cmd=1)]) == [
+        (0x40, 1, [(0x2022, 2, 8), (remote.DUMMY_INDEX, 0, 8), (0x2012, 1, 8)]),
+    ]
+    # given TPDO size: dummy up to it
+    assert remote.rpdo_plan([_raw(0x40, 1, 2, tpdo_size=6, entity_index=1, cmd=0)]) == [
+        (0x40, 1, [(remote.DUMMY_INDEX, 0, 16), (0x2012, 1, 8), (remote.DUMMY_INDEX, 0, 24)]),
+    ]
+    # mixed with a named source of the same TPDO (TPDO 3, 6 B): the known size wins
+    plan = remote.rpdo_plan([_raw(0x36, 3, 1, entity_index=1, cmd=0), _source(old_node, "relay", slot=0)])
+    assert plan == [(0x36, 3, [(remote.DUMMY_INDEX, 0, 8), (0x2012, 1, 8), (remote.DUMMY_INDEX, 0, 24), (0x4000, 1, 8)])]
+
+
+def test_rpdo_plan_raw_errors(old_node: remote.RemoteNode) -> None:
+    with pytest.raises(remote.PlanError, match="relay.state overlaps node 0x36 TPDO 3 offset 5"):
+        remote.rpdo_plan([_raw(0x36, 3, 5, entity_index=1, cmd=0), _source(old_node, "relay", slot=0)])
+    with pytest.raises(remote.PlanError, match="has different sizes"):
+        remote.rpdo_plan([_raw(0x36, 3, 0, tpdo_size=8, entity_index=1, cmd=0), _source(old_node, "relay", slot=0)])
+    with pytest.raises(remote.PlanError, match="offset 7 .* is outside the 6 B TPDO 3"):
+        remote.rpdo_plan([_source(old_node, "relay", slot=0), dict(_raw(0x36, 3, 7, entity_index=1, cmd=0), label="node 0x36 TPDO 3 offset 7 (x)")])

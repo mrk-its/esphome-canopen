@@ -312,6 +312,67 @@ def test_codegen_remote(tmp_path):
 
 
 @needs_esphome
+def test_codegen_raw_rpdo(tmp_path: Path) -> None:
+    entities = [
+        # lamp (6): brightness (command 1) from byte 2 of node 0x40 TPDO 1, state from byte 0
+        {"id": "lamp", "index": 6, "rpdo": [{"node_id": 0x40, "tpdo": 1, "offset": 2, "cmd": 1}, {"node_id": 0x40, "tpdo": 1, "offset": 0}]},
+        # relay (4): byte 3 of a 5-byte TPDO 4 of node 0x41, and byte 1 of the old dimmer's TPDO 3 (6 B, known)
+        {"id": "relay", "index": 4, "rpdo": [{"node_id": 0x41, "tpdo": 4, "offset": 3, "tpdo_size": 5}]},
+        {"id": "door", "index": 3, "rpdo": [{"node_id": 0x36, "tpdo": 3, "offset": 1}, {"node": "dimmer", "entity": "relay"}]},
+    ]
+    main_cpp, _ = generate(tmp_path, entities, remote_nodes=REMOTE_NODES)
+    rpdos = re.findall(r"can_hub->configure_rpdo\((\d+), (\d+), (.*?)\);", main_cpp)
+    assert [(int(n), int(cob)) for n, cob, _ in rpdos] == [
+        (0, layout.tpdo_cob_id(3, 0x36)),
+        (1, layout.tpdo_cob_id(1, 0x40)),
+        (2, layout.tpdo_cob_id(4, 0x41)),
+    ]
+    # door (3) state from byte 1 and from relay.state (byte 5), the TPDO's full 6 bytes
+    assert rpdos[0][2] == "{{0x0005, 0, 8}, {0x2032, 1, 8}, {0x0005, 0, 24}, {0x2032, 1, 8}}"
+    # no TPDO size: ends at byte 2
+    assert rpdos[1][2] == "{{0x2062, 1, 8}, {0x0005, 0, 8}, {0x2062, 2, 8}}"
+    assert rpdos[2][2] == "{{0x0005, 0, 24}, {0x2042, 1, 8}, {0x0005, 0, 8}}"
+
+
+@needs_esphome
+@pytest.mark.parametrize(
+    "entities, message",
+    [
+        pytest.param(
+            [{"id": "temp", "index": 1, "rpdo": [{"node_id": 0x40, "tpdo": 1, "offset": 0}]}],
+            "node 0x40 TPDO 1 offset 0 is 1 B, but 'temp' command 0 (value) is 4 B",
+            id="raw-size",
+        ),
+        pytest.param(
+            [{"id": "relay", "index": 4, "rpdo": [{"node_id": 0x40, "tpdo": 1, "offset": 0, "cmd": 1}]}],
+            "'relay' has no command 1",
+            id="raw-cmd",
+        ),
+        pytest.param(
+            [{"id": "relay", "index": 4, "rpdo": [{"node_id": 0x40, "tpdo": 1, "offset": 4, "tpdo_size": 4}]}],
+            "offset 4 is outside a 4 B TPDO",
+            id="raw-tpdo-size",
+        ),
+        pytest.param(
+            [{"id": "relay", "index": 4, "rpdo": [{"node_id": 0x40, "tpdo": 8, "offset": 0}]}],
+            "value must be at most 7",
+            id="raw-tpdo-range",
+        ),
+        pytest.param(
+            [
+                {"id": "relay", "index": 4, "rpdo": [{"node_id": 0x40, "tpdo": 1, "offset": 2}]},
+                {"id": "door", "index": 3, "rpdo": [{"node_id": 0x40, "tpdo": 1, "offset": 2}]},
+            ],
+            "node 0x40 TPDO 1 offset 2 (rpdo of 'door') overlaps node 0x40 TPDO 1 offset 2 (rpdo of 'relay')",
+            id="raw-overlap",
+        ),
+    ],
+)
+def test_invalid_raw_rpdo(tmp_path: Path, entities: list, message: str) -> None:
+    assert message in config_error(tmp_path, entities, remote_nodes=REMOTE_NODES)
+
+
+@needs_esphome
 @pytest.mark.parametrize(
     "entities, extra, message",
     [

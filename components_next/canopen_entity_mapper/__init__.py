@@ -15,10 +15,20 @@ from esphome import automation
 import esphome.codegen as cg
 from esphome.components import canopen
 import esphome.config_validation as cv
-from esphome.const import CONF_ID
+from esphome.const import (
+    CONF_ID,
+    CONF_INDEX,
+    CONF_MAX_VALUE,
+    CONF_MIN_VALUE,
+    CONF_NUMBER,
+    CONF_OFFSET,
+    CONF_SIZE,
+    CONF_STATE,
+)
 from esphome.core import CORE, Lambda
 from esphome.cpp_generator import MockObj
 import esphome.final_validate as fv
+from esphome.schema_extractors import SCHEMA_EXTRACT, schema_extractor
 from esphome.types import ConfigType
 
 from . import layout, remote
@@ -29,12 +39,7 @@ CODEOWNERS = ["@mrk-its"]
 DEPENDENCIES = ["canopen"]
 
 CONF_ENTITIES = "entities"
-CONF_INDEX = "index"
-CONF_SIZE = "size"
-CONF_MIN_VALUE = "min_value"
-CONF_MAX_VALUE = "max_value"
 CONF_TPDO = "tpdo"
-CONF_NUMBER = "number"
 CONF_IMMEDIATE = "immediate"
 CONF_CAPS = "caps"
 CONF_OD_WRITER = "od_writer"
@@ -42,8 +47,8 @@ CONF_REMOTE_NODES = "remote_nodes"
 CONF_RPDO = "rpdo"
 CONF_NODE = "node"
 CONF_ENTITY = "entity"
-CONF_STATE = "state"
 CONF_CMD = "cmd"
+CONF_TPDO_SIZE = "tpdo_size"
 CONF_MAPPER_ID = "canopen_entity_mapper_id"
 # remote state (node, entity, state) a `platform: canopen_entity_mapper` entity or a toggle action reads, set by
 # their validation; collected from the whole validated config by remote_state_slots()
@@ -86,7 +91,7 @@ TPDO_SCHEMA = cv.Schema(
 )
 
 # a remote node's entity state, by node name (remote_nodes) and entity, into command `cmd` of the local entity
-RPDO_SCHEMA = cv.All(
+RPDO_REMOTE_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.Required(CONF_NODE): cv.string,
@@ -98,6 +103,43 @@ RPDO_SCHEMA = cv.All(
     ),
     cv.has_at_least_one_key(CONF_ENTITY, CONF_INDEX),
 )
+
+
+def validate_raw_rpdo_tpdo_size(config: ConfigType) -> ConfigType:
+    tpdo_size = config.get(CONF_TPDO_SIZE)
+    if tpdo_size is not None and tpdo_size <= config[CONF_OFFSET]:
+        raise cv.Invalid(
+            f"offset {config[CONF_OFFSET]} is outside a {tpdo_size} B TPDO",
+            path=[CONF_OFFSET],
+        )
+    return config
+
+
+# raw TPDO position: one byte at `offset` of TPDO `tpdo` of node `node_id`, into command `cmd` of the local entity;
+# `tpdo_size`: the length of that TPDO (the RPDO maps it all, unset: up to the last mapped byte)
+RPDO_RAW_SCHEMA = cv.All(
+    cv.Schema(
+        {
+            cv.Required(canopen.CONF_NODE_ID): cv.int_range(min=1, max=127),
+            cv.Required(CONF_TPDO): cv.int_range(min=0, max=layout.TPDO_COUNT - 1),
+            cv.Required(CONF_OFFSET): cv.int_range(min=0, max=7),
+            cv.Optional(CONF_CMD, default=0): cv.int_range(min=0, max=254),
+            cv.Optional(CONF_TPDO_SIZE): cv.int_range(min=1, max=8),
+        }
+    ),
+    validate_raw_rpdo_tpdo_size,
+)
+
+
+@schema_extractor("schema")
+def validate_rpdo(value: Any) -> ConfigType:
+    """The raw form if `node_id` is given, else the named one (picked here, not by cv.Any: errors of the right form)."""
+    if value is SCHEMA_EXTRACT:
+        return cv.Any(RPDO_RAW_SCHEMA, RPDO_REMOTE_SCHEMA)
+    if isinstance(value, dict) and canopen.CONF_NODE_ID in value:
+        return RPDO_RAW_SCHEMA(value)
+    return RPDO_REMOTE_SCHEMA(value)
+
 
 ENTITY_SCHEMA = cv.Schema(
     {
@@ -113,7 +155,7 @@ ENTITY_SCHEMA = cv.Schema(
         # light / cover capabilities, for platforms not known to layout.py
         cv.Optional(CONF_CAPS): cv.ensure_list(cv.string),
         # remote states written into this entity's commands by RPDO (resolve_remote_rpdo())
-        cv.Optional(CONF_RPDO): cv.ensure_list(RPDO_SCHEMA),
+        cv.Optional(CONF_RPDO): cv.ensure_list(validate_rpdo),
     }
 )
 
@@ -174,10 +216,25 @@ def _remote_node(remote_nodes: dict[str, Any], node: str) -> remote.RemoteNode:
 
 
 def resolve_remote_rpdo(config: ConfigType) -> ConfigType:
-    """Resolve the `rpdo:` entries of the entities to the remote state (RemoteNode.state() + node, tpdo_size)."""
+    """Resolve the `rpdo:` entries of the entities to the remote state (RemoteNode.state() + node, tpdo_size).
+
+    Raw entries (`node_id`) get a `remote` without `node`: one byte, `tpdo_size` only if given.
+    """
     for entity_pos, entity in enumerate(config[CONF_ENTITIES]):
         for rpdo_pos, rpdo in enumerate(entity.get(CONF_RPDO, [])):
             path = [CONF_ENTITIES, entity_pos, CONF_RPDO, rpdo_pos]
+            if canopen.CONF_NODE_ID in rpdo:
+                entity[CONF_RPDO][rpdo_pos] = {
+                    **rpdo,
+                    "remote": {
+                        "node_id": rpdo[canopen.CONF_NODE_ID],
+                        "tpdo": rpdo[CONF_TPDO],
+                        "offset": rpdo[CONF_OFFSET],
+                        "size": 1,
+                        "tpdo_size": rpdo.get(CONF_TPDO_SIZE),
+                    },
+                }
+                continue
             try:
                 node = _remote_node(config[CONF_REMOTE_NODES], rpdo[CONF_NODE])
                 state = node.state(
@@ -270,7 +327,7 @@ def validate_rpdo_sizes(
             name, size = local[rpdo[CONF_CMD]]
             if size != src["size"]:
                 raise cv.Invalid(
-                    f"{src['node']} {src['entity']}.{src['state']} is {src['size']} B, but "
+                    f"{rpdo_label(src)} is {src['size']} B, but "
                     f"'{entity[CONF_ID]}' command {rpdo[CONF_CMD]} ({name}) is {size} B",
                     path=path,
                 )
@@ -334,6 +391,13 @@ def resolve_remote_slots(
     return slots
 
 
+def rpdo_label(src: dict) -> str:
+    """A resolved `rpdo:` entry (its `remote`) in errors."""
+    if "node" in src:
+        return f"{src['node']} {src['entity']}.{src['state']}"
+    return f"node 0x{src['node_id']:02x} TPDO {src['tpdo']} offset {src['offset']}"
+
+
 def rpdo_sources(config: ConfigType, slots: list[tuple[int, dict]]) -> list[dict]:
     """remote.rpdo_plan() sources: the entities' `rpdo:` entries and the slots."""
     sources = [
@@ -341,8 +405,7 @@ def rpdo_sources(config: ConfigType, slots: list[tuple[int, dict]]) -> list[dict
             **rpdo["remote"],
             "entity_index": entity[CONF_INDEX],
             CONF_CMD: rpdo[CONF_CMD],
-            "label": f"{rpdo['remote']['node']} {rpdo['remote']['entity']}.{rpdo['remote']['state']} "
-            f"(rpdo of '{entity[CONF_ID]}')",
+            "label": f"{rpdo_label(rpdo['remote'])} (rpdo of '{entity[CONF_ID]}')",
         }
         for entity in config[CONF_ENTITIES]
         for rpdo in entity.get(CONF_RPDO, ())
