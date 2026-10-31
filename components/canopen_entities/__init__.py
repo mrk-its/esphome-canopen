@@ -200,6 +200,21 @@ REMOTE_LOGS_SCHEMA = cv.Schema(
 ).extend(cv.COMPONENT_SCHEMA)
 
 
+# what canopen_entities needs from the hub beyond its first upstream PR: own PDOs (PR 5), SDO block transfer (PR 6)
+HUB_REQUIRED = ("enable_pdo", "enable_sdo_block", "CONF_SDO_BLOCK_SIZE")
+HUB_SOURCE = "github://mrk-its/esphome@canopen-full"
+
+
+def validate_hub(config: ConfigType) -> ConfigType:
+    """A `canopen` hub with everything canopen_entities uses (ESPHome may ship a partial one while the PRs go in)."""
+    if missing := [name for name in HUB_REQUIRED if not hasattr(canopen, name)]:
+        raise cv.Invalid(
+            f"this ESPHome's 'canopen' component lacks {', '.join(missing)}, which canopen_entities needs: "
+            f"load the full hub as an external component (source: {HUB_SOURCE}, components: [canopen])"
+        )
+    return config
+
+
 def validate_unique_indices(config: ConfigType) -> ConfigType:
     seen = set()
     for pos, entity in enumerate(config[CONF_ENTITIES]):
@@ -225,6 +240,7 @@ def validate_od_writer_tpdo(config: ConfigType) -> ConfigType:
 
 
 CONFIG_SCHEMA = cv.All(
+    validate_hub,
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(CANopenEntities),

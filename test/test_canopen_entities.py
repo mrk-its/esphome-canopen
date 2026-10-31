@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 
 import pytest
@@ -452,3 +453,27 @@ def test_codegen_remote_logs(tmp_path: Path) -> None:
 )
 def test_invalid_remote_logs(tmp_path: Path, extra: dict, remote_logs: dict, message: str) -> None:
     assert message in config_error(tmp_path, ENTITIES, extra, remote_logs=remote_logs)
+
+
+@needs_esphome
+def test_partial_hub(tmp_path):
+    """A hub without the later upstream PRs (here: PDOs and SDO block transfer removed from a copy) gives a clear
+    error instead of an AttributeError."""
+    hub = tmp_path / "hub"
+    shutil.copytree(HUB / "canopen", hub / "canopen", ignore=shutil.ignore_patterns("__pycache__"))
+    init = hub / "canopen" / "__init__.py"
+    source = init.read_text(encoding="utf-8")
+    for old, new in (
+        ("def enable_pdo(", "def _no_enable_pdo("),
+        ("def enable_sdo_block(", "def _no_enable_sdo_block("),
+        ("CONF_SDO_BLOCK_SIZE", "_NO_SDO_BLOCK_SIZE"),
+    ):
+        source = source.replace(old, new)
+    init.write_text(source, encoding="utf-8")
+    path = write_config(tmp_path, [{"id": "temp", "index": 1, "tpdo": 0}])
+    path.write_text(path.read_text(encoding="utf-8").replace(str(HUB), str(hub)), encoding="utf-8")
+    result = run_esphome(tmp_path, "config")
+    assert result.returncode != 0
+    output = result.stdout + result.stderr
+    assert "lacks enable_pdo, enable_sdo_block, CONF_SDO_BLOCK_SIZE" in output
+    assert "github://mrk-its/esphome@canopen-full" in output
