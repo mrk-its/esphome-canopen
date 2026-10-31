@@ -8,7 +8,7 @@ User docs: README.md is the overview / quick start only; the option reference li
 Port to CANopenNode (replacing canopen-stack), in progress: plan and handoff state in `docs/canopennode.md`,
 current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopennode.md`, done; step 3:
 `docs/sdo_server_canopennode.md`). Upstream PRs 1-3 as built and tested: `docs/upstream_prs_1-3.md`. Hub PRs 7+
-(generic CiA 301 for `esphome_entity_mapper`) are developed on branch `canopen-next` in `~/repos/esphome`
+(generic CiA 301 for `canopen_entity_mapper`) are developed on branch `canopen-next` in `~/repos/esphome`
 ("Hub for the entity mapper" in `docs/canopennode.md`; PRs 7-9 (SDO server, OD API, own PDOs) done,
 PR 10 store/restore next).
 
@@ -99,7 +99,7 @@ PR 10 store/restore next).
 - `components_next` (CANopenNode) build checks with it: `test/esp32_canopen.yaml` (ESP32-C3, esp-idf; add
   `-s framework arduino` for Arduino) and `test/esp8266_canopen.yaml` (d1_mini + mcp2515), e.g.
   `~/repos/esphome-upstream-venv/bin/esphome compile test/esp32_canopen.yaml`. CANopenNode comes from GitHub
-  (`CANOPENNODE_SOURCE` in `components_next/canopen/__init__.py`, the fork's `esphome` branch pinned to a commit;
+  (`CANOPENNODE_SOURCE` in `components_next/canopen/__init__.py`, the fork's `library-json` branch (upstream PR #664) pinned to a commit;
   bump it after pushing the fork); `canopennode_path: <local checkout>` overrides it for development.
 - Old component ESP32 build in Docker: `./docker_build.sh` (renders `test/config.yaml.template` with `envsubst`;
   note `framework` must be a mapping, e.g. `{type: esp-idf}`). Docker leaves root-owned files in `.esphome/`.
