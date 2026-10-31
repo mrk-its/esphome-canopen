@@ -449,6 +449,10 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
    `docs/upstream_prs_1-3.md` with a description of the new branches, update CLAUDE.md, and before PR 1 goes out the
    open points of "Before PR 1" below (#21522, library source, CI boilerplate).
 
+**After PR 6: OTA in the hub** (planned 2026-11-01, [canopen_ota.md](canopen_ota.md)): `ota: - platform: canopen` on
+the CiA 302-3 program download objects (`0x1F50` / `0x1F51` / `0x1F56` / `0x1F57`) instead of the mapper's `0x3000`,
+which stays in the manufacturer area only for the old component. The mapper then has no OTA.
+
 ### Old split (superseded)
 Kept for the history of what each part contained; the branches below are not used any more.
 
@@ -745,7 +749,8 @@ Open points for `canopen_entity_mapper` itself (not in the steps yet):
   (MCUboot `Swap type: revert` armed), `safe_mode` confirms it 60 s after boot ("Boot seems successful"), then it
   survives a reset (`Swap type: none`); an image reset before the confirmation is reverted by MCUboot, the previous
   one boots again. With `safe_mode: disabled: true` nothing confirms, so the OTA platform warns on Zephyr. Open:
-  speed with bigger blocks / a bigger server buffer.
+  speed with bigger blocks / a bigger server buffer. Planned: move to the hub on CiA 302-3 objects,
+  [canopen_ota.md](canopen_ota.md).
 - **MPDO for the OD writer (own step, changes the wire protocol, needs can2mqtt and all nodes updated):** today
   `0x500 + target` is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7 frame whose first byte equals another
   node's id is applied there as an OD write, and the ID has several producers. Proposal: the CiA 301 MPDO format
