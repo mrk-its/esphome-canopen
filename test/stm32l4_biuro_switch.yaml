@@ -1,5 +1,5 @@
 # Nucleo as a wall switch on the canopen hub + canopen_entities: the user button B1 toggles dimmer4's light5
-# ("biuro", node 0x37 on the old component) with canopen.light.toggle; the green LED blinks on CAN traffic; CAN OTA
+# ("biuro", node 0x37 on the old component) with canopen_entities.light.toggle; the green LED blinks on CAN traffic; CAN OTA
 # from can2mqtt (upload .esphome/build/stm32l4-biuro-switch/.west_build/zephyr/zephyr/zephyr.signed.bin). Build / flash
 # with the esphomeplatformzephyr venv:
 #   ../esphomeplatformzephyr/venv/bin/esphome run test/stm32l4_biuro_switch.yaml
@@ -156,4 +156,4 @@ binary_sensor:
       - delayed_on_off: 20ms
     on_press:
       - logger.log: "B1 pressed"
-      - canopen.light.toggle: {node: dimmer4, entity: light5}  # biuro
+      - canopen_entities.light.toggle: {node: dimmer4, entity: light5}  # biuro

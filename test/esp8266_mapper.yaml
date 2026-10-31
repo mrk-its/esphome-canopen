@@ -80,8 +80,8 @@ button:
   - platform: template
     name: Hall toggle
     on_press:
-      - canopen.light.toggle: {node: dimmer, entity: light_hall}
-      - canopen.number.set: {node: dimmer, entity: setpoint, value: 21.5}
+      - canopen_entities.light.toggle: {node: dimmer, entity: light_hall}
+      - canopen_entities.number.set: {node: dimmer, entity: setpoint, value: 21.5}
 
 # CAN OTA (zlib-compressed images: miniz)
 ota:

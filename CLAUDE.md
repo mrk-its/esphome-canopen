@@ -35,13 +35,13 @@ of the mapper's `0x3000`: `docs/canopen_ota.md`.
   codegen and checks the layout hash at boot, OD `0x3002:1`). ESPHome-free, tested by `test/test_layout.py`.
 - `remote.py`: `remote_nodes` - loads another node's YAML (packages/substitutions/extend passes only, no
   validation; both formats: `canopen_entities:` and the old component's `canopen: entities:`) to resolve
-  `rpdo: {node, entity}`, `platform: canopen_entities` entities and the `canopen.<domain>.<action>` actions.
+  `rpdo: {node, entity}`, `platform: canopen_entities` entities and the `canopen_entities.<domain>.<action>` actions.
   Raw YAML values may be strings after substitution: coerce (`_normalize_node_config`, `layout.flag`).
 - Remote state slots: remote states read by `platform: canopen_entities` entities (`binary_sensor.py`, `sensor.py`,
   `text_sensor.py`, C++ in `remote_entities.*`) and toggle actions are collected from the full validated config
   (`remote_state_slots()`, entries marked with `CONF_REMOTE_STATE`), OD `0x4000+n:1`, filled by RPDO.
-  Typed actions `canopen.<domain>.<action>` (`_remote_action()`; registered in the hub's `canopen.` namespace, the
-  old component's names) -> `RemoteCommandAction` writes.
+  Typed actions `canopen_entities.<domain>.<action>` (`_remote_action()`; `canopen.<domain>.<action>` on the old
+  component and until 2026-11-01) -> `RemoteCommandAction` writes.
 - `canopen_entities.cpp/.h`: `CANopenEntities` (the component), `MappedEntity` (one entity, the `OdObject` handler of
   its three records), remote state slots, the OD writer.
 - `log_buffer.*` / `remote_logs.*`: remote logs, see "Remote logs".

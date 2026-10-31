@@ -3,7 +3,7 @@
 Sits on top of the `canopen` hub (`canopen_id`): entity metadata, states and commands at 0x2000 + 16 * N, TPDOs
 computed by layout.py, the layout hash at 0x3002, the ESPHome identity can2mqtt checks, the OD writer, and links to
 other nodes (`remote_nodes`, docs/linking-nodes.md): remote state slots at 0x4000 + n and entity commands filled by
-RPDOs from the other nodes' TPDOs, `platform: canopen_entities` entities and `canopen.<domain>.<action>` actions.
+RPDOs from the other nodes' TPDOs, `platform: canopen_entities` entities and `canopen_entities.<domain>.<action>` actions.
 """
 
 from collections.abc import Iterable
@@ -719,7 +719,7 @@ class _Target:
 def _remote_action(
     name: str, domains: tuple[str, ...], writes, schema=None, toggle: bool = False
 ) -> None:
-    """Register `canopen.<domain>.<action>`, sending the commands `writes(config, target)` returns."""
+    """Register `canopen_entities.<domain>.<action>`, sending the commands `writes(config, target)` returns."""
 
     def validate(config: ConfigType) -> ConfigType:
         if CONF_ENTITY not in config and CONF_INDEX not in config:
@@ -820,7 +820,9 @@ def _cover_control_writes(config: ConfigType, target: _Target) -> list[dict]:
         if option in config
     )
     if not writes:
-        raise cv.Invalid("canopen.cover.control: set 'stop', 'position' or 'tilt'")
+        raise cv.Invalid(
+            "canopen_entities.cover.control: set 'stop', 'position' or 'tilt'"
+        )
     return writes
 
 
@@ -837,7 +839,7 @@ _SWITCH_LIGHT = (layout.DOMAIN_SWITCH, layout.DOMAIN_LIGHT)
 _COVER = (layout.DOMAIN_COVER,)
 
 _remote_action(
-    "canopen.light.turn_on",
+    "canopen_entities.light.turn_on",
     _LIGHT_SWITCH,
     _light_turn_on_writes,
     {
@@ -845,21 +847,29 @@ _remote_action(
         cv.Optional("color_temperature"): cv.templatable(cv.color_temperature),
     },
 )
-_remote_action("canopen.light.turn_off", _LIGHT_SWITCH, _const_writes(0))
+_remote_action("canopen_entities.light.turn_off", _LIGHT_SWITCH, _const_writes(0))
 _remote_action(
-    "canopen.light.toggle", _LIGHT_SWITCH, _const_writes(TOGGLE_BOOL), toggle=True
+    "canopen_entities.light.toggle",
+    _LIGHT_SWITCH,
+    _const_writes(TOGGLE_BOOL),
+    toggle=True,
 )
-_remote_action("canopen.switch.turn_on", _SWITCH_LIGHT, _const_writes(1))
-_remote_action("canopen.switch.turn_off", _SWITCH_LIGHT, _const_writes(0))
+_remote_action("canopen_entities.switch.turn_on", _SWITCH_LIGHT, _const_writes(1))
+_remote_action("canopen_entities.switch.turn_off", _SWITCH_LIGHT, _const_writes(0))
 _remote_action(
-    "canopen.switch.toggle", _SWITCH_LIGHT, _const_writes(TOGGLE_BOOL), toggle=True
+    "canopen_entities.switch.toggle",
+    _SWITCH_LIGHT,
+    _const_writes(TOGGLE_BOOL),
+    toggle=True,
 )
-_remote_action("canopen.cover.open", _COVER, _const_writes(1))
-_remote_action("canopen.cover.close", _COVER, _const_writes(2))
-_remote_action("canopen.cover.stop", _COVER, _const_writes(0))
-_remote_action("canopen.cover.toggle", _COVER, _const_writes(TOGGLE_COVER), toggle=True)
+_remote_action("canopen_entities.cover.open", _COVER, _const_writes(1))
+_remote_action("canopen_entities.cover.close", _COVER, _const_writes(2))
+_remote_action("canopen_entities.cover.stop", _COVER, _const_writes(0))
 _remote_action(
-    "canopen.cover.control",
+    "canopen_entities.cover.toggle", _COVER, _const_writes(TOGGLE_COVER), toggle=True
+)
+_remote_action(
+    "canopen_entities.cover.control",
     _COVER,
     _cover_control_writes,
     {
@@ -878,12 +888,12 @@ for _action, _code in (
     ("arm_custom_bypass", 5),
 ):
     _remote_action(
-        f"canopen.alarm_control_panel.{_action}",
+        f"canopen_entities.alarm_control_panel.{_action}",
         (layout.DOMAIN_ALARM,),
         _const_writes(_code),
     )
 _remote_action(
-    "canopen.number.set",
+    "canopen_entities.number.set",
     (layout.DOMAIN_NUMBER,),
     _number_set_writes,
     {cv.Required("value"): cv.templatable(cv.float_)},

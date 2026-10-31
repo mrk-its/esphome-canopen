@@ -263,7 +263,7 @@ enum RemoteCmdEncoding : uint8_t {
 
 uint32_t encode_remote_cmd(uint8_t encoding, float value, uint8_t size, float min_value, float max_value);
 
-// canopen.<domain>.<action>: writes one or more commands of a remote node's entity with the OD writer
+// canopen_entities.<domain>.<action>: writes one or more commands of a remote node's entity with the OD writer
 template<typename... Ts> class RemoteCommandAction : public Action<Ts...>, public Parented<CANopenEntities> {
  public:
   static constexpr size_t MAX_WRITES = 3;  // MAX_WRITES in __init__.py

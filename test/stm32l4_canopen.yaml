@@ -105,7 +105,7 @@ esphome:
         ESP_LOGI("test", "OD writer: switch %s (expect OFF), send_od_write to us %s, light %s (expect OFF)",
                  ONOFF(id(test_switch).state), YESNO(local), ONOFF(id(test_light).remote_values.is_on()));
     # a real one over the bus with a remote action: dimmer4 (node 0x37, old component) light5 "biuro" off
-    - canopen.light.turn_off: {node: dimmer4, entity: light5}
+    - canopen_entities.light.turn_off: {node: dimmer4, entity: light5}
     - delay: 1s
     - lambda: |-
         id(can_gate).read_sdo<uint8_t>(0x37, 0x2051, 1, +[](void *, const canopen::SDOReply &r) {
@@ -462,4 +462,4 @@ button:
   - platform: template
     name: "Biuro toggle"
     on_press:
-      - canopen.light.toggle: {node: dimmer4, entity: light5}
+      - canopen_entities.light.toggle: {node: dimmer4, entity: light5}

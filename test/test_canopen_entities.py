@@ -266,9 +266,9 @@ def test_codegen_remote(tmp_path):
         **remote_entity("sensor", "table_brightness", "dimmer", "light_table", "brightness"),
         **remote_entity("text_sensor", "cover_text", "dimmer", "cover_hall"),
         **button(
-            {"canopen.light.toggle": {"node": "dimmer", "entity": "light_hall"}},
-            {"canopen.light.turn_on": {"node": "dimmer", "entity": "light_table", "brightness": "50%"}},
-            {"canopen.number.set": {"node": "dimmer", "entity": "setpoint", "value": 20}},
+            {"canopen_entities.light.toggle": {"node": "dimmer", "entity": "light_hall"}},
+            {"canopen_entities.light.turn_on": {"node": "dimmer", "entity": "light_table", "brightness": "50%"}},
+            {"canopen_entities.number.set": {"node": "dimmer", "entity": "setpoint", "value": 20}},
         ),
     }
     entities = [{"id": "relay", "index": 4, "tpdo": 1, "rpdo": [{"node": "dimmer", "entity": "relay"}]}]
@@ -390,14 +390,14 @@ def test_invalid_raw_rpdo(tmp_path: Path, entities: list, message: str) -> None:
         ),
         pytest.param(
             [],
-            button({"canopen.cover.open": {"node": "dimmer", "entity": "light_hall"}}),
-            "canopen.cover.open: dimmer 'light_hall' is a light, expected cover",
+            button({"canopen_entities.cover.open": {"node": "dimmer", "entity": "light_hall"}}),
+            "canopen_entities.cover.open: dimmer 'light_hall' is a light, expected cover",
             id="action-domain",
         ),
         pytest.param(
             [],
-            button({"canopen.light.turn_off": {"node": "dimmer2", "entity": "light_hall"}}),
-            "canopen.light.turn_off: dimmer2 has the OD writer off",
+            button({"canopen_entities.light.turn_off": {"node": "dimmer2", "entity": "light_hall"}}),
+            "canopen_entities.light.turn_off: dimmer2 has the OD writer off",
             id="action-od-writer-off",
         ),
         pytest.param(

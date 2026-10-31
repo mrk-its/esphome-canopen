@@ -275,7 +275,7 @@ Things to watch:
 ## Layers (target)
 ```
 entity mapper    (canopen_entities) ESPHome entities <-> 0x2000+, remote slots 0x4000+, template_entities,
-                 remote states (rpdo: {node, entity}, platform: canopen), canopen.<domain>.<action>,
+                 remote states (rpdo: {node, entity}, platform: canopen_entities), canopen_entities.<domain>.<action>,
                  OD writer, layout hash   (layout.py, remote.py unchanged)
 services         OTA (0x3000), remote logs (0x3100), device API (SDO client queue, NMT, HB, EMCY)
 node core        CANopenComponent: OD builder, NodeConfig (heartbeat, HB consumers, SDO clients, PDOs),
@@ -537,7 +537,7 @@ Target split (2026-10-30): the `canopen` hub (generic CiA 301) goes upstream; ev
 and can2mqtt stays here as the external component `canopen_entities` (named `esphome_entity_mapper` until
 2026-10-31, then `canopen_entity_mapper` until 2026-11-01), which refers to a hub with `canopen_id`:
 entities (0x2000+16n), TPDO layout and hash (0x3002), remote states (0x4000+n, `rpdo: {node, entity}`,
-`platform: canopen`, `canopen.<domain>.<action>`), the OD writer, OTA (0x3000), remote logs (0x3100), and the
+`platform: canopen_entities`, `canopen_entities.<domain>.<action>`), the OD writer, OTA (0x3000), remote logs (0x3100), and the
 ESPHome identity values and version string.
 
 **Milestone (2026-10-30): can2mqtt discovers a node on the new hub.** `test/stm32l4_canopen.yaml` (hub from
@@ -721,7 +721,7 @@ Open points for `canopen_entities` itself (not in the steps yet):
   fixed `std::array` so listeners can attach before the slot sizes are set), `binary_sensor` / `sensor` /
   `text_sensor` **`platform: canopen_entities`** (was `platform: canopen`: a platform module must live in the
   component's directory, and `canopen` is now the upstream hub), and the `canopen.<domain>.<action>` actions (names
-  kept; `RemoteCommandAction` with at most 3 writes, sent with `send_od_write()`; an action to a node with the OD
+  kept at first; `canopen_entities.<domain>.<action>` since 2026-11-01, off the hub's `canopen.` prefix; `RemoteCommandAction` with at most 3 writes, sent with `send_od_write()`; an action to a node with the OD
   writer off is rejected). RPDOs through the hub's `configure_rpdo()`, one per remote (node, TPDO), mapping the
   remote TPDO's **full length** (CANopenNode reports a longer frame with an EMCY): gaps and the tail are single
   dummy entries (index 0x0005, sub 0, any length); the plan (`remote.rpdo_plan()`, ESPHome-free) rejects overlaps
