@@ -454,7 +454,7 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
    (`git diff canopen-pr6-sdo-block canopen-full -- esphome/components/canopen tests/components/canopen` empty).
 3. Each branch on its own: `script/cpp_unit_test.py canopen`, `script/test_build_components.py -c canopen -t
    <target>` for the four targets, clang-tidy on esp8266-arduino-tidy and esp32-idf-tidy
-   (`test/upstream_tidy_setup.diff`, trimmed to the PR's features; see "Upstream conventions"), and the line count (`scripts/pr_split_lines.py` on the
+   (with the tidy setup of `canopen-full` `62bd875`, trimmed to the PR's features; see "Upstream conventions"), and the line count (`scripts/pr_split_lines.py` on the
    branch's tree: PR N's own lines are the "PR N" row).
 4. Docs: re-split `~/repos/esphome-docs` (branch `canopen-full`, the whole page, matching this branch) the same way,
    one page section per PR.
@@ -515,14 +515,13 @@ callback refactors):
   `volatile` in the port header (main loop only). Docs branches updated too.
 - clang-tidy (23.1.4, `script/clang-tidy -e <env> esphome/components/canopen`) is clean on esp8266-arduino-tidy,
   esp32-idf-tidy, bk72xx-tidy and nrf52-tidy (2026-11-01, `canopen-full` `5e2a6cf`; it found two issues, fixed there:
-  identical SDO read `case`s, a `uint8_t` loop index against `size()`). It needs a local setup that is **not** in the
-  PRs yet (`test/upstream_tidy_setup.diff`, apply in `~/repos/esphome` with `git apply`): CANopenNode (the pinned
+  identical SDO read `case`s, a `uint8_t` loop index against `size()`). Its setup is committed on `canopen-full` (`62bd875`,
+  outside the component directory, so the PR cut check doesn't see it; goes into PR 1): CANopenNode (the pinned
   GitHub URL; esp32-idf-tidy rejects `file://` and `git+file://`) in `platformio.ini` `[common] lib_deps_base` (the
   only list every tidy env gets; esp32-idf-tidy reads only the `[common*]` sections), and `USE_CANOPEN_*`,
   `CANOPEN_SDO_BLOCK_SIZE` and the `CO_CONFIG_*` values in `esphome/core/defines.h` (`od.h` / `od_handler.h` include
   it before `CANopen.h`; esp32-idf-tidy ignores `build_flags`, so they can't go there). No include path is needed since
-  the port header is in the CANopenNode fork (see "Port header"). Open: put this setup into PR 1.
-- Done on `canopen-next` (2026-10-31, one commit, to fold into the PRs when they are cut):
+  the port header is in the CANopenNode fork (see "Port header"). - Done on `canopen-next` (2026-10-31, one commit, to fold into the PRs when they are cut):
   - `ObjectDictionary` without `std::deque` (512-byte blocks): plain vectors that only grow until `finalize()`;
     entries refer to their objects by position until then, and the pointers CANopenNode gets are taken in
     `finalize()`. `add_*()` / `set_object()` after `finalize()` are ignored. `add_record()` takes an
