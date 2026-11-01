@@ -40,7 +40,6 @@ FILES = {
     "types.h": 1,
     "canopen.h": 1,
     "__init__.py": 1,
-    "canopennode_port/CO_driver_target.h": 1,
     "node_monitor.cpp": 2,
     "frames.cpp": 2,
     "sdo_client.cpp": 3,
@@ -331,11 +330,7 @@ def main() -> None:
     args = sys.argv[1:]
     if args and args[0] == "--annotate":
         path = Path(args[1])
-        rel = (
-            path.name
-            if path.parent.name != "canopennode_port"
-            else f"canopennode_port/{path.name}"
-        )
+        rel = path.name
         lines = path.read_text(encoding="utf-8").splitlines()
         for line, pr in zip(lines, classify(path, rel)):
             print(f"{pr if line.strip() else ' '} | {line}")

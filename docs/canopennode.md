@@ -413,14 +413,14 @@ local ring in `to_code()`, the duplicate node id check in `_final_validate`; PR 
 helper in the chain (PR 3).
 
 **Line counts** (`scripts/pr_split_lines.py`, see below; non-blank lines, comments included, all `.cpp`, `.h`
-including the port header, and `__init__.py`; 2433 in all):
+and `__init__.py`; 2263 in all; the port header is in the CANopenNode fork since 2026-11-01):
 
 | PR | Content | .cpp | .h | .py | Total | Comment-only | Tests (non-blank) |
 |---|---|---|---|---|---|---|---|
-| 1 | Node core: library, port header, driver, basic OD, NMT + HB producer, SDO server, identity / device info | 393 | 327 | 157 | **877** | 110 | 272: `common.yaml` + `test.*.yaml` 130, `fake_canbus.h` 45, `od_test` 75, `__init__.py` 22 |
+| 1 | Node core: library, driver, basic OD, NMT + HB producer, SDO server, identity / device info | 393 | 182 | 133 | **708** | 76 | 272: `common.yaml` + `test.*.yaml` 130, `fake_canbus.h` 45, `od_test` 75, `__init__.py` 22 |
 | 2 | Node monitoring, raw frames, heartbeat/EMCY triggers, loopback | 162 | 100 | 70 | **332** | 37 | 141: `frames_test` 59, `loopback_test` 82 |
-| 3 | SDO client, NMT master, `canopen.sdo_write` / `canopen.nmt` | 281 | 163 | 115 | **559** | 36 | 102: `loopback_test` (SDO tests) 77, `sdo_reply_test` 25 |
-| 4 | OD handler API (`OdObject`, `OdStream`, `write_od()`) + profile API (`CANopenNode`, `register_node()`) | 70 | 181 | 37 | **288** | 47 | 216: `canopen_node_test` 108, `od_test` (handler tests) 108 |
+| 3 | SDO client, NMT master, `canopen.sdo_write` / `canopen.nmt` | 279 | 163 | 115 | **557** | 36 | 102: `loopback_test` (SDO tests) 77, `sdo_reply_test` 25 |
+| 4 | OD handler API (`OdObject`, `OdStream`, `write_od()`) + profile API (`CANopenNode`, `register_node()`) | 70 | 182 | 37 | **289** | 47 | 216: `canopen_node_test` 108, `od_test` (handler tests) 108 |
 | 5 | Own PDOs + store/restore 0x1010/0x1011 | 243 | 77 | 10 | **330** | 37 | 202: `pdo_test` 103, `storage_test` 99 |
 | 6 | SDO server block transfer (`sdo_block_size`) | 3 | 0 | 44 | **47** | 6 | 230: `sdo_block_test` |
 
@@ -430,7 +430,7 @@ maps OD entries with handlers (4, `request_tpdo(index, sub)` uses the extension)
 `OdObject` (4). `cia402` (old PRs 5 / 6, on top of #21533) is a separate chain on PR 4.
 
 Notes:
-- PR 1 is under the ~1000-line limit (~770 without comment-only lines). If it's still too much: identity / device
+- PR 1 is under the ~1000-line limit (~630 without comment-only lines). If it's still too much: identity / device
   info (`device_info.cpp` without 0x1200, ~70) can move to PR 2.
 - PR 6 is small: fold it into PR 5, or keep it separate, since its download size cap needs CANopenNode's
   `CO_CONFIG_SDO_SRV_BLKSIZE` patch (fork branch `sdo-srv-blksize`), which upstream CANopenNode doesn't have yet.
@@ -450,11 +450,23 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
    `#ifdef` blocks in `canopen.cpp`, banner blocks in `canopen.h` / `od.h`, the `types.h` blocks, the `__init__.py`
    blocks and lines, `dispatch_frame_()` / the `next_local_` loop in `driver_can.cpp`, the extension lines in
    `od.*`); trim the tests the same way (test `__init__.py` enables only the `enable_*()` of PRs <= N; `common.yaml`
-   only the options of PRs <= N; `TEST`s by the table above). The last branch must equal `canopen-full`
-   (`git diff canopen-pr6-sdo-block canopen-full -- esphome/components/canopen tests/components/canopen` empty).
+   only the options of PRs <= N; `TEST`s by the table above). The clang-tidy setup (`canopen-full` `62bd875`) is cut
+   the same way: PR 1 adds the CANopenNode line to `platformio.ini` `lib_deps_base` (upstream CI runs clang-tidy on
+   the files a PR changes; without it `CANopen.h` isn't found), and each PR adds the `esphome/core/defines.h` lines of
+   the `enable_*()` it introduces:
+
+   | PR | `defines.h` |
+   |---|---|
+   | 1 | none (the node core uses the `CO_CONFIG_*` defaults of `CO_driver_target.h`) |
+   | 3 | `USE_CANOPEN_SDO_CLIENT`, `CO_CONFIG_SDO_CLI`, `CO_CONFIG_FIFO`; `USE_CANOPEN_NMT_MASTER`, `CO_CONFIG_NMT` |
+   | 5 | `USE_CANOPEN_PDO`, `CO_CONFIG_PDO`, `CO_CONFIG_STORAGE` |
+   | 6 | `CANOPEN_SDO_BLOCK_SIZE`, `CO_CONFIG_SDO_SRV`, `CO_CONFIG_SDO_SRV_BUFFER_SIZE`, `CO_CONFIG_SDO_SRV_BLKSIZE`, `CO_CONFIG_CRC16` |
+
+   The last branch must equal `canopen-full` (`git diff canopen-pr6-sdo-block canopen-full --
+   esphome/components/canopen tests/components/canopen platformio.ini esphome/core/defines.h` empty).
 3. Each branch on its own: `script/cpp_unit_test.py canopen`, `script/test_build_components.py -c canopen -t
-   <target>` for the four targets, clang-tidy on esp8266-arduino-tidy and esp32-idf-tidy
-   (with the tidy setup of `canopen-full` `62bd875`, trimmed to the PR's features; see "Upstream conventions"), and the line count (`scripts/pr_split_lines.py` on the
+   <target>` for the four targets, clang-tidy on esp8266-arduino-tidy, esp32-idf-tidy,
+   bk72xx-tidy and nrf52-tidy (with the branch's own part of the tidy setup, step 2), and the line count (`scripts/pr_split_lines.py` on the
    branch's tree: PR N's own lines are the "PR N" row).
 4. Docs: re-split `~/repos/esphome-docs` (branch `canopen-full`, the whole page, matching this branch) the same way,
    one page section per PR.
@@ -490,8 +502,9 @@ pushed, not in `components_next` yet): [cia402.md](cia402.md), "PR 4". Each bran
 - **Library source:** no `file://` path. Stock CANopenNode can't be used as is: it has no `library.json`, and the
   Zephyr and native ESP-IDF backends of ESPHome require a manifest (`esphome/platformio/library.py`, only the `host`
   backend accepts manifest-less libraries; plain PlatformIO builds would work). Done (2026-10-29): packaging-only
-  fork (branch `esphome`, upstream + `library.json`, pushed), pulled from GitHub by commit; port header in our
-  component. Optional: propose the `library.json` to CANopenNode upstream so the fork can go. The port header reaches CANopenNode on ESP32, ESP8266 and Zephyr (see "Port header"). The block-size
+  fork (branch `esphome`, upstream + `library.json`, pushed), pulled from GitHub by commit; since 2026-11-01 the
+  port header is in the fork too (see "Port header"), so the fork stays even if upstream takes the `library.json`
+  (unless the header moves back once upstream's clang-tidy can reach a component's include dir). The block-size
   patch (branch `sdo-srv-blksize`) is needed only from step 3 on (drop it, or send it
   upstream).
 - **ESP32 / ESP8266 builds** (upstream CI: esp32-idf, esp32-ard, esp8266): all three compile with upstream `dev`
@@ -501,7 +514,9 @@ pushed, not in `components_next` yet): [cia402.md](cia402.md), "PR 4". Each bran
   hardware: done (2026-11-01, see "Current state", "ESP32 hardware").
 - **API churn first:** the rename and `heartbeat_clients` rebuilt on node monitoring go into PR 1, so PR 2 doesn't
   rewrite code under review.
-- **Upstream boilerplate:** `tests/components/canopen/*.yaml`, Python tests, CODEOWNERS, esphome.io docs.
+- **Upstream boilerplate:** `tests/components/canopen/*.yaml`, Python tests, CODEOWNERS, esphome.io docs, the
+  clang-tidy setup (`platformio.ini` `lib_deps_base`, `defines.h`; see "Cutting the branches", step 2). The
+  CANopenNode pin is then in two places (`CANOPENNODE_SOURCE`, `platformio.ini`): bump both.
 - **#21522** (another author's open `canopen` hub, base of #21533): talk to its author / comment there before
   opening a competing component (open question below).
 
@@ -515,13 +530,14 @@ callback refactors):
   `volatile` in the port header (main loop only). Docs branches updated too.
 - clang-tidy (23.1.4, `script/clang-tidy -e <env> esphome/components/canopen`) is clean on esp8266-arduino-tidy,
   esp32-idf-tidy, bk72xx-tidy and nrf52-tidy (2026-11-01, `canopen-full` `5e2a6cf`; it found two issues, fixed there:
-  identical SDO read `case`s, a `uint8_t` loop index against `size()`). Its setup is committed on `canopen-full` (`62bd875`,
-  outside the component directory, so the PR cut check doesn't see it; goes into PR 1): CANopenNode (the pinned
+  identical SDO read `case`s, a `uint8_t` loop index against `size()`). Its setup is committed on `canopen-full` (`62bd875`)
+  and is cut into the PRs like the component ("Cutting the branches", step 2): CANopenNode (the pinned
   GitHub URL; esp32-idf-tidy rejects `file://` and `git+file://`) in `platformio.ini` `[common] lib_deps_base` (the
   only list every tidy env gets; esp32-idf-tidy reads only the `[common*]` sections), and `USE_CANOPEN_*`,
   `CANOPEN_SDO_BLOCK_SIZE` and the `CO_CONFIG_*` values in `esphome/core/defines.h` (`od.h` / `od_handler.h` include
   it before `CANopen.h`; esp32-idf-tidy ignores `build_flags`, so they can't go there). No include path is needed since
-  the port header is in the CANopenNode fork (see "Port header"). - Done on `canopen-next` (2026-10-31, one commit, to fold into the PRs when they are cut):
+  the port header is in the CANopenNode fork (see "Port header").
+- Done on `canopen-next` (2026-10-31, one commit, to fold into the PRs when they are cut):
   - `ObjectDictionary` without `std::deque` (512-byte blocks): plain vectors that only grow until `finalize()`;
     entries refer to their objects by position until then, and the pointers CANopenNode gets are taken in
     `finalize()`. `add_*()` / `set_object()` after `finalize()` are ignored. `add_record()` takes an
