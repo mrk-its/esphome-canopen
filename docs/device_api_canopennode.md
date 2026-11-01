@@ -273,7 +273,7 @@ Raw frames (PDOs of other devices, later the host OD writer; done, moved to PR 1
 5. `pytest test/` for the old component (needs pytest installed; old component untouched).
 
 ## Status (2026-10-29)
-Implemented in `components_next` and as PR 3 (`canopen-3-sdo`); hardware results (24/24), lessons and what isn't
+Implemented in `components_next` and as PR 3 (`canopen-3-sdo`, deleted 2026-11-01); hardware results (24/24), lessons and what isn't
 covered: [upstream_prs_1-3.md](upstream_prs_1-3.md).
 
 ## Open points

@@ -18,7 +18,7 @@ current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopenn
 (generic CiA 301 for `canopen_entities`) are developed on branch `canopen-next` in `~/repos/esphome`
 ("Hub for the entity mapper" in `docs/canopennode.md`; PRs 7-12 (SDO server, OD API, own PDOs, store/restore,
 loopback between local nodes, SDO block transfer) done).
-Upstream PRs are being re-split (the old `canopen-1..4` branches / `docs/upstream_prs_1-3.md` are superseded): the hub
+Upstream PRs are being re-split (the old `canopen-1..4` branches are deleted, `docs/upstream_prs_1-3.md` is superseded): the hub
 refactored by feature on branch `canopen-full` in `~/repos/esphome`, the file -> PR map, line counts and cutting
 steps in `docs/canopennode.md`, "Upstream PRs" -> "New split"; per-PR line counts with `scripts/pr_split_lines.py`.
 Planned after PR 6: OTA in the hub on CiA 302-3 program download objects (`0x1F50`/`0x1F51`/`0x1F56`/`0x1F57`) instead

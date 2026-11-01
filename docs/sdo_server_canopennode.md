@@ -1,7 +1,7 @@
 # CANopenNode step 3: SDO server and identity
 
 ## Status (2026-10-30): done as upstream PR 7
-Implemented in `~/repos/esphome` on branch `canopen-next` (on top of `canopen-4-profile`; the branch for
+Implemented in `~/repos/esphome` on branch `canopen-next` (on top of `canopen-4-profile`, deleted 2026-11-01; the branch for
 all remaining hub PRs, cut into separate PR branches later). Differs from the plan below, which was written for the
 old combined component:
 - generic CiA 301, nothing esphome-canopen specific: `identity:` (`vendor_id`, `product_code`, `revision_number`,

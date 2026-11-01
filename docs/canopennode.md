@@ -22,7 +22,8 @@ see "Hub for the entity mapper"). **Next:** cut the upstream PRs again from the 
 ## Current state (handoff)
 Where to continue (2026-10-31):
 - **Upstream split:** "Upstream PRs" -> "New split": what `canopen-full` changed, the file -> PR map, the line counts
-  (`scripts/pr_split_lines.py`), and the cutting steps.
+  (`scripts/pr_split_lines.py`), and the cutting steps. PR 1 is cut (2026-11-01, `canopen-pr1-node` in
+  `~/repos/esphome` and `~/repos/esphome-docs`, not pushed); next: PR 2.
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
 - **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
   `components_next`); the old component (`components/canopen`, canopen-stack) and `components_next/canopen` (a stale
@@ -349,8 +350,8 @@ out early and the next ones are prepared here meanwhile.
 ### New split (2026-10-31, branch `canopen-full`) — current plan
 **Why.** The old split (tables further down) followed the order the work was done in: every PR edited the same
 functions (`setup()` mixed every feature, 7 `#ifdef` blocks), so a fix in one PR had to be rebased through all later
-ones. None of the old branches (`canopen-1-node` .. `canopen-4-profile`) was opened as an upstream PR (only pushed to
-mrk-its/esphome), so the split is redone from the finished tree: refactor the hub by feature first, so that each PR
+ones. None of the old branches (`canopen-1-node` .. `canopen-4-profile`, deleted 2026-11-01, locally and on mrk-its/esphome) was opened as an upstream PR
+(only pushed to mrk-its/esphome), so the split is redone from the finished tree: refactor the hub by feature first, so that each PR
 mostly *adds files and blocks*, then cut the PR branches from it.
 
 **Where.** `~/repos/esphome`, branch `canopen-full`, created from `canopen-next` (`21ab50897e`, hub PRs 1-12 in 17
@@ -464,13 +465,29 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
 
    The last branch must equal `canopen-full` (`git diff canopen-pr6-sdo-block canopen-full --
    esphome/components/canopen tests/components/canopen platformio.ini esphome/core/defines.h` empty).
+
+   **PR 1 done (2026-11-01), not pushed:** `canopen-pr1-node` in `~/repos/esphome`, `144fce267f` on `upstream/dev`
+   `27aa91bb9d` (component, `tests/components/canopen`, `tests/component_tests/canopen`, CODEOWNERS, the
+   `platformio.ini` line; 659 lines by the script), and in `~/repos/esphome-docs`, `bad076268` on `next` `231db3c44`
+   (the page cut to PR 1, the two index links). Checked: `cpp_unit_test.py canopen` (2), the Python component tests
+   (6), `test_build_components.py` for the four targets (only PR 1's four sources built, no warnings), clang-tidy
+   esp8266-arduino-tidy and esp32-idf-tidy (4 files, clean; it only checks committed files, so run it after the
+   commit), pre-commit. Cut by hand where the script's annotation is wrong (fix its rules before PR 2): the end of
+   the raw frames block in `canopen.h` (`};`, `frame_listeners_`, heartbeat / EMCY callbacks: PR 2),
+   `set_response_timeout()` / `response_timeout_ms_` (PR 3), the OD storage members in `od.h` (PR 1, only
+   `extensions_` is PR 4), the `PendingEntry{..., 0}` extension initializers in `od.cpp` (PR 4), the loopback loop
+   body in `transmit()` (PR 2). Also: the class comment and includes trimmed to PR 1, `OD_TPDO` / `OD_RPDO` left to
+   PR 5, `_final_validate` left out (all its checks are PRs 2 / 6), `fake_canbus.h` moves to PR 2 (no PR 1 test uses
+   it), `od_test.cpp` has `Strings` and `Record` only. Venv: `PYTHONPATH=<worktree>` so the scripts import the
+   worktree's `esphome`, not the editable install of `~/repos/esphome`.
 3. Each branch on its own: `script/cpp_unit_test.py canopen`, `script/test_build_components.py -c canopen -t
    <target>` for the four targets, clang-tidy on esp8266-arduino-tidy, esp32-idf-tidy,
    bk72xx-tidy and nrf52-tidy (with the branch's own part of the tidy setup, step 2), and the line count (`scripts/pr_split_lines.py` on the
    branch's tree: PR N's own lines are the "PR N" row).
 4. Docs: re-split `~/repos/esphome-docs` (branch `canopen-full`, the whole page, matching this branch) the same way,
    one page section per PR.
-5. Then: delete the old `canopen-1-node` .. `canopen-4-profile` branches on mrk-its/esphome (ask first), replace
+5. Then: ~~delete the old `canopen-1-node` .. `canopen-4-profile` branches on mrk-its/esphome~~ (done 2026-11-01:
+   `canopen-1-node` `acf8485713`, `canopen-2-frames` `09010a96e7`, `canopen-3-sdo` `933739c6eb`, `canopen-4-profile` `ab086aa045`), replace
    `docs/upstream_prs_1-3.md` with a description of the new branches, update CLAUDE.md, and before PR 1 goes out the
    open points of "Before PR 1" below (#21522, library source, CI boilerplate).
 
@@ -488,14 +505,14 @@ Old split (revised 2026-10-29: the first version of PR 1, ~1050 production lines
 | 1. node + heartbeat monitoring | CANopenNode integration (library, port header trimmed to NMT / HB producer+consumer / EM, driver, runtime OD with VAR/ARRAY), NMT state machine, heartbeat producer, `heartbeat_clients` + `on_node_event`, `is_node_online()` / `get_node_state()` | 845 (measured, incl. comments; tests 175) |
 | 2. raw frames and events | `on_heartbeat` / `on_emcy` (+ decoders, `Emergency`), `add_frame_listener()`, `send_frame()` | ~150 |
 | 3. SDO client + NMT master | `sdo_client.cpp`, `add_record()` (0x1280), `canopen.sdo_write`, `canopen.nmt`, optional parts | ~450 |
-| 4. profile API | `canopen_node.h` (`CANopenNode` base class, hooks, forwarders), `register_node()`; branch `canopen-4-profile`, done ([cia402.md](cia402.md), "PR 4") | 145 (tests ~240) |
+| 4. profile API | `canopen_node.h` (`CANopenNode` base class, hooks, forwarders), `register_node()`; branch `canopen-4-profile` (deleted 2026-11-01), done ([cia402.md](cia402.md), "PR 4") | 145 (tests ~240) |
 | 5. `cia402`, SDO | direct port of #21533 onto the hub (ideally by its author) | ~450 |
 | 6. PDO process data | `add_pdo_listener()` / `send_pdo()`, `SDOSequence`, `configure_rpdo/tpdo`; `cia402` `process_data: pdo` | ~450 |
 
 The SDO server and our own entities/OTA/logs (steps 3-8) are a later chain.
 
 Branches, tests and results of PRs 1-3: [upstream_prs_1-3.md](upstream_prs_1-3.md); PR 4 (`canopen-4-profile`,
-pushed, not in `components_next` yet): [cia402.md](cia402.md), "PR 4". Each branch is cut from
+deleted 2026-11-01): [cia402.md](cia402.md), "PR 4". Each branch is cut from
 `components_next/canopen` (the full, hardware-tested tree) in `~/repos/esphome`; later branches stack on it.
 
 ### Before PR 1 (applies to the new split too)

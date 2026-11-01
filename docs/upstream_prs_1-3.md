@@ -7,8 +7,11 @@ the plans and their history are in [canopennode.md](canopennode.md) (overall por
 (step 2). The PRs after these (profile API, `cia402`, PDO) are in [cia402.md](cia402.md).
 
 ## Branches
+**Superseded and deleted (2026-11-01, locally and on mrk-its/esphome):** the PRs are re-split from `canopen-full`
+(`canopen-pr1-node` ..., see [canopennode.md](canopennode.md), "New split"). Last commits: `canopen-1-node` `acf8485713`, `canopen-2-frames` `09010a96e7`, `canopen-3-sdo` `933739c6eb`, `canopen-4-profile` `ab086aa045`.
+
 All in `~/repos/esphome`, branched from `upstream/dev`, one commit each, stacked, pushed to `origin`
-(mrk-its/esphome). No PRs opened yet.
+(mrk-its/esphome). No PRs opened.
 
 | PR | Branch | Content | Size (component / tests) |
 |---|---|---|---|
