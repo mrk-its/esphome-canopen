@@ -11,8 +11,8 @@ OD writer and OTA. So:
 * can2mqtt handles both;
 * with the same `node_id` and entity `index` values the entities keep their identity in Home Assistant.
 
-A node can be moved to the new component with an OTA update over CAN (same upload protocol); this hasn't been tested
-on hardware yet, so keep a way to flash it over USB.
+A node can be moved to the new component with an OTA update over CAN (same upload protocol), as done on an ESP32-C3
+node. Keep a way to flash it over USB anyway, in case the new firmware doesn't come up.
 
 ## YAML
 ```yaml

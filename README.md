@@ -12,8 +12,8 @@ which is being contributed to ESPHome. Until it is in an ESPHome release, this r
 is developed on), so one `external_components` entry brings both.
 
 > **Status:** `canopen_entities` replaces this repository's old `canopen` component (built on canopen-stack). It is
-> new: tested on STM32 hardware (ESPHome on Zephyr), ESP32 and ESP8266 builds compile but haven't been tested on
-> hardware yet. Nodes with the old component keep working on the same bus. The old component stays available from the
+> new: running on ESP32 (ESP32-C3, ESP-IDF) and STM32 hardware (ESPHome on Zephyr); ESP8266 builds compile but haven't
+> been tested on hardware yet. Nodes with the old component keep working on the same bus. The old component stays available from the
 > `main` branch. See [Migrating from the old component](docs/migration.md).
 
 ## How it works

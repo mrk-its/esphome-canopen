@@ -13,7 +13,10 @@ ota:
 
 ## Updating a node
 1. Build the firmware: `esphome compile node.yaml`. The image is
-   `.esphome/build/<node>/.pioenvs/<node>/firmware.bin` (on Zephyr see [below](#zephyr-platform-zephyr-with-mcuboot)).
+   `.esphome/build/<node>/build/firmware.ota.bin` with ESP-IDF (on ESP32 by default),
+   `.esphome/build/<node>/.pioenvs/<node>/firmware.bin` with PlatformIO builds (e.g. ESP8266), on Zephyr see
+   [below](#zephyr-platform-zephyr-with-mcuboot). can2mqtt finds the node id in the image itself, so the file name
+   doesn't matter.
 2. Copy it into a per-node subdirectory of can2mqtt's firmware directory, e.g. `firmware/<node>/firmware.bin`:
    * HA add-on: `/addon_configs/<SLUG>_can2mqtt/<node>/firmware.bin` (SLUG is shown on the add-on page)
    * standalone: `--firmware-dir` (default `./firmware`)

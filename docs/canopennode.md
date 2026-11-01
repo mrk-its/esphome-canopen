@@ -32,6 +32,13 @@ Where to continue (2026-10-31):
   is from 2023) before this branch merges, so its users can pin it. User docs rewritten for the hub +
   `canopen_entities` (2026-11-01, `docs/migration.md` for old -> new), with this repo at `@canopen_entities`:
   change that ref when the branch is merged.
+- **ESP32 hardware** (2026-11-01): `~/repos/zrodlana/esphome/node-c3-t2.yaml` (ESP32-C3, ESP-IDF, `esp32_can`,
+  node 0x32, built with the esphomeplatformzephyr venv) migrated to `canopen` + `canopen_entities`
+  (`common/common_canopen_entities.yaml`: no CAN status counters, no "Disable OTA reboot" switch). Updated by CAN OTA
+  from the old component through can2mqtt, then again with `remote_logs` (block size 16, `tx_queue_len: 128`):
+  entities in HA, toggles of lights on `dimmer1` / `dimmer4` (old component, old-format YAML read by `remote.py`),
+  remote logs in can2mqtt, all working. The other `zrodlana` nodes still use `common/common.yaml` (old component, via
+  `../../esphome-canopen/components`): build them from `main`.
 - **Hub copy in this repo** (2026-11-01): `components/canopen` is a generated copy of `canopen-full`
   (`scripts/sync_hub.py`, `SYNCED_FROM`, checked by `test/test_hub_copy.py`), so users need one `external_components`
   source (a `github://` source of the ESPHome fork is a 42 MB shallow clone for the 110 KB hub). The hub is still
@@ -498,8 +505,8 @@ pushed, not in `components_next` yet): [cia402.md](cia402.md), "PR 4". Each bran
 - **ESP32 / ESP8266 builds** (upstream CI: esp32-idf, esp32-ard, esp8266): all three compile with upstream `dev`
   (`test/esp32_canopen.yaml`, `test/esp8266_canopen.yaml`). `driver_can.cpp` uses `send_data(..., data, len)`,
   which is in `dev` but not in the 2026.9.x releases, so `components_next` needs ESPHome newer than 2026.9 (fine for
-  PRs against `dev`; matters only if it ships as an external component before the next release). Still to do: run
-  on real ESP32 hardware.
+  PRs against `dev`; matters only if it ships as an external component before the next release). Run on real ESP32
+  hardware: done (2026-11-01, see "Current state", "ESP32 hardware").
 - **API churn first:** the rename and `heartbeat_clients` rebuilt on node monitoring go into PR 1, so PR 2 doesn't
   rewrite code under review.
 - **Upstream boilerplate:** `tests/components/canopen/*.yaml`, Python tests, CODEOWNERS, esphome.io docs.
