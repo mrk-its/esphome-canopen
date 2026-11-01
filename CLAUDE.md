@@ -62,7 +62,8 @@ committing them). After hub changes: commit in the fork, `scripts/sync_hub.py`, 
 full hub is in an ESPHome release. CANopenNode is pinned in the hub (`CANOPENNODE_SOURCE` in its `__init__.py`, a commit
 of the fork's `esphome` branch: `library.json` (upstream PR #664), the SDO block size patch and the port header
 `CO_driver_target.h` (in the fork since 2026-11-01, for clang-tidy); pin the commit, not the branch; bump it after
-pushing the fork; `canopennode_path: <local checkout>` overrides it for development).
+pushing the fork, in both places: `CANOPENNODE_SOURCE` and the CANopenNode line of `platformio.ini` `lib_deps_base` in
+`~/repos/esphome` (the clang-tidy setup, on `canopen-full`); `canopennode_path: <local checkout>` overrides it for development).
 
 ## CAN OTA flow
 - OD 0x3000: `:1` ctrl, `:2` size, `:3` MD5 (16 bytes), `:4` image data (SDO block download), `:5` flags
