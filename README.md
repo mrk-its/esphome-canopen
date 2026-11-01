@@ -83,7 +83,7 @@ esp32:
 
 external_components:
   # canopen_entities, and the canopen component until it is in an ESPHome release
-  - source: github://mrk-its/esphome-canopen@feature/entity-mapper
+  - source: github://mrk-its/esphome-canopen@canopen_entities
 
 logger:
   logs:

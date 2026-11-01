@@ -1,7 +1,7 @@
 # Porting esphome-canopen to CANopenNode
 
 Status (2026-10-31): the hub (upstream `canopen` component, CANopenNode) is done for the entity mapper (hub PRs 1-12
-on `canopen-next` in `~/repos/esphome`); `canopen_entities` is ported (this repo, branch `feature/entity-mapper`,
+on `canopen-next` in `~/repos/esphome`); `canopen_entities` is ported (this repo, branch `canopen_entities`, renamed from `feature/entity-mapper` 2026-11-01;
 see "Hub for the entity mapper"). **Next:** cut the upstream PRs again from the refactored hub, see "Upstream PRs",
 "New split" (branch `canopen-full`, refactor committed as `e9f738ebf7`).
 
@@ -24,13 +24,13 @@ Where to continue (2026-10-31):
 - **Upstream split:** "Upstream PRs" -> "New split": what `canopen-full` changed, the file -> PR map, the line counts
   (`scripts/pr_split_lines.py`), and the cutting steps.
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
-- **Repo layout** (2026-11-01, `feature/entity-mapper`): `components/` holds only `canopen_entities` (moved from
+- **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
   `components_next`); the old component (`components/canopen`, canopen-stack) and `components_next/canopen` (a stale
   copy of the hub) are removed, with the tests and configs only they used (`test_od.py`, `test_frames.py` (the hub has
   both tests), `test_remote.py`, `logs_test.cpp`, `esp32_canopen.yaml` / `esp8266_canopen.yaml`, the Docker build,
   `examples/`, CI's build job). The old component stays on `main`; tag `main` (e.g. `v0.4.0`, the last tag `v0.3.1`
   is from 2023) before this branch merges, so its users can pin it. User docs rewritten for the hub +
-  `canopen_entities` (2026-11-01, `docs/migration.md` for old -> new), with this repo at `@feature/entity-mapper`:
+  `canopen_entities` (2026-11-01, `docs/migration.md` for old -> new), with this repo at `@canopen_entities`:
   change that ref when the branch is merged.
 - **Hub copy in this repo** (2026-11-01): `components/canopen` is a generated copy of `canopen-full`
   (`scripts/sync_hub.py`, `SYNCED_FROM`, checked by `test/test_hub_copy.py`), so users need one `external_components`
@@ -156,7 +156,7 @@ The bullets below are the state of step 1 (2026-10-29), kept for the CANopenNode
   - Entries can't be added after init (canopen-stack allowed this until operational); that case is logged.
 - **Development tree:** first `components_next/canopen` here, then the hub in `~/repos/esphome` (upstream PR
   branches, now `canopen-full`) plus `canopen_entities` here. Since 2026-11-01 `canopen_entities` is in `components/`
-  and the old component is gone from `feature/entity-mapper` (see "Current state").
+  and the old component is gone from `canopen_entities` (see "Current state").
 - **Test target:** `test/stm32l4_canopen.yaml` (Zephyr, nucleo_l476rg, MCUboot), built with
   `../esphomeplatformzephyr/venv/bin/esphome` (version 2026.11.0-dev). Upstream build check with the upstream `dev`
   venv `~/repos/esphome-upstream-venv` (see CLAUDE.md "Testing"): `test/esp8266_mapper.yaml`; the hub's own builds
@@ -328,7 +328,7 @@ Each step is a commit on `feature/canopennode` (or its own `feature/...` branch)
    `0x4000+n`, `rpdo: {node, entity}`, `platform: canopen` entities reading other nodes, `canopen.<domain>.<action>`)
    stay, but in the entity mapper (`canopen_entities`), not in the `canopen` hub (decision 2026-10-30; replaces
    the 2026-10-29 decision to drop them).
-9. **Switch over** (2026-11-01, `feature/entity-mapper`: the old component removed, `canopen_entities` in
+9. **Switch over** (2026-11-01, `canopen_entities`: the old component removed, `canopen_entities` in
    `components/`; the hub stays in `~/repos/esphome`, so the first bullet became "the hub replaces it"):
    - `components_next/canopen` replaces `components/canopen`;
    - remove the canopen-stack code (`co_cmd`, `co_storage`, the old `driver_can`/`od`, the `CO_*` build flags,

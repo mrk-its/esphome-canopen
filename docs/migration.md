@@ -35,7 +35,7 @@ ota:
 ```yaml
 # new
 external_components:
-  - source: github://mrk-its/esphome-canopen@feature/entity-mapper   # canopen + canopen_entities
+  - source: github://mrk-its/esphome-canopen@canopen_entities   # canopen + canopen_entities
 
 canopen:
   node_id: 0x10

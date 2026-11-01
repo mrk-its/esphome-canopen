@@ -6,8 +6,8 @@ developed in `~/repos/esphome`, branch `canopen-full`; this repo ships a generat
 "Layout"). The host side is
 [can2mqtt](https://github.com/mrk-its/can2mqtt) (MQTT/Home Assistant bridge, also the OTA uploader).
 OD layout for entities: see OBJECT_DICTIONARY.md.
-The old component (on canopen-stack) is only on `main` (there as `components/canopen`; replaced on
-`feature/entity-mapper`, 2026-11-01); nodes still running it interoperate (same OD, `remote.py` reads their YAML).
+The old component (on canopen-stack) is only on `main` (there as `components/canopen`; replaced on branch
+`canopen_entities`, 2026-11-01); nodes still running it interoperate (same OD, `remote.py` reads their YAML).
 User docs: README.md is the overview / quick start only; the option reference lives in `docs/configuration.md`,
 `docs/linking-nodes.md`, `docs/ota.md`, `docs/remote-logs.md`, old -> new in `docs/migration.md`. Document new options
 there. The hub's own options are documented in esphome-docs (`~/repos/esphome-docs`, branch `canopen-full`); the user
@@ -27,6 +27,9 @@ of the mapper's `0x3000`: `docs/canopen_ota.md`.
 ## Workflow
 - Always do new features and fixes on a `feature/<short-name>` branch (created from the current branch,
   usually `dev`), never directly on `dev` or `main`.
+- Exception: the CANopenNode port (`canopen_entities` + the hub copy) lives on branch `canopen_entities` (no
+  `feature/` prefix, renamed from `feature/entity-mapper` 2026-11-01); its steps go straight onto it. The user docs
+  load the component from `@canopen_entities` until it's merged.
 
 ## Layout
 `components/canopen_entities/`:
