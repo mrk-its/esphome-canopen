@@ -59,9 +59,10 @@ of the mapper's `0x3000`: `docs/canopen_ota.md`.
 `components/canopen/SYNCED_FROM` (commit, digest); `test/test_hub_copy.py` fails if the copy was edited, differs from
 that commit, or was synced with `--worktree` (the fork's uncommitted state, for a hardware test of hub changes before
 committing them). After hub changes: commit in the fork, `scripts/sync_hub.py`, commit here. Delete the copy once the
-full hub is in an ESPHome release. CANopenNode is pinned in the hub (`CANOPENNODE_SOURCE` in its `__init__.py`, the
-fork's `library-json` branch (upstream PR #664); bump it after pushing the fork; `canopennode_path: <local checkout>`
-overrides it for development).
+full hub is in an ESPHome release. CANopenNode is pinned in the hub (`CANOPENNODE_SOURCE` in its `__init__.py`, a commit
+of the fork's `esphome` branch: `library.json` (upstream PR #664), the SDO block size patch and the port header
+`CO_driver_target.h` (in the fork since 2026-11-01, for clang-tidy); pin the commit, not the branch; bump it after
+pushing the fork; `canopennode_path: <local checkout>` overrides it for development).
 
 ## CAN OTA flow
 - OD 0x3000: `:1` ctrl, `:2` size, `:3` MD5 (16 bytes), `:4` image data (SDO block download), `:5` flags

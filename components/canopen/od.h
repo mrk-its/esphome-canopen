@@ -5,6 +5,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "esphome/core/defines.h"  // before CANopenNode: clang-tidy gets the CO_CONFIG_* values from it
+
 #define OD_DEFINITION
 #include "CANopen.h"
 

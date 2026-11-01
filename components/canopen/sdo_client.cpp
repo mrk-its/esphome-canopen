@@ -128,8 +128,6 @@ bool CANopenComponent::start_sdo_() {
     this->sdo_rx_buf_ = std::make_unique<uint8_t[]>(SDO_MAX_UPLOAD);
   switch (r.kind) {
     case SDOKind::SDO_KIND_READ:
-      return CO_SDOclientUploadInitiate(cli, r.index, r.sub, this->response_timeout_ms_, false) ==
-             CO_SDO_RT_ok_communicationEnd;
     case SDOKind::SDO_KIND_READ_DATA:
       return CO_SDOclientUploadInitiate(cli, r.index, r.sub, this->response_timeout_ms_, false) ==
              CO_SDO_RT_ok_communicationEnd;

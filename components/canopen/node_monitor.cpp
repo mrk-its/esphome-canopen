@@ -71,7 +71,7 @@ void CANopenComponent::config_node_monitor_(CO_config_t &cfg) {
 }
 
 void CANopenComponent::init_node_monitor_() {
-  for (uint8_t i = 0; i < this->hb_cons_.size(); i++) {
+  for (uint8_t i = 0, n = this->hb_cons_.size(); i < n; i++) {
     CO_HBconsumer_t *hb = this->co_->HBcons;
     CO_HBconsumer_initCallbackHeartbeatStarted(hb, i, this, on_hb_started);
     CO_HBconsumer_initCallbackNmtChanged(hb, i, this, on_hb_nmt_changed);

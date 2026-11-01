@@ -19,7 +19,6 @@ from esphome.const import (
 from esphome.core import CORE, ID
 from esphome.cpp_generator import MockObj, TemplateArgsType
 import esphome.final_validate as fv
-from esphome.helpers import write_file_if_changed
 from esphome.types import ConfigType
 
 CODEOWNERS = ["@mrk-its"]
@@ -49,12 +48,9 @@ CONF_DEVICE_NAME = "device_name"
 CONF_HARDWARE_VERSION = "hardware_version"
 CONF_SOFTWARE_VERSION = "software_version"
 
-# CANopenNode upstream + library.json + SDO server block size option (branch esphome), pinned to a commit
-CANOPENNODE_SOURCE = "https://github.com/mrk-its/CANopenNode.git#9ff367b8205d746a84111b38e01ace3feaffb401"
-PORT_PATH = Path(__file__).resolve().parent / "canopennode_port"
-PORT_HEADER = "CO_driver_target.h"
-# a local IDF component is named after its directory
-IDF_PORT_COMPONENT = "canopennode_port"
+# CANopenNode upstream + library.json + SDO server block size option + the ESPHome target header CO_driver_target.h
+# (branch esphome), pinned to a commit
+CANOPENNODE_SOURCE = "https://github.com/mrk-its/CANopenNode.git#30a669c94678595c4cac7fe9d9c5e3fb75166e18"
 
 ns = cg.esphome_ns.namespace("canopen")
 CANopenComponent = ns.class_("CANopenComponent", cg.Component)
@@ -327,34 +323,14 @@ FINAL_VALIDATE_SCHEMA = _final_validate
 
 
 def add_canopennode_library(path: str | None = None) -> None:
-    """Add the CANopenNode library and its target header (also used by the C++ unit tests)."""
+    """Add the CANopenNode library (also used by the C++ unit tests).
+
+    Its target header (CO_driver_target.h) is in the library itself, so no include path is needed.
+    """
     if path is not None:
         cg.add_library("CANopenNode", None, f"file://{path}")
     else:
         cg.add_library("CANopenNode", None, CANOPENNODE_SOURCE)
-    # CANopenNode's 301/CO_driver.h includes CO_driver_target.h, which lives in canopennode_port/. Project -I
-    # flags don't reach converted libraries (only -D/-W do), so that directory is added as a package of its own:
-    if CORE.is_esp32:
-        # ESP-IDF: a converted library sees only the components it requires, which include every
-        # project-managed IDF component. Generated in the build dir: CMakeLists.txt files are gitignored in esphome.
-        from esphome.components.esp32 import add_idf_component
-
-        idf_port = CORE.relative_build_path(IDF_PORT_COMPONENT)
-        idf_port.mkdir(parents=True, exist_ok=True)
-        write_file_if_changed(
-            idf_port / PORT_HEADER,
-            (PORT_PATH / PORT_HEADER).read_text(encoding="utf-8"),
-        )
-        write_file_if_changed(
-            idf_port / "CMakeLists.txt", 'idf_component_register(INCLUDE_DIRS ".")\n'
-        )
-        add_idf_component(name=IDF_PORT_COMPONENT, path=str(idf_port))
-    else:
-        # Zephyr (native build) exports every library's include dirs globally
-        cg.add_library("CANopenNode-esphome-port", None, f"file://{PORT_PATH}")
-        # PlatformIO (ESP8266, host, ...) passes project build flags to libraries, but its LDF doesn't link the
-        # library above to CANopenNode
-        cg.add_build_flag(f"-I{PORT_PATH}")
 
 
 async def to_code(config):

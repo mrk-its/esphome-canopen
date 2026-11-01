@@ -64,27 +64,20 @@ The bullets below are the state of step 1 (2026-10-29), kept for the CANopenNode
       our port config disables are dropped by the linker (no size change);
     - branch `sdo-srv-blksize`, commit `67ad4ba`: the `CO_CONFIG_SDO_SRV_BLKSIZE` patch alone (below), to propose
       upstream separately;
-    - branch `esphome`, commit `9ff367b` (2026-10-30: reset to `library-json` + cherry-pick of `67ad4ba`, force-pushed;
-      was `f38ec8a`, library.json only): what every build pins (`CANOPENNODE_SOURCE` in the PR branches,
-      `canopen-next` and `components_next`);
+    - branch `esphome`, commit `30a669c` (2026-11-01: + the port header `CO_driver_target.h` in the library root, see
+      "Port header"; before that `9ff367b`, 2026-10-30: reset to `library-json` + cherry-pick of `67ad4ba`,
+      force-pushed; was `f38ec8a`, library.json only): what every build pins (`CANOPENNODE_SOURCE` in the hub;
+      pinned to the commit, not the branch);
     - branch `esphome-old-dce5a01`: the old all-in-one commit (library.json + port header + block-size patch), kept
       for reference.
-- **Port header** `canopennode_port/CO_driver_target.h` (moved out of the fork, 2026-10-29; then in
-  `components_next/canopen`, now in the hub, `esphome/components/canopen/canopennode_port/` in `~/repos/esphome`).
-  Project `-I` flags don't reach converted libraries on the native backends (only `-D`/`-W` do,
-  `get_project_compile_flags()` in `esphome/framework_helpers.py`), so codegen adds the directory as a header-only
-  package, one way per backend:
-  - **ESP32 (ESP-IDF and Arduino, both native IDF builds):** `add_idf_component(name="canopennode_port",
-    path=...)` (`canopennode_port/CMakeLists.txt`: `idf_component_register(INCLUDE_DIRS ".")`). A converted library
-    only sees the components it REQUIRES, which include every project-managed component
-    (`ESPHOME_PROJECT_MANAGED_COMPONENTS`). A local IDF component is named after its directory, hence the
-    directory name;
-  - **Zephyr (native west build):** a header-only local library (`canopennode_port/library.json`,
-    `"CANopenNode-esphome-port"`, `includeDir: "."`, no sources); Zephyr exports every library's include dirs
-    globally;
-  - **PlatformIO (ESP8266, ...):** `-I<dir>` as a project build flag (PlatformIO passes build flags to libraries; its
-    LDF doesn't link the library above to CANopenNode). Added together with the library for every non-ESP32
-    target.
+- **Port header** `CO_driver_target.h`: in the fork's root (the library's `includeDir`) since 2026-11-01, commit
+  `30a669c`. Before that it was in the hub (`canopennode_port/`, moved out of the fork 2026-10-29), added by codegen
+  per backend (a generated IDF component on ESP32, a header-only library on Zephyr, `-I` on PlatformIO), because
+  project `-I` flags don't reach converted libraries. Moved back because `301/CO_driver.h` includes it
+  unconditionally and upstream's `script/clang-tidy` drops include dirs inside the ESPHome repo (only `-I <root>` and
+  dirs under `.pio/` survive), so tidy couldn't find it there; esp32-idf-tidy also rejects `file://` libraries. In the
+  library it is found on every backend with no codegen at all (`add_canopennode_library()` only adds the library).
+  Changing the header now means a fork commit + a `CANOPENNODE_SOURCE` bump.
 
   Checked (2026-10-29): Zephyr (esphomeplatformzephyr venv, 2026.11.0-dev) builds and runs on the nucleo (NMT
   operational, node 0x01 heartbeat seen, bus error-active with 0 TX errors); upstream ESPHome 2026.9.1 in Docker
@@ -292,7 +285,7 @@ entity mapper    (canopen_entities) ESPHome entities <-> 0x2000+, remote slots 0
 services         OTA (0x3000), remote logs (0x3100), device API (SDO client queue, NMT, HB, EMCY)
 node core        CANopenComponent: OD builder, NodeConfig (heartbeat, HB consumers, SDO clients, PDOs),
                  persistence (preferences), driver glue on ESPHome canbus
-CANopenNode      CANopen.c + 301/*  (fork: library.json + SDO block size patch; port header in the hub's canopennode_port/)
+CANopenNode      CANopen.c + 301/*  (fork: library.json + SDO block size patch + port header CO_driver_target.h)
 ```
 - Only the node core (`canopen.cpp`, `od.cpp`, `driver_can.cpp`) includes CANopenNode headers.
 - Mapper and services use a neutral API: `OdType`, `OdHandler` with read/write on an offset stream, and
@@ -385,8 +378,8 @@ feature" (2026-10-31, pushed to mrk-its/esphome). `canopen-next` stays as it was
   `loopback_test.cpp` (tests of several PRs, cut by `TEST`).
 - Checked: `script/cpp_unit_test.py canopen` (34 tests), `script/test_build_components.py -c canopen -t <target>`
   for esp32-idf, esp32-ard, esp8266-ard, rp2040-ard (no warnings), the mapper on ESP8266 / ESP32-C3 (upstream venv)
-  and STM32L4 (fork venv). Cost: flash +0.4-0.6 KB (hooks no longer inlined into `setup()`), RAM +8 B. clang-tidy not
-  run (needs `test/upstream_tidy_setup.diff`).
+  and STM32L4 (fork venv). Cost: flash +0.4-0.6 KB (hooks no longer inlined into `setup()`), RAM +8 B. clang-tidy: see
+  "Upstream conventions" (clean after the port header move, 2026-11-01).
 - When adding code to the hub from now on: put it in its feature's file and banner block, keep `setup()` /
   `process_()` / `dump_config()` to one hook call per feature, so the cut stays mechanical.
 
@@ -399,7 +392,6 @@ feature" (2026-10-31, pushed to mrk-its/esphome). `canopen-next` stays as it was
 | `device_info.cpp` | 1 | 0x1000, 0x1008-0x100A, 0x1018, SDO server 0x1200 |
 | `od.h` / `od.cpp` | 1 | runtime OD (`add_var/array/record/string`, `finalize()`, `find()`); `// --- Handlers ---` blocks: 4 |
 | `types.h` | 1 | `NMTState`; `NodeEvent`, `FrameCallback`, `Emergency`, decoders: 2; `NMTCommand`, SDO types: 3; `PdoMapping`: 5 |
-| `canopennode_port/CO_driver_target.h` | 1 | port header (`CO_CONFIG_*` defaults; features switch parts on with build flags in `enable_*()`) |
 | `__init__.py` | 1 | schema / codegen; blocks of PRs 2-6 (see below) |
 | `node_monitor.cpp` | 2 | 0x1016, `monitor_node()`, HB consumer callbacks, node events, `get_node_state()` / `is_node_online()` |
 | `frames.cpp` | 2 | frame listeners, `send_frame()`, `dispatch_frame_()` (heartbeat / EMCY callbacks) |
@@ -461,8 +453,8 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
    only the options of PRs <= N; `TEST`s by the table above). The last branch must equal `canopen-full`
    (`git diff canopen-pr6-sdo-block canopen-full -- esphome/components/canopen tests/components/canopen` empty).
 3. Each branch on its own: `script/cpp_unit_test.py canopen`, `script/test_build_components.py -c canopen -t
-   <target>` for the four targets, clang-tidy (`test/upstream_tidy_setup.diff`; the tidy setup for upstream CI is
-   still an open decision, see "Upstream conventions"), and the line count (`scripts/pr_split_lines.py` on the
+   <target>` for the four targets, clang-tidy on esp8266-arduino-tidy and esp32-idf-tidy
+   (`test/upstream_tidy_setup.diff`, trimmed to the PR's features; see "Upstream conventions"), and the line count (`scripts/pr_split_lines.py` on the
    branch's tree: PR N's own lines are the "PR N" row).
 4. Docs: re-split `~/repos/esphome-docs` (branch `canopen-full`, the whole page, matching this branch) the same way,
    one page section per PR.
@@ -521,13 +513,15 @@ callback refactors):
   `OdResult::OD_RESULT_OK`, ...: bare `SUCCESS` / `OK` break LibreTiny, whose SDK defines them as macros), concatenated
   namespaces, static methods without the trailing `_`, a NOLINT block around CANopenNode's C driver API, no
   `volatile` in the port header (main loop only). Docs branches updated too.
-- clang-tidy (23.1.4, `script/clang-tidy -e esp8266-arduino-tidy esphome/components/canopen`) is clean. It needs a
-  local setup that is **not** in the PRs yet (`test/upstream_tidy_setup.diff`, apply in `~/repos/esphome` with
-  `git apply`): CANopenNode and the port directory
-  (`file://esphome/components/canopen/canopennode_port`) in `platformio.ini` `lib_deps`, the `CO_CONFIG_*` flags in
-  its `build_flags`, and `USE_CANOPEN_*` in `esphome/core/defines.h`. Open for PR 1: upstream's tidy script drops
-  include dirs inside the repo (so a plain `-I` to the port header doesn't work), and `esp32-idf-tidy` rejects relative
-  `file://` libraries and ignores `build_flags`. Needs a decision before PR 1 goes out.
+- clang-tidy (23.1.4, `script/clang-tidy -e <env> esphome/components/canopen`) is clean on esp8266-arduino-tidy,
+  esp32-idf-tidy, bk72xx-tidy and nrf52-tidy (2026-11-01, `canopen-full` `5e2a6cf`; it found two issues, fixed there:
+  identical SDO read `case`s, a `uint8_t` loop index against `size()`). It needs a local setup that is **not** in the
+  PRs yet (`test/upstream_tidy_setup.diff`, apply in `~/repos/esphome` with `git apply`): CANopenNode (the pinned
+  GitHub URL; esp32-idf-tidy rejects `file://` and `git+file://`) in `platformio.ini` `[common] lib_deps_base` (the
+  only list every tidy env gets; esp32-idf-tidy reads only the `[common*]` sections), and `USE_CANOPEN_*`,
+  `CANOPEN_SDO_BLOCK_SIZE` and the `CO_CONFIG_*` values in `esphome/core/defines.h` (`od.h` / `od_handler.h` include
+  it before `CANopen.h`; esp32-idf-tidy ignores `build_flags`, so they can't go there). No include path is needed since
+  the port header is in the CANopenNode fork (see "Port header"). Open: put this setup into PR 1.
 - Done on `canopen-next` (2026-10-31, one commit, to fold into the PRs when they are cut):
   - `ObjectDictionary` without `std::deque` (512-byte blocks): plain vectors that only grow until `finalize()`;
     entries refer to their objects by position until then, and the pointers CANopenNode gets are taken in
