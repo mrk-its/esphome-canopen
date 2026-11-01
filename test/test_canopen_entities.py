@@ -20,7 +20,8 @@ import yaml
 REPO = Path(__file__).parent.parent
 MAPPER = REPO / "components" / "canopen_entities"
 VENV = Path(os.environ.get("ESPHOME_UPSTREAM_VENV", Path.home() / "repos" / "esphome-upstream-venv"))
-HUB = Path(os.environ.get("ESPHOME_CANOPEN_HUB", Path.home() / "repos" / "esphome" / "esphome" / "components"))
+# the hub: this repo's copy (scripts/sync_hub.py), or another checkout's components directory
+HUB = Path(os.environ.get("ESPHOME_CANOPEN_HUB", REPO / "components"))
 ESPHOME = VENV / "bin" / "esphome"
 
 _spec = importlib.util.spec_from_file_location("mapper_layout", MAPPER / "layout.py")
@@ -471,9 +472,12 @@ def test_partial_hub(tmp_path):
         source = source.replace(old, new)
     init.write_text(source, encoding="utf-8")
     path = write_config(tmp_path, [{"id": "temp", "index": 1, "tpdo": 0}])
-    path.write_text(path.read_text(encoding="utf-8").replace(str(HUB), str(hub)), encoding="utf-8")
+    config = json.loads(path.read_text(encoding="utf-8"))
+    hub_source = next(e for e in config["external_components"] if e["components"] == ["canopen"])
+    hub_source["source"]["path"] = str(hub)
+    path.write_text(json.dumps(config, indent=1), encoding="utf-8")
     result = run_esphome(tmp_path, "config")
     assert result.returncode != 0
     output = result.stdout + result.stderr
     assert "lacks enable_pdo, enable_sdo_block, CONF_SDO_BLOCK_SIZE" in output
-    assert "github://mrk-its/esphome@canopen-full" in output
+    assert "github://mrk-its/esphome-canopen" in output

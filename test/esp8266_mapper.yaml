@@ -1,13 +1,10 @@
-# ESP8266 build check for canopen_entities on the upstream canopen hub (~/repos/esphome, branch canopen-next),
+# ESP8266 build check for canopen_entities on the canopen hub (components/canopen, synced from mrk-its/esphome canopen-full),
 # with upstream ESPHome (dev venv): ~/repos/esphome-upstream-venv/bin/esphome compile test/esp8266_mapper.yaml
 
 external_components:
-  - source:
-      type: local
-      path: ../../esphome/esphome/components
-    components: [canopen]
+  # the hub (a copy, scripts/sync_hub.py) and canopen_entities
   - source: ../components
-    components: [canopen_entities]
+    components: [canopen, canopen_entities]
 
 esphome:
   name: esp8266-mapper

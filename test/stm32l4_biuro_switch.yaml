@@ -6,13 +6,9 @@
 # (same board and partition layout as stm32l4_canopen.yaml, which has the hardware tests)
 
 external_components:
-  # canopen from the upstream PR branches (whatever is checked out in ../../esphome)
-  - source:
-      type: local
-      path: ../../esphome/esphome/components
-    components: [canopen]
+  # the hub (a copy, scripts/sync_hub.py) and canopen_entities
   - source: ../components
-    components: [canopen_entities]
+    components: [canopen, canopen_entities]
 
 esphome:
   name: stm32l4-biuro-switch

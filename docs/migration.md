@@ -1,7 +1,7 @@
 # Migrating from the old component
 The old `canopen:` component of this repository (on [canopen-stack](https://github.com/mrk-its/canopen-stack)) is
-replaced by two: the `canopen` component (the CANopen node on [CANopenNode](https://github.com/CANopenNode/CANopenNode),
-being contributed to ESPHome) and `canopen_entities` from this repository. The old component is still available from
+replaced by two, both shipped by this repository: the `canopen` component (the CANopen node on
+[CANopenNode](https://github.com/CANopenNode/CANopenNode), being contributed to ESPHome) and `canopen_entities`. The old component is still available from
 the `main` branch of this repository.
 
 The wire format is the same ([OBJECT_DICTIONARY.md](../OBJECT_DICTIONARY.md)): object dictionary layout, TPDO layout,
@@ -35,10 +35,7 @@ ota:
 ```yaml
 # new
 external_components:
-  - source: github://mrk-its/esphome@canopen-full   # until canopen is in an ESPHome release
-    components: [canopen]
-  - source: github://mrk-its/esphome-canopen@feature/entity-mapper
-    components: [canopen_entities]
+  - source: github://mrk-its/esphome-canopen@feature/entity-mapper   # canopen + canopen_entities
 
 canopen:
   node_id: 0x10

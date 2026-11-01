@@ -2,15 +2,16 @@
 
 ESPHome external component `canopen_entities` (`components/canopen_entities`), exposing ESPHome entities over
 CANopen, plus CAN OTA and remote logs. It sits on the `canopen` hub (generic CiA 301 on CANopenNode, going upstream;
-developed in `~/repos/esphome`, branch `canopen-full`). The host side is
+developed in `~/repos/esphome`, branch `canopen-full`; this repo ships a generated copy in `components/canopen`, see
+"Layout"). The host side is
 [can2mqtt](https://github.com/mrk-its/can2mqtt) (MQTT/Home Assistant bridge, also the OTA uploader).
 OD layout for entities: see OBJECT_DICTIONARY.md.
-The old component (`components/canopen`, on canopen-stack) is only on `main` (removed on `feature/entity-mapper`,
-2026-11-01); nodes still running it interoperate (same OD, `remote.py` reads their YAML).
+The old component (on canopen-stack) is only on `main` (there as `components/canopen`; replaced on
+`feature/entity-mapper`, 2026-11-01); nodes still running it interoperate (same OD, `remote.py` reads their YAML).
 User docs: README.md is the overview / quick start only; the option reference lives in `docs/configuration.md`,
 `docs/linking-nodes.md`, `docs/ota.md`, `docs/remote-logs.md`, old -> new in `docs/migration.md`. Document new options
 there. The hub's own options are documented in esphome-docs (`~/repos/esphome-docs`, branch `canopen-full`); the user
-docs link its `canopen.mdx` on GitHub and the hub source `github://mrk-its/esphome@canopen-full` (pushed; keep it pushed after hub changes).
+docs link its `canopen.mdx` on GitHub. Users load both components from this repo (one `external_components` entry).
 Port to CANopenNode (replacing canopen-stack), in progress: plan and handoff state in `docs/canopennode.md`,
 current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopennode.md`, done; step 3:
 `docs/sdo_server_canopennode.md`). Upstream PRs 1-3 as built and tested: `docs/upstream_prs_1-3.md`. Hub PRs 7+
@@ -49,9 +50,15 @@ of the mapper's `0x3000`: `docs/canopen_ota.md`.
 - `ota/`: the `ota: - platform: canopen_entities` component, OD `0x3000`, wraps the platform's
   `esphome::ota::make_ota_backend()`; optional zlib (miniz) decompression. Planned to move into the hub on CiA 302-3
   objects (`docs/canopen_ota.md`).
-- The hub (`canopen`) comes from `~/repos/esphome` (`external_components` with `components: [canopen]`); CANopenNode is
-  pinned there (`CANOPENNODE_SOURCE` in the hub's `__init__.py`, the fork's `library-json` branch (upstream PR #664);
-  bump it after pushing the fork; `canopennode_path: <local checkout>` overrides it for development).
+`components/canopen/`: **a generated copy of the hub, never edit it here.** The hub is developed and tested in
+`~/repos/esphome` (branch `canopen-full`, pushed to mrk-its/esphome), from where the upstream PRs are cut.
+`scripts/sync_hub.py` copies `esphome/components/canopen` from a commit (`--ref`, default `canopen-full`) and writes
+`components/canopen/SYNCED_FROM` (commit, digest); `test/test_hub_copy.py` fails if the copy was edited, differs from
+that commit, or was synced with `--worktree` (the fork's uncommitted state, for a hardware test of hub changes before
+committing them). After hub changes: commit in the fork, `scripts/sync_hub.py`, commit here. Delete the copy once the
+full hub is in an ESPHome release. CANopenNode is pinned in the hub (`CANOPENNODE_SOURCE` in its `__init__.py`, the
+fork's `library-json` branch (upstream PR #664); bump it after pushing the fork; `canopennode_path: <local checkout>`
+overrides it for development).
 
 ## CAN OTA flow
 - OD 0x3000: `:1` ctrl, `:2` size, `:3` MD5 (16 bytes), `:4` image data (SDO block download), `:5` flags
@@ -105,8 +112,9 @@ of the mapper's `0x3000`: `docs/canopen_ota.md`.
 ## Testing
 - `pytest test/`: Python tests, plus `test/test_logs.py`, which builds `test/logs/log_buffer_test.cpp` against
   `components/canopen_entities/log_buffer.cpp` with stub headers (`test/logs/stubs/`) and runs it (ASan/UBSan if
-  available). `test/test_canopen_entities.py` runs codegen / validation through the upstream venv with the hub from
-  `~/repos/esphome` (`$ESPHOME_UPSTREAM_VENV`, `$ESPHOME_CANOPEN_HUB`; skipped without them). `test/remote_node.yaml`
+  available). `test/test_canopen_entities.py` runs codegen / validation through the upstream venv with the hub copy
+  in `components/` (`$ESPHOME_UPSTREAM_VENV`, `$ESPHOME_CANOPEN_HUB` for another hub; skipped without the venv).
+  `test/test_hub_copy.py` checks the hub copy (see "Layout"; `$ESPHOME_FORK`, default `~/repos/esphome`). `test/remote_node.yaml`
   is a node in the old component's format, the fixture of `test_mapper_remote.py`. pytest is in the
   esphomeplatformzephyr venv.
 - The hub's own tests are in `~/repos/esphome`: `script/cpp_unit_test.py canopen`,
@@ -117,12 +125,12 @@ of the mapper's `0x3000`: `docs/canopen_ota.md`.
   so the hub may use APIs newer than the last release (e.g. `canbus::send_data(..., data, len)`, in `dev` but not in
   2026.9.x).
 - Build checks: `test/esp8266_mapper.yaml` (upstream venv, d1_mini + mcp2515), `test/stm32l4_canopen.yaml`,
-  `test/stm32l4_biuro_switch.yaml`, `test/stm32l4_loopback.yaml` (fork venv, nucleo_l476rg), all with the hub from
-  `../../esphome` (whatever branch is checked out there).
+  `test/stm32l4_biuro_switch.yaml`, `test/stm32l4_loopback.yaml` (fork venv, nucleo_l476rg), all with the hub copy
+  from `../components` (`scripts/sync_hub.py --worktree` to try uncommitted hub changes).
 - Config validation without building: `esphome config <yaml>`, against both upstream ESPHome (the venv above) and
   the esphomeplatformzephyr venv, when touching Python schema code.
-- CI (`.github/workflows/test.yml`): pytest only (codegen tests skipped). No build job yet; one could take the hub
-  from mrk-its/esphome `canopen-full` (pushed) with ESPHome `dev`.
+- CI (`.github/workflows/test.yml`): pytest only (codegen tests skipped, the hub copy checked against `SYNCED_FROM`).
+  No build job yet; it would need ESPHome `dev`.
 
 ## Debugging CAN OTA
 - Serial log 115200: `Received N kB (P%)` every KB; measure speed from its timestamps.

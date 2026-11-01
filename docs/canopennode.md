@@ -30,9 +30,12 @@ Where to continue (2026-10-31):
   both tests), `test_remote.py`, `logs_test.cpp`, `esp32_canopen.yaml` / `esp8266_canopen.yaml`, the Docker build,
   `examples/`, CI's build job). The old component stays on `main`; tag `main` (e.g. `v0.4.0`, the last tag `v0.3.1`
   is from 2023) before this branch merges, so its users can pin it. User docs rewritten for the hub +
-  `canopen_entities` (2026-11-01, `docs/migration.md` for old -> new); they point to the hub at
-  `github://mrk-its/esphome@canopen-full` (pushed) and to this repo at `@feature/entity-mapper`: change that ref when
-  the branch is merged.
+  `canopen_entities` (2026-11-01, `docs/migration.md` for old -> new), with this repo at `@feature/entity-mapper`:
+  change that ref when the branch is merged.
+- **Hub copy in this repo** (2026-11-01): `components/canopen` is a generated copy of `canopen-full`
+  (`scripts/sync_hub.py`, `SYNCED_FROM`, checked by `test/test_hub_copy.py`), so users need one `external_components`
+  source (a `github://` source of the ESPHome fork is a 42 MB shallow clone for the 110 KB hub). The hub is still
+  developed in `~/repos/esphome`; re-sync after each hub commit. Delete the copy once the full hub is released.
 
 The bullets below are the state of step 1 (2026-10-29), kept for the CANopenNode fork and port header details.
 - **esphome-canopen:**
@@ -353,9 +356,9 @@ mostly *adds files and blocks*, then cut the PR branches from it.
 **Where.** `~/repos/esphome`, branch `canopen-full`, created from `canopen-next` (`21ab50897e`, hub PRs 1-12 in 17
 commits on `upstream/dev` `b155e4ba0b`), plus the refactor as one commit, `e9f738ebf7` "[canopen] Split the hub by
 feature" (2026-10-31, pushed to mrk-its/esphome). `canopen-next` stays as it was;
-`components/canopen_entities` and the test configs here build against whatever is checked out in
-`~/repos/esphome` (`test/stm32l4_*.yaml`, `test/esp8266_mapper.yaml`), so `canopen-full` replaces `canopen-next` as
-the hub branch (check it out there for those builds).
+`canopen-full` replaces `canopen-next` as the hub branch. The test configs here (`test/stm32l4_*.yaml`,
+`test/esp8266_mapper.yaml`) use the hub copy in `components/canopen`, synced from `canopen-full`
+(`scripts/sync_hub.py`; `--worktree` for uncommitted hub changes).
 
 **The refactor** (no behaviour change; function bodies moved verbatim):
 - `setup()` in `canopen.cpp` is a fixed sequence of per-feature hooks: `add_*_od_()` (OD entries) -> `od.finalize()`
@@ -783,8 +786,8 @@ Open points for `canopen_entities` itself (not in the steps yet):
 - `csdo:` and its lambda API (`setup_csdo`, `csdo_recv`, `csdo_send_*`): map onto the hub's SDO client; custom
   tx/rx IDs need the pinned channels (device_api_canopennode.md, "Open points");
 - user migration: done (`docs/migration.md`, 2026-11-01);
-- until the hub is merged, where the mapper gets the hub from: the esphome fork branch (mrk-its/esphome `canopen-full`,
-  pushed) as an external component, `components: [canopen]`.
+- until the hub is merged, where the mapper gets the hub from: done, a synced copy in this repo (`components/canopen`,
+  2026-11-01).
 
 ## Size comparison with the old component (2026-10-31)
 Compile-only, equivalent configs: old `components/canopen` vs the hub (`canopen-next`) + `canopen_entities`, and a

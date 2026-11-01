@@ -202,7 +202,8 @@ REMOTE_LOGS_SCHEMA = cv.Schema(
 
 # what canopen_entities needs from the hub beyond its first upstream PR: own PDOs (PR 5), SDO block transfer (PR 6)
 HUB_REQUIRED = ("enable_pdo", "enable_sdo_block", "CONF_SDO_BLOCK_SIZE")
-HUB_SOURCE = "github://mrk-its/esphome@canopen-full"
+# this repo ships the full hub (components/canopen, a copy of mrk-its/esphome canopen-full)
+HUB_SOURCE = "github://mrk-its/esphome-canopen"
 
 
 def validate_hub(config: ConfigType) -> ConfigType:
@@ -210,7 +211,8 @@ def validate_hub(config: ConfigType) -> ConfigType:
     if missing := [name for name in HUB_REQUIRED if not hasattr(canopen, name)]:
         raise cv.Invalid(
             f"this ESPHome's 'canopen' component lacks {', '.join(missing)}, which canopen_entities needs: "
-            f"load the full hub as an external component (source: {HUB_SOURCE}, components: [canopen])"
+            f"take 'canopen' from esphome-canopen too (external_components: source: {HUB_SOURCE}, with "
+            "components: [canopen, canopen_entities] or without a components: filter)"
         )
     return config
 

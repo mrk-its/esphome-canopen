@@ -3,9 +3,8 @@
 # segmented; node_a's server has no block transfer), node_b writes node_a's 0x1017, and node_a's send_frame() reaches
 # node_b's frame listener. The frames also go out on the real bus (node 0x01's heartbeat must still reach both).
 external_components:
-  - source:
-      type: local
-      path: ../../esphome/esphome/components
+  # the hub (a copy, scripts/sync_hub.py)
+  - source: ../components
     components: [canopen]
 
 esphome:

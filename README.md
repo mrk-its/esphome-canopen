@@ -7,9 +7,9 @@ home automation nodes that need no WiFi. Nodes can also control each other direc
 their logs over CAN.
 
 The CANopen node itself is the `canopen` component (CiA 301 on [CANopenNode](https://github.com/CANopenNode/CANopenNode)),
-which is being contributed to ESPHome. Until it is in an ESPHome release, it comes from the
-[mrk-its/esphome](https://github.com/mrk-its/esphome/tree/canopen-full) fork as an external component, see the
-[Quick start](#quick-start).
+which is being contributed to ESPHome. Until it is in an ESPHome release, this repository ships it too
+(`components/canopen`, a copy of the [mrk-its/esphome](https://github.com/mrk-its/esphome/tree/canopen-full) branch it
+is developed on), so one `external_components` entry brings both.
 
 > **Status:** `canopen_entities` replaces this repository's old `canopen` component (built on canopen-stack). It is
 > new: tested on STM32 hardware (ESPHome on Zephyr), ESP32 and ESP8266 builds compile but haven't been tested on
@@ -82,11 +82,8 @@ esp32:
     type: esp-idf
 
 external_components:
-  # the CANopen node, until it is in an ESPHome release (then remove this entry)
-  - source: github://mrk-its/esphome@canopen-full
-    components: [canopen]
+  # canopen_entities, and the canopen component until it is in an ESPHome release
   - source: github://mrk-its/esphome-canopen@feature/entity-mapper
-    components: [canopen_entities]
 
 logger:
   logs:
@@ -147,9 +144,9 @@ A few rules:
 * `index` and `node_id` together identify the entity in Home Assistant. Don't renumber them after the node is in use.
 * TPDOs 0..6 are free to use; TPDO 7 is reserved for node-to-node commands (unless `od_writer: false`). Each TPDO
   holds 8 bytes. The build fails if the states don't fit, and it logs the computed layout.
-* While the `canopen` entry from mrk-its/esphome is in `external_components`, it replaces ESPHome's own `canopen`
-  component, also once ESPHome has one. Remove the entry when the full component is in your ESPHome release; until
-  then `canopen_entities` reports a `canopen` that lacks what it needs.
+* The `canopen` component from this repository replaces ESPHome's own, also once ESPHome has one. To use ESPHome's
+  (when it is complete in your release), load only `components: [canopen_entities]` from here; with an incomplete
+  one `canopen_entities` reports what is missing.
 
 ## Documentation
 
@@ -170,8 +167,8 @@ A few rules:
   that the bus is terminated, and that MQTT discovery is enabled. can2mqtt logs a `node_id: .., device name: ..`
   line for every node it detects.
 * **Build fails with an error about `send_data`**: your ESPHome is too old, see [What you need](#what-you-need).
-* **`canopen` component lacks enable_pdo, ...**: the `canopen` component of your ESPHome isn't complete yet; add the
-  `canopen` entry from the [Quick start](#quick-start) to `external_components`.
+* **`canopen` component lacks enable_pdo, ...**: the `canopen` component of your ESPHome isn't complete yet; load
+  `canopen` from this repository too (drop the `components:` filter, or list `[canopen, canopen_entities]`).
 * **Node gets slow or drops frames**: at `DEBUG` the `canbus` component logs every received frame. Over a serial
   console that is slower than the bus, so set `logger: logs: canbus: INFO`.
 * **OTA over CAN is very slow (seconds per KB)**: frames of an SDO block are being lost, and every loss costs a
