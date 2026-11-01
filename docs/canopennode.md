@@ -31,8 +31,8 @@ Where to continue (2026-10-31):
   `examples/`, CI's build job). The old component stays on `main`; tag `main` (e.g. `v0.4.0`, the last tag `v0.3.1`
   is from 2023) before this branch merges, so its users can pin it. User docs rewritten for the hub +
   `canopen_entities` (2026-11-01, `docs/migration.md` for old -> new); they point to the hub at
-  `github://mrk-its/esphome@canopen-full` and to this repo at `@feature/entity-mapper`: push `canopen-full`, and change
-  the ref when the branch is merged.
+  `github://mrk-its/esphome@canopen-full` (pushed) and to this repo at `@feature/entity-mapper`: change that ref when
+  the branch is merged.
 
 The bullets below are the state of step 1 (2026-10-29), kept for the CANopenNode fork and port header details.
 - **esphome-canopen:**
@@ -352,7 +352,7 @@ mostly *adds files and blocks*, then cut the PR branches from it.
 
 **Where.** `~/repos/esphome`, branch `canopen-full`, created from `canopen-next` (`21ab50897e`, hub PRs 1-12 in 17
 commits on `upstream/dev` `b155e4ba0b`), plus the refactor as one commit, `e9f738ebf7` "[canopen] Split the hub by
-feature" (2026-10-31, not pushed). `canopen-next` stays as it was;
+feature" (2026-10-31, pushed to mrk-its/esphome). `canopen-next` stays as it was;
 `components/canopen_entities` and the test configs here build against whatever is checked out in
 `~/repos/esphome` (`test/stm32l4_*.yaml`, `test/esp8266_mapper.yaml`), so `canopen-full` replaces `canopen-next` as
 the hub branch (check it out there for those builds).
@@ -441,7 +441,7 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
 
 **Cutting the branches** (next steps, in order):
 1. Done: the refactor is committed on `canopen-full` (`e9f738ebf7`); keep it checked out in `~/repos/esphome` for the
-   mapper builds here. Push it to mrk-its/esphome when wanted.
+   mapper builds here. Pushed to mrk-its/esphome (`origin/canopen-full`).
 2. Branches `canopen-pr1-node` .. `canopen-pr6-sdo-block` from `upstream/dev`, stacked, one commit each. For PR N:
    take `esphome/components/canopen/` and `tests/components/canopen/` from `canopen-full`, delete the files of PRs
    > N, and remove the lines of PRs > N from the shared files (`--annotate` shows them: hook calls and
@@ -784,7 +784,7 @@ Open points for `canopen_entities` itself (not in the steps yet):
   tx/rx IDs need the pinned channels (device_api_canopennode.md, "Open points");
 - user migration: done (`docs/migration.md`, 2026-11-01);
 - until the hub is merged, where the mapper gets the hub from: the esphome fork branch (mrk-its/esphome `canopen-full`,
-  push it first) as an external component, `components: [canopen]`.
+  pushed) as an external component, `components: [canopen]`.
 
 ## Size comparison with the old component (2026-10-31)
 Compile-only, equivalent configs: old `components/canopen` vs the hub (`canopen-next`) + `canopen_entities`, and a

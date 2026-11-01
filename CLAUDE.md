@@ -10,7 +10,7 @@ The old component (`components/canopen`, on canopen-stack) is only on `main` (re
 User docs: README.md is the overview / quick start only; the option reference lives in `docs/configuration.md`,
 `docs/linking-nodes.md`, `docs/ota.md`, `docs/remote-logs.md`, old -> new in `docs/migration.md`. Document new options
 there. The hub's own options are documented in esphome-docs (`~/repos/esphome-docs`, branch `canopen-full`); the user
-docs link its `canopen.mdx` on GitHub and the hub source `github://mrk-its/esphome@canopen-full` (push it there).
+docs link its `canopen.mdx` on GitHub and the hub source `github://mrk-its/esphome@canopen-full` (pushed; keep it pushed after hub changes).
 Port to CANopenNode (replacing canopen-stack), in progress: plan and handoff state in `docs/canopennode.md`,
 current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopennode.md`, done; step 3:
 `docs/sdo_server_canopennode.md`). Upstream PRs 1-3 as built and tested: `docs/upstream_prs_1-3.md`. Hub PRs 7+
@@ -121,8 +121,8 @@ of the mapper's `0x3000`: `docs/canopen_ota.md`.
   `../../esphome` (whatever branch is checked out there).
 - Config validation without building: `esphome config <yaml>`, against both upstream ESPHome (the venv above) and
   the esphomeplatformzephyr venv, when touching Python schema code.
-- CI (`.github/workflows/test.yml`): pytest only (codegen tests skipped). No build job until the hub is on GitHub
-  (mrk-its/esphome `canopen-full`).
+- CI (`.github/workflows/test.yml`): pytest only (codegen tests skipped). No build job yet; one could take the hub
+  from mrk-its/esphome `canopen-full` (pushed) with ESPHome `dev`.
 
 ## Debugging CAN OTA
 - Serial log 115200: `Received N kB (P%)` every KB; measure speed from its timestamps.

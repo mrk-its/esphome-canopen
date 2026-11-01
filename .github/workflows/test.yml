@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         # test_mapper_remote.py needs ESPHome's YAML loader; test_logs.py a C++ compiler (runner's g++). The
         # test_canopen_entities.py codegen tests need the canopen hub checkout (~/repos/esphome) and are skipped here.
-        # No build job: canopen_entities needs the hub from mrk-its/esphome (branch canopen-full, not pushed yet).
+        # No build job yet: it would take the hub from mrk-its/esphome (branch canopen-full) and ESPHome dev.
         run: pip install esphome pytest
       - name: Run tests
         run: pytest -v test/
