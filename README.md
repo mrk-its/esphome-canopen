@@ -1,16 +1,26 @@
 # ESPHome CANopen
 
-An [ESPHome](https://esphome.io/) external component that turns an ESPHome device into a CANopen node. Lights,
-switches, sensors, covers and other entities are exposed on a CAN bus, and the
+An [ESPHome](https://esphome.io/) external component, `canopen_entities`, that exposes an ESPHome device's entities
+on a CAN bus. Lights, switches, sensors, covers and other entities become objects of a CANopen node, and the
 [can2mqtt](https://github.com/mrk-its/can2mqtt) bridge brings them into Home Assistant. You get wired, reliable
 home automation nodes that need no WiFi. Nodes can also control each other directly, be updated over CAN, and send
 their logs over CAN.
+
+The CANopen node itself is the `canopen` component (CiA 301 on [CANopenNode](https://github.com/CANopenNode/CANopenNode)),
+which is being contributed to ESPHome. Until it is in an ESPHome release, it comes from the
+[mrk-its/esphome](https://github.com/mrk-its/esphome/tree/canopen-full) fork as an external component, see the
+[Quick start](#quick-start).
+
+> **Status:** `canopen_entities` replaces this repository's old `canopen` component (built on canopen-stack). It is
+> new: tested on STM32 hardware (ESPHome on Zephyr), ESP32 and ESP8266 builds compile but haven't been tested on
+> hardware yet. Nodes with the old component keep working on the same bus. The old component stays available from the
+> `main` branch. See [Migrating from the old component](docs/migration.md).
 
 ## How it works
 
 ```
  ┌─────────────┐   ┌─────────────┐
- │ ESPHome node│   │ ESPHome node│  ...   (this component)
+ │ ESPHome node│   │ ESPHome node│  ...   (canopen + canopen_entities)
  └──────┬──────┘   └──────┬──────┘
 ════════╧═════════════════╧═══════════ CAN bus
                  │
@@ -32,19 +42,25 @@ their logs over CAN.
 * Entity types: `sensor`, `number`, `binary_sensor`, `switch`, `cover` (position / tilt), `light` (brightness /
   color temperature) and `alarm_control_panel`
 * State broadcast in up to 8 TPDOs, with compact 1- or 2-byte encoding of sensor values
-* [Linking nodes](docs/linking-nodes.md): actions such as `canopen.light.toggle` and remote states as local
+* [Linking nodes](docs/linking-nodes.md): actions such as `canopen_entities.light.toggle` and remote states as local
   entities, with other nodes referred to by their YAML file and entity ids
 * [OTA over CAN](docs/ota.md): firmware updates from Home Assistant through can2mqtt
 * [Remote logs](docs/remote-logs.md): read a node's log in can2mqtt, no serial cable needed
-* Heartbeat monitoring of other nodes (`heartbeat_clients`, `on_hb_consumer_event`)
-* Runs on upstream ESPHome (ESP32, ESP8266) and on STM32 with ESPHome on Zephyr (`platform: zephyr`, from the
+* From the `canopen` component: heartbeat monitoring of other nodes (`heartbeat_clients`, `on_node_event`), NMT,
+  emergency messages, an SDO client for lambdas, several nodes on one bus
+  ([`canopen` docs](https://github.com/mrk-its/esphome-docs/blob/canopen-full/src/content/docs/components/canopen.mdx))
+* Runs on ESPHome for ESP32 and ESP8266, and on STM32 with ESPHome on Zephyr (`platform: zephyr`, from the
   [esphomeplatformzephyr](https://github.com/esphomeplatformzephyr/esphome) fork)
 
 ## What you need
 
+* **ESPHome `dev`** (or 2026.11 and newer, once released): the `canopen` component uses a `canbus` API that isn't in
+  ESPHome 2026.10 and older. On those the build fails with an error about `send_data`. The esphomeplatformzephyr fork
+  has it.
 * **Nodes**: an ESP32 board (it has a [built-in CAN controller](https://esphome.io/components/canbus/esp32/) and
   needs only an external 3.3 V CAN transceiver such as SN65HVD230), an ESP8266 with an
-  [MCP2515](https://esphome.io/components/canbus/mcp2515/) module, or an STM32 board running ESPHome on Zephyr ([esphomeplatformzephyr](https://github.com/esphomeplatformzephyr/esphome)).
+  [MCP2515](https://esphome.io/components/canbus/mcp2515/) module, or an STM32 board running ESPHome on Zephyr
+  ([esphomeplatformzephyr](https://github.com/esphomeplatformzephyr/esphome)).
 * **CAN bus**: a twisted pair with a 120 Ω terminator at each end, and the same bit rate on every node.
 * **A can2mqtt host** on the bus: the [Home Assistant add-on](https://github.com/mrk-its/can2mqtt) or any Linux box
   with a [python-can](https://python-can.readthedocs.io/en/stable/interfaces.html) supported interface.
@@ -54,7 +70,7 @@ their logs over CAN.
 
 ## Quick start
 
-**1. Add the component to a node's YAML.** This example uses an ESP32 with a relay and a temperature sensor:
+**1. Add the components to a node's YAML.** This example uses an ESP32 with a relay and a temperature sensor:
 
 ```yaml
 esphome:
@@ -66,7 +82,11 @@ esp32:
     type: esp-idf
 
 external_components:
-  - source: github://mrk-its/esphome-canopen
+  # the CANopen node, until it is in an ESPHome release (then remove this entry)
+  - source: github://mrk-its/esphome@canopen-full
+    components: [canopen]
+  - source: github://mrk-its/esphome-canopen@feature/entity-mapper
+    components: [canopen_entities]
 
 logger:
   logs:
@@ -82,16 +102,18 @@ canbus:
 
 canopen:
   node_id: 1          # unique on the bus, 1..127
+
+canopen_entities:
   entities:
     - id: relay
-      index: 1        # stable id of the entity, 1..64
+      index: 1        # stable id of the entity, 1..255
       tpdo: 0         # broadcast state changes
     - id: temperature
       index: 2
       tpdo: 0
 
 ota:
-  - platform: canopen # later updates over CAN
+  - platform: canopen_entities  # later updates over CAN
 
 switch:
   - platform: gpio
@@ -123,21 +145,23 @@ go over CAN, see [OTA over CAN](docs/ota.md).
 
 A few rules:
 * `index` and `node_id` together identify the entity in Home Assistant. Don't renumber them after the node is in use.
-* TPDOs 0..6 are free to use; TPDO 7 is reserved for node-to-node commands (unless `pdo_od_writer: false`). Each
-  TPDO holds 8 bytes. The build fails if the states don't fit, and it logs the computed layout.
-
-More complete configurations are in [examples/](examples/).
+* TPDOs 0..6 are free to use; TPDO 7 is reserved for node-to-node commands (unless `od_writer: false`). Each TPDO
+  holds 8 bytes. The build fails if the states don't fit, and it logs the computed layout.
+* While the `canopen` entry from mrk-its/esphome is in `external_components`, it replaces ESPHome's own `canopen`
+  component, also once ESPHome has one. Remove the entry when the full component is in your ESPHome release; until
+  then `canopen_entities` reports a `canopen` that lacks what it needs.
 
 ## Documentation
 
 | | |
 |---|---|
-| [Configuration](docs/configuration.md) | all `canopen:` options, entity / TPDO / RPDO / template entity schemas |
-| [Linking nodes](docs/linking-nodes.md) | `remote_nodes`, `canopen.*` actions, `platform: canopen` remote-state entities |
+| [Configuration](docs/configuration.md) | all `canopen_entities:` options, entity / TPDO / RPDO schemas, the `canopen:` options that matter here |
+| [Linking nodes](docs/linking-nodes.md) | `remote_nodes`, `canopen_entities.*` actions, `platform: canopen_entities` remote-state entities |
 | [OTA over CAN](docs/ota.md) | firmware updates through can2mqtt, Zephyr / MCUboot |
 | [Remote logs](docs/remote-logs.md) | node logs over CAN (`remote_logs:`) |
+| [Migrating from the old component](docs/migration.md) | old `canopen:` options and where they went |
+| [`canopen` component](https://github.com/mrk-its/esphome-docs/blob/canopen-full/src/content/docs/components/canopen.mdx) | the CANopen node: heartbeats, NMT, SDO, PDOs (draft of its esphome.io page) |
 | [Object Dictionary](OBJECT_DICTIONARY.md) | OD layout, entity types, TPDO layout, for integrators |
-| [Examples](examples/) | example node configurations |
 | [Changelog](CHANGELOG.md) | |
 
 ## Troubleshooting
@@ -145,11 +169,14 @@ More complete configurations are in [examples/](examples/).
 * **Nothing shows up in Home Assistant**: check that all nodes and the can2mqtt interface use the same bit rate,
   that the bus is terminated, and that MQTT discovery is enabled. can2mqtt logs a `node_id: .., device name: ..`
   line for every node it detects.
+* **Build fails with an error about `send_data`**: your ESPHome is too old, see [What you need](#what-you-need).
+* **`canopen` component lacks enable_pdo, ...**: the `canopen` component of your ESPHome isn't complete yet; add the
+  `canopen` entry from the [Quick start](#quick-start) to `external_components`.
 * **Node gets slow or drops frames**: at `DEBUG` the `canbus` component logs every received frame. Over a serial
   console that is slower than the bus, so set `logger: logs: canbus: INFO`.
 * **OTA over CAN is very slow (seconds per KB)**: frames of an SDO block are being lost, and every loss costs a
-  2 s timeout. Lower `sdo_block_transfer_size` (e.g. 16), or on `zephyr_can` raise `rx_buffer_size` to at least the
-  block size.
+  2 s timeout. Lower `sdo_block_size` on `canopen:` (e.g. 16, the default with `canopen_entities`), or on
+  `zephyr_can` raise `rx_buffer_size` to at least the block size.
 * **`rx errors` on `zephyr_can`** point at the physical bus: stub length, termination, wiring.
 
 ## Support

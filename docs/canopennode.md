@@ -29,8 +29,10 @@ Where to continue (2026-10-31):
   copy of the hub) are removed, with the tests and configs only they used (`test_od.py`, `test_frames.py` (the hub has
   both tests), `test_remote.py`, `logs_test.cpp`, `esp32_canopen.yaml` / `esp8266_canopen.yaml`, the Docker build,
   `examples/`, CI's build job). The old component stays on `main`; tag `main` (e.g. `v0.4.0`, the last tag `v0.3.1`
-  is from 2023) before this branch merges, so its users can pin it. User docs (README, `docs/configuration.md`, ...)
-  still describe the old component: rewrite next.
+  is from 2023) before this branch merges, so its users can pin it. User docs rewritten for the hub +
+  `canopen_entities` (2026-11-01, `docs/migration.md` for old -> new); they point to the hub at
+  `github://mrk-its/esphome@canopen-full` and to this repo at `@feature/entity-mapper`: push `canopen-full`, and change
+  the ref when the branch is merged.
 
 The bullets below are the state of step 1 (2026-10-29), kept for the CANopenNode fork and port header details.
 - **esphome-canopen:**
@@ -780,8 +782,7 @@ Open points for `canopen_entities` itself (not in the steps yet):
 - `canopen.entity_cmd` (a command to another node's entity, on `write_sdo` or the OD writer frame);
 - `csdo:` and its lambda API (`setup_csdo`, `csdo_recv`, `csdo_send_*`): map onto the hub's SDO client; custom
   tx/rx IDs need the pinned channels (device_api_canopennode.md, "Open points");
-- user migration: YAML changes from one `canopen:` block to `canopen:` + `canopen_entities:`; update
-  `configuration.md` / `linking-nodes.md`;
+- user migration: done (`docs/migration.md`, 2026-11-01);
 - until the hub is merged, where the mapper gets the hub from: the esphome fork branch (mrk-its/esphome `canopen-full`,
   push it first) as an external component, `components: [canopen]`.
 

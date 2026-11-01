@@ -8,8 +8,9 @@ OD layout for entities: see OBJECT_DICTIONARY.md.
 The old component (`components/canopen`, on canopen-stack) is only on `main` (removed on `feature/entity-mapper`,
 2026-11-01); nodes still running it interoperate (same OD, `remote.py` reads their YAML).
 User docs: README.md is the overview / quick start only; the option reference lives in `docs/configuration.md`,
-`docs/linking-nodes.md`, `docs/ota.md`, `docs/remote-logs.md`. Document new options there. They still describe the
-old component: to be rewritten for the hub + `canopen_entities`.
+`docs/linking-nodes.md`, `docs/ota.md`, `docs/remote-logs.md`, old -> new in `docs/migration.md`. Document new options
+there. The hub's own options are documented in esphome-docs (`~/repos/esphome-docs`, branch `canopen-full`); the user
+docs link its `canopen.mdx` on GitHub and the hub source `github://mrk-its/esphome@canopen-full` (push it there).
 Port to CANopenNode (replacing canopen-stack), in progress: plan and handoff state in `docs/canopennode.md`,
 current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopennode.md`, done; step 3:
 `docs/sdo_server_canopennode.md`). Upstream PRs 1-3 as built and tested: `docs/upstream_prs_1-3.md`. Hub PRs 7+
