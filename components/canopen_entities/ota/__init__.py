@@ -32,13 +32,25 @@ except ImportError:
 CanopenOTAComponent = ns.class_("CanopenOTAComponent", OTAComponent)
 
 
+def _is_zephyr() -> bool:
+    """Zephyr builds of the fork: `using_zephyr_rtos` (framework-zephyr branch), `is_zephyr` (older branches)."""
+    return getattr(CORE, "using_zephyr_rtos", False) or getattr(CORE, "is_zephyr", False)
+
+
+def _mcuboot():
+    """The fork's swap method helpers: exported by `esphome.components.zephyr` (framework-zephyr branch), or in
+    `esphome.components.zephyr.mcuboot` (older branches). Deferred: esphome.components.zephyr is heavy."""
+    try:
+        from esphome.components.zephyr import apply_swap_method, validate_swap_method
+    except ImportError:
+        from esphome.components.zephyr.mcuboot import apply_swap_method, validate_swap_method
+    return validate_swap_method, apply_swap_method
+
+
 def _validate_swap_method(config: ConfigType) -> ConfigType:
     if not SWAP_METHOD_SCHEMA:
         return config
-    # deferred: esphome.components.zephyr is heavy
-    from esphome.components.zephyr.mcuboot import validate_swap_method
-
-    return validate_swap_method(config)
+    return _mcuboot()[0](config)
 
 
 CONFIG_SCHEMA = cv.All(
@@ -61,7 +73,7 @@ def _final_validate(config: ConfigType) -> ConfigType:
     """On Zephyr the backend installs a test upgrade, which MCUboot keeps only once the image is confirmed, and
     safe_mode is what confirms it (after a good boot): without it every update is rolled back at the next reset."""
     safe_mode = fv.full_config.get().get("safe_mode") or {}
-    if getattr(CORE, "is_zephyr", False) and safe_mode.get(CONF_DISABLED, False):
+    if _is_zephyr() and safe_mode.get(CONF_DISABLED, False):
         _LOGGER.warning(
             "ota canopen_entities: 'safe_mode: disabled: true' leaves updated images unconfirmed, "
             "MCUboot rolls them back at the next reset; enable safe_mode"
@@ -74,7 +86,7 @@ FINAL_VALIDATE_SCHEMA = _final_validate
 
 def _compression() -> bool:
     """zlib (miniz) inflate needs ~43 KB of heap: not on stm32 / zephyr."""
-    return not (getattr(CORE, "is_zephyr", False) or getattr(CORE, "is_stm32", False))
+    return not (_is_zephyr() or getattr(CORE, "is_stm32", False))
 
 
 def FILTER_SOURCE_FILES() -> list[str]:
@@ -95,7 +107,5 @@ async def to_code(config: ConfigType) -> None:
     if not config[CONF_REBOOT]:
         cg.add(var.set_reboot(False))
 
-    if SWAP_METHOD_SCHEMA and getattr(CORE, "is_zephyr", False):
-        from esphome.components.zephyr.mcuboot import apply_swap_method
-
-        apply_swap_method(config)
+    if SWAP_METHOD_SCHEMA and _is_zephyr():
+        _mcuboot()[1](config)

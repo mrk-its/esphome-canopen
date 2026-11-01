@@ -13,74 +13,83 @@ external_components:
 esphome:
   name: stm32l4-biuro-switch
 
-zephyr:
+stm32:
   variant: STM32L4
   # board: nucleo_l476rg/stm32l476xx
   board: nucleo_l476rg
-  advanced:
-    runner: openocd
-    bootloader: mcuboot
+  framework:
+    advanced:
+      runner: openocd
+      bootloader: mcuboot
   # nucleo_l476rg has no MCUboot layout upstream, so carve the 1 MB flash into
   # boot (64K) / slot0 / slot1 (464K each), keeping the board's 32K storage at 0xf8000.
-  overlays:
-    app: |
-      /delete-node/ &storage_partition;
+    overlays:
+      app: |
+        /delete-node/ &storage_partition;
 
-      &flash0 {
-          partitions {
-              boot_partition: partition@0 {
-                  label = "mcuboot";
-                  reg = <0x0 DT_SIZE_K(64)>;
-              };
-              slot0_partition: partition@10000 {
-                  label = "image-0";
-                  reg = <0x10000 0x74000>;
-              };
-              slot1_partition: partition@84000 {
-                  label = "image-1";
-                  reg = <0x84000 0x74000>;
-              };
-              storage_partition: partition@f8000 {
-                  label = "storage";
-                  reg = <0xf8000 DT_SIZE_K(32)>;
-              };
-          };
-      };
+        &flash0 {
+            partitions {
+                boot_partition: partition@0 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "mcuboot";
+                    reg = <0x0 DT_SIZE_K(64)>;
+                };
+                slot0_partition: partition@10000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "image-0";
+                    reg = <0x10000 0x74000>;
+                };
+                slot1_partition: partition@84000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "image-1";
+                    reg = <0x84000 0x74000>;
+                };
+                storage_partition: partition@f8000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "storage";
+                    reg = <0xf8000 DT_SIZE_K(32)>;
+                };
+            };
+        };
 
-      / {
-          chosen {
-              zephyr,code-partition = &slot0_partition;
-          };
-      };
-    mcuboot: |
-      /delete-node/ &storage_partition;
+        / {
+            chosen {
+                zephyr,code-partition = &slot0_partition;
+            };
+        };
+      mcuboot: |
+        /delete-node/ &storage_partition;
 
-      &flash0 {
-          partitions {
-              boot_partition: partition@0 {
-                  label = "mcuboot";
-                  reg = <0x0 DT_SIZE_K(64)>;
-              };
-              slot0_partition: partition@10000 {
-                  label = "image-0";
-                  reg = <0x10000 0x74000>;
-              };
-              slot1_partition: partition@84000 {
-                  label = "image-1";
-                  reg = <0x84000 0x74000>;
-              };
-              storage_partition: partition@f8000 {
-                  label = "storage";
-                  reg = <0xf8000 DT_SIZE_K(32)>;
-              };
-          };
-      };
+        &flash0 {
+            partitions {
+                boot_partition: partition@0 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "mcuboot";
+                    reg = <0x0 DT_SIZE_K(64)>;
+                };
+                slot0_partition: partition@10000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "image-0";
+                    reg = <0x10000 0x74000>;
+                };
+                slot1_partition: partition@84000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "image-1";
+                    reg = <0x84000 0x74000>;
+                };
+                storage_partition: partition@f8000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "storage";
+                    reg = <0xf8000 DT_SIZE_K(32)>;
+                };
+            };
+        };
 
-      / {
-          chosen {
-              zephyr,code-partition = &boot_partition;
-          };
-      };
+        / {
+            chosen {
+                zephyr,code-partition = &boot_partition;
+            };
+        };
 
 logger:
   logs:
