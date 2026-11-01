@@ -23,7 +23,7 @@ see "Hub for the entity mapper"). **Next:** cut the upstream PRs again from the 
 Where to continue (2026-10-31):
 - **Upstream split:** "Upstream PRs" -> "New split": what `canopen-full` changed, the file -> PR map, the line counts
   (`scripts/pr_split_lines.py`), and the cutting steps. PR 1 is cut (2026-11-01, `canopen-pr1-node` in
-  `~/repos/esphome` and `~/repos/esphome-docs`, not pushed); next: PR 2.
+  `~/repos/esphome` and `~/repos/esphome-docs`, pushed); `canopen-full` is now stacked on it; next: PR 2.
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
 - **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
   `components_next`); the old component (`components/canopen`, canopen-stack) and `components_next/canopen` (a stale
@@ -361,6 +361,15 @@ feature" (2026-10-31, pushed to mrk-its/esphome). `canopen-next` stays as it was
 `test/esp8266_mapper.yaml`) use the hub copy in `components/canopen`, synced from `canopen-full`
 (`scripts/sync_hub.py`; `--worktree` for uncommitted hub changes).
 
+**Stacked on PR 1 (2026-11-01).** `canopen-full` was rebased on `upstream/dev` `0548ad7a72` (clean, canopen files
+unchanged), then rewritten as `canopen-pr1-node` + one commit "[canopen] PRs 2-6 on top of PR 1 (to be split)"
+(`30cc4937e3`, same tree as before). The previous history (the 17 + refactor + tidy commits, rebased) is
+`canopen-full-backup` (`68cbae6c54`); `e9f738ebf7` and `62bd875` below name commits of the history before that. The
+same in `~/repos/esphome-docs`: `canopen-full` = `canopen-pr1-node` + "Document PRs 2-6 (to be split)"
+(`0a03b105e`), backup `canopen-full-backup` (`cbb190d07`). All pushed (force-push for `canopen-full`). Cutting
+PR N from here: split PR N's part out of the "PRs 2-6" commit into its own commit below it (branch
+`canopen-prN-...` at that commit), rest stays on top; review fixes go into the PR commits and are rebased up.
+
 **The refactor** (no behaviour change; function bodies moved verbatim):
 - `setup()` in `canopen.cpp` is a fixed sequence of per-feature hooks: `add_*_od_()` (OD entries) -> `od.finalize()`
   -> `config_*_(cfg)` (`CO_config_t` counts / entries) -> `CO_new` / `CO_CANinit` -> `init_pdo_storage_()` ->
@@ -466,8 +475,8 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
    The last branch must equal `canopen-full` (`git diff canopen-pr6-sdo-block canopen-full --
    esphome/components/canopen tests/components/canopen platformio.ini esphome/core/defines.h` empty).
 
-   **PR 1 done (2026-11-01), not pushed:** `canopen-pr1-node` in `~/repos/esphome`, `144fce267f` on `upstream/dev`
-   `27aa91bb9d` (component, `tests/components/canopen`, `tests/component_tests/canopen`, CODEOWNERS, the
+   **PR 1 done (2026-11-01), pushed:** `canopen-pr1-node` in `~/repos/esphome`, `50448cf939` on `upstream/dev`
+   `0548ad7a72` (first cut `144fce267f` on `27aa91bb9d`, rebased) (component, `tests/components/canopen`, `tests/component_tests/canopen`, CODEOWNERS, the
    `platformio.ini` line; 659 lines by the script), and in `~/repos/esphome-docs`, `bad076268` on `next` `231db3c44`
    (the page cut to PR 1, the two index links). Checked: `cpp_unit_test.py canopen` (2), the Python component tests
    (6), `test_build_components.py` for the four targets (only PR 1's four sources built, no warnings), clang-tidy
