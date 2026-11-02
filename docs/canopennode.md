@@ -473,8 +473,9 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
    | 5 | `USE_CANOPEN_PDO`, `CO_CONFIG_PDO`, `CO_CONFIG_STORAGE` |
    | 6 | `CANOPEN_SDO_BLOCK_SIZE`, `CO_CONFIG_SDO_SRV`, `CO_CONFIG_SDO_SRV_BUFFER_SIZE`, `CO_CONFIG_SDO_SRV_BLKSIZE`, `CO_CONFIG_CRC16` |
 
-   The last branch must equal `canopen-full` (`git diff canopen-pr6-sdo-block canopen-full --
-   esphome/components/canopen tests/components/canopen platformio.ini esphome/core/defines.h` empty).
+   The last branch must equal `canopen-full` (`git diff canopen-pr7-ota canopen-full --
+   esphome/components/canopen tests/components/canopen platformio.ini esphome/core/defines.h` shows only the Zephyr
+   parts PR 7 leaves out, see [canopen_ota.md](canopen_ota.md), "Upstream").
 
    **PR 1 done (2026-11-01), pushed:** `canopen-pr1-node` in `~/repos/esphome`, `50448cf939` on `upstream/dev`
    `0548ad7a72` (first cut `144fce267f` on `27aa91bb9d`, rebased) (component, `tests/components/canopen`, `tests/component_tests/canopen`, CODEOWNERS, the

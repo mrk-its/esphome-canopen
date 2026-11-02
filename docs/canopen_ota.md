@@ -191,7 +191,7 @@ goes out after those; only PR 1 is cut so far. Size: 388 lines + 277 of tests by
 `tests/components/canopen/ota/`, `test-ota.esp32-idf.yaml`, `test-ota.esp8266-ard.yaml`, the two tests and two configs in
 `tests/component_tests/canopen/`.
 
-**Leave out of the PR: the Zephyr parts** (proposed, not decided), because upstream has no Zephyr backend, so they would be
+**Left out of the PR: the Zephyr parts** (decided 2026-11-02), because upstream has no Zephyr backend, so they would be
 dead code there: the `SWAP_METHOD_SCHEMA` import, `_mcuboot()`, `_is_zephyr()` and the `safe_mode` warning in `__init__.py`,
 and the `USE_OTA_MCUBOOT` magic check in `program_download.cpp`. They stay on `canopen-full`, which then differs from the
 last PR branch by exactly these lines (check it with the "must equal `canopen-full`" diff), and go upstream with the Zephyr
