@@ -22,8 +22,8 @@ Upstream PRs are being re-split (the old `canopen-1..4` branches are deleted, `d
 refactored by feature on branch `canopen-full` in `~/repos/esphome`, the file -> PR map, line counts and cutting
 steps in `docs/canopennode.md`, "Upstream PRs" -> "New split"; per-PR line counts with `scripts/pr_split_lines.py`.
 OTA in the hub on CiA 302-3 program download objects (`0x1F50`/`0x1F51`/`0x1F56`/`0x1F57`) instead of the mapper's `0x3000`:
-`docs/canopen_ota.md`. Implemented on branch `canopen-ota` of `~/repos/esphome` (on top of `canopen-full`) and in can2mqtt
-`dev`, not yet tested over CAN; the mapper's OTA stays until then. The hub copy is synced with `--ref canopen-ota` meanwhile.
+`docs/canopen_ota.md`. Implemented on `canopen-full` and in can2mqtt `dev`, tested over CAN on the nucleo only; the mapper's
+OTA stays until the rest is tested. Next upstream: PR 7 (`canopen_ota.md`, "Upstream").
 
 ## Workflow
 - Always do new features and fixes on a `feature/<short-name>` branch (created from the current branch,

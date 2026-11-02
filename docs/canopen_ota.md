@@ -1,8 +1,8 @@
 # CAN OTA in the hub (CiA 302-3 program download)
 
-Plan (2026-11-01). Hub side implemented 2026-11-02 on branch `canopen-ota` of `~/repos/esphome` (on top of
-`canopen-full`, the copy in `components/canopen` is synced from it): `esphome/components/canopen/ota/`. can2mqtt side on its
-`dev` (0.2.13-b4). Not yet: a test over CAN, removing the mapper's OTA. Move OTA out of `canopen_entities` into the `canopen` hub, as
+Plan (2026-11-01). Hub side implemented 2026-11-02 on branch `canopen-full` of `~/repos/esphome`:
+`esphome/components/canopen/ota/`. can2mqtt side on its
+`dev` (0.2.13-b4). Tested over CAN on the nucleo. Not yet: removing the mapper's OTA. Move OTA out of `canopen_entities` into the `canopen` hub, as
 `ota: - platform: canopen`, on the standard program download objects of CiA 302-3 (`0x1F50` / `0x1F51` / `0x1F56` /
 `0x1F57`) instead of our manufacturer-specific `0x3000`. Context: [canopennode.md](canopennode.md) (the port, the
 upstream split), the current protocol in CLAUDE.md ("CAN OTA flow") and [ota.md](ota.md) (user docs).
@@ -182,9 +182,45 @@ then covers the gzip file. It doesn't help ESP32.
 
 ## Upstream
 
-- A later hub PR on top of PR 6 (SDO block transfer), after the six of the new split (canopennode.md, "Upstream PRs"):
-  `ota/` subdirectory of `canopen` (platform `ota: - platform: canopen`), miniz only if compression stays.
-- Docs: an OTA section on the `canopen` page in esphome-docs (branch `canopen-full`).
+PR 7 of the new split (canopennode.md, "Upstream PRs"): `[canopen] Add OTA on the CiA 302-3 program download objects`,
+branch `canopen-pr7-ota`, stacked on PR 6. It uses the OD handler API (PR 4) and needs SDO block transfer (PR 6), so it
+goes out after those; only PR 1 is cut so far. Size: 388 lines + 277 of tests by `scripts/pr_split_lines.py`, under the
+~1000-line limit, and all in new files: `ota/` and `test-ota.*`, nothing in the hub's shared files.
+
+**Contents:** `esphome/components/canopen/ota/` (`__init__.py`, `canopen_ota.h`, `program_download.*`),
+`tests/components/canopen/ota/`, `test-ota.esp32-idf.yaml`, `test-ota.esp8266-ard.yaml`, the two tests and two configs in
+`tests/component_tests/canopen/`.
+
+**Leave out of the PR: the Zephyr parts** (proposed, not decided), because upstream has no Zephyr backend, so they would be
+dead code there: the `SWAP_METHOD_SCHEMA` import, `_mcuboot()`, `_is_zephyr()` and the `safe_mode` warning in `__init__.py`,
+and the `USE_OTA_MCUBOOT` magic check in `program_download.cpp`. They stay on `canopen-full`, which then differs from the
+last PR branch by exactly these lines (check it with the "must equal `canopen-full`" diff), and go upstream with the Zephyr
+platform or a follow-up. MCUboot rejects a bad image anyway; the magic check only fails it earlier.
+
+**Before it goes out:**
+- [ ] Check the objects against the CiA 302-3 v4.1.0 text (table in "CiA 302-3 program download"). If no copy can be had,
+  say in the PR what they're based on, not that they follow the standard.
+- [ ] A real CAN upload on an upstream platform. So far only the nucleo on the Zephyr fork, which upstream doesn't have:
+  ESP32 (ESP-IDF) and ESP8266 at least; `begin(0)` is read and compiled there, not run.
+- [ ] An interrupted upload over CAN (host gone mid-transfer): the application keeps running, the next stop + clear works.
+- [ ] Clang-tidy (`esp8266-arduino-tidy`, `esp32-idf-tidy`, `bk72xx-tidy`, `nrf52-tidy`). Not run yet. It may need `defines.h`
+  / `platformio.ini` additions as in "Cutting the branches", step 2. nrf52 has no backend with this contract: check the
+  platform's validation there (`test-ota` only covers ESP32 and ESP8266).
+- [ ] `test_build_components.py` on `esp32-ard` and `rp2040-ard` too (add `test-ota` files, or only say which ran). Bk72xx,
+  rtl87xx: no canbus platform in the tests today.
+- [ ] Docs: an OTA section on the `canopen` page in esphome-docs, branch `canopen-full`, then cut with the PR: the option,
+  the host sequence and that the host must check the CRC, the image file per platform.
+- [ ] `canopen-pr7-ota` on its own: `cpp_unit_test.py canopen`, the component tests, pre-commit.
+
+**PR description points:**
+- Why standard objects: a private OD index in the hub would be a reservation every other user of the manufacturer area has
+  to avoid, and any CiA 302-3 tool can use these.
+- Not compiled in unless requested (the ESP8266 comparison: 0 symbols without, +9.7 KB of code with).
+- The host is responsible for the CRC check; no MD5, no compression, and no NMT state required, each a deliberate choice.
+- The block size cap of PR 6 depends on the CANopenNode fork's patch, as PR 6 already says.
+- Client: can2mqtt's `program_download.py` as the reference.
+
+After it: can2mqtt keeps both paths, the mapper's OTA goes (plan step 7).
 
 ## Testing done (2026-11-02)
 
@@ -194,8 +230,9 @@ then covers the gzip file. It doesn't help ESP32.
 - Nucleo (Zephyr, the backend of esphomeplatformzephyr PR 231, the hub from the fork's working tree): a test firmware
   driving the objects through the OD with its own signed image from slot 0. Refusals, CRC, stop, swap, confirmation; a
   corrupted image gets a different CRC, and if started anyway MCUboot rejects it.
-- **Not yet over CAN**: no SDO transfer on hardware, this machine has no CAN interface besides the nucleo's. Needs
-  can2mqtt on another machine. Speed unmeasured.
+- Over CAN, 2026-11-02: can2mqtt 0.2.13-b4 updated the nucleo (`sdo_block_size: 60`): 122,455 B in 46 s, 2.62 KB/s, no gap
+  over 1 s, CRC-32 as the file's, MCUboot swap about 6 s, `safe_mode` confirmed the image. The first real upload, Zephyr only.
+  Not yet: an interrupted upload, ESP32, ESP8266, a node moving from `0x3000`.
 
 ## Open questions
 

@@ -29,6 +29,7 @@ PRS = {
     4: "OD handler API, profile API",
     5: "PDOs, store/restore",
     6: "SDO block transfer",
+    7: "OTA on CiA 302-3 objects",
 }
 
 FILES = {
@@ -291,6 +292,8 @@ def classify_py(lines: list[str]) -> list[int]:
 
 def classify(path: Path, rel: str) -> list[int]:
     lines = path.read_text(encoding="utf-8").splitlines()
+    if rel.startswith("ota/"):
+        return [7] * len(lines)
     default = FILES.get(rel, 1)
     if rel == "types.h":
         return classify_types(lines)
@@ -303,6 +306,8 @@ def classify(path: Path, rel: str) -> list[int]:
 
 def classify_test(path: Path) -> list[int]:
     lines = path.read_text(encoding="utf-8").splitlines()
+    if path.parent.name == "ota" or path.name.startswith("test-ota."):
+        return [7] * len(lines)
     default = TEST_FILES.get(path.name, 1)
     out = [default] * len(lines)
     if path.suffix != ".cpp":
@@ -349,7 +354,7 @@ def main() -> None:
     unknown = []
     for path in files:
         rel = str(path.relative_to(root))
-        if rel not in FILES:
+        if rel not in FILES and not rel.startswith("ota/"):
             unknown.append(rel)
         kind = path.suffix.lstrip(".")
         for line, pr in zip(
@@ -376,7 +381,7 @@ def main() -> None:
         )
         for path in sorted(
             p
-            for p in tests_dir.iterdir()
+            for p in [*tests_dir.iterdir(), *(tests_dir / "ota").glob("*")]
             if p.is_file() and p.suffix in (".cpp", ".h", ".py", ".yaml")
         ):
             name = (

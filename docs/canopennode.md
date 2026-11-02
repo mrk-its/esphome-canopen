@@ -433,6 +433,7 @@ and `__init__.py`; 2263 in all; the port header is in the CANopenNode fork since
 | 4 | OD handler API (`OdObject`, `OdStream`, `write_od()`) + profile API (`CANopenNode`, `register_node()`) | 70 | 182 | 37 | **289** | 47 | 216: `canopen_node_test` 108, `od_test` (handler tests) 108 |
 | 5 | Own PDOs + store/restore 0x1010/0x1011 | 243 | 77 | 10 | **330** | 37 | 202: `pdo_test` 103, `storage_test` 99 |
 | 6 | SDO server block transfer (`sdo_block_size`) | 3 | 0 | 44 | **47** | 6 | 230: `sdo_block_test` |
+| 7 | OTA on CiA 302-3 objects (`ota: - platform: canopen`), see below | 199 | 110 | 79 | **388** | 32 | 277: `ota/program_download_test` 245, `test-ota.*.yaml` 27, `ota/__init__.py` 5 |
 
 Dependencies (why this order): 2 uses 1's NMT strings and frame path; 3's actions and local SDO transfers use the OD
 (1) and the loopback (2, `loopback_test` SDO tests); 4's `CANopenNode` forwards the SDO client / NMT master (3); 5
@@ -500,9 +501,10 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
    `docs/upstream_prs_1-3.md` with a description of the new branches, update CLAUDE.md, and before PR 1 goes out the
    open points of "Before PR 1" below (#21522, library source, CI boilerplate).
 
-**After PR 6: OTA in the hub** (planned 2026-11-01, [canopen_ota.md](canopen_ota.md)): `ota: - platform: canopen` on
-the CiA 302-3 program download objects (`0x1F50` / `0x1F51` / `0x1F56` / `0x1F57`) instead of the mapper's `0x3000`,
-which stays in the manufacturer area only for the old component. The mapper then has no OTA.
+**PR 7: OTA in the hub** (implemented, on `canopen-full` since 2026-11-02; plan in [canopen_ota.md](canopen_ota.md),
+"Upstream"): `ota: - platform: canopen` on the CiA 302-3 program download objects (`0x1F50` / `0x1F51` / `0x1F56` /
+`0x1F57`) instead of the mapper's `0x3000`, which stays in the manufacturer area only for the old component. The mapper
+then has no OTA. Branch `canopen-pr7-ota`, stacked on PR 6.
 
 ### Old split (superseded)
 Kept for the history of what each part contained; the branches below are not used any more.
