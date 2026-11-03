@@ -1,5 +1,6 @@
 # Unreleased
 * `canopen_entities` accepts node-to-node commands as DAM-MPDO (CiA 301) on `0x500..0x57F`, next to the old OD writer frames
+* `canopen_entities: od_writer_mpdo: true` sends them as DAM-MPDO (default: the old frames); update the target nodes first, firmware without DAM-MPDO ignores these frames
 
 
 # 2024-05-27, v0.3.0

@@ -74,7 +74,8 @@ remote state through can2mqtt while debugging.
 ## Actions
 All take `node` (name in `remote_nodes`) and `entity` (id) or `index` of the remote entity; the remote entity's type
 is checked against the action. Commands are sent with the [OD writer](../OBJECT_DICTIONARY.md#od-writer), so the
-remote node must have it on (`od_writer`, the default). Toggles read the remote state from a remote state slot, so
+remote node must have it on (`od_writer`, the default); `od_writer_mpdo` on the sending node selects the frame format
+([options](configuration.md)). Toggles read the remote state from a remote state slot, so
 the remote entity needs `tpdo`.
 
 | Action | Remote entity | Options |

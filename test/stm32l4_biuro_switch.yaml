@@ -1,5 +1,5 @@
 # Nucleo as a wall switch on the canopen hub + canopen_entities: the user button B1 toggles dimmer4's light5
-# ("biuro", node 0x37 on the old component) with canopen_entities.light.toggle; the green LED blinks on CAN traffic; CAN OTA
+# ("biuro", node 0x37) with canopen_entities.light.toggle; the green LED blinks on CAN traffic; CAN OTA
 # from can2mqtt (upload .esphome/build/stm32l4-biuro-switch/.west_build/zephyr/zephyr/zephyr.signed.bin). Build / flash
 # with the esphomeplatformzephyr venv:
 #   ../esphomeplatformzephyr/venv/bin/esphome run test/stm32l4_biuro_switch.yaml
@@ -137,6 +137,8 @@ safe_mode:
 
 canopen_entities:
   canopen_id: can_gate
+  # the button's toggle goes out as DAM-MPDO
+  od_writer_mpdo: true
   remote_nodes:
     dimmer4: ../../zrodlana/esphome/dimmer4.yaml
   # remote logs for can2mqtt (OD 0x3100): a log block goes out back to back, tx_buffer_size 32 takes it plus the

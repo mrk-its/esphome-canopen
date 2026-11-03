@@ -1,10 +1,13 @@
 // Host test of components/canopen_entities/od_writer_frame.h, built and run by test/test_od_writer_frame.py.
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 #include "od_writer_frame.h"
 
 using esphome::canopen_entities::decode_od_writer_frame;
+using esphome::canopen_entities::encode_dam_mpdo_frame;
+using esphome::canopen_entities::encode_old_od_writer_frame;
 using esphome::canopen_entities::OdWriterFrame;
 
 #define CHECK(cond) \
@@ -50,6 +53,22 @@ int main() {
     const uint8_t as_old[8] = {uint8_t(node), 1, 0x10, 0x20, 0, 0, 0, 0};
     CHECK(decode_od_writer_frame(as_old, 8, node, frame) && !frame.dam);
   }
+
+  // encoders: what is sent decodes to what was meant
+  uint8_t out[8];
+  encode_dam_mpdo_frame(out, NODE, 0x2032, 3, 0x04030201, 4);
+  const uint8_t dam_expected[8] = {0x80 | NODE, 0x32, 0x20, 3, 1, 2, 3, 4};
+  CHECK(memcmp(out, dam_expected, 8) == 0);
+  CHECK(decode_od_writer_frame(out, 8, NODE, frame));
+  CHECK(frame.dam && frame.index == 0x2032 && frame.sub == 3 && frame.len == 4);
+  encode_dam_mpdo_frame(out, NODE, 0x2032, 3, 0x04030201, 1);  // padded with zeros, whatever the upper bytes hold
+  const uint8_t dam_padded[8] = {0x80 | NODE, 0x32, 0x20, 3, 1, 0, 0, 0};
+  CHECK(memcmp(out, dam_padded, 8) == 0);
+  encode_old_od_writer_frame(out, NODE, 0x2032, 3, 0x04030201);
+  const uint8_t old_expected[8] = {NODE, 3, 0x32, 0x20, 1, 2, 3, 4};
+  CHECK(memcmp(out, old_expected, 8) == 0);
+  CHECK(decode_od_writer_frame(out, 5, NODE, frame));
+  CHECK(!frame.dam && frame.index == 0x2032 && frame.sub == 3 && frame.len == 1 && frame.value[0] == 1);
 
   printf("OK\n");
   return 0;

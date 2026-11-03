@@ -47,6 +47,7 @@ CONF_TPDO = "tpdo"
 CONF_IMMEDIATE = "immediate"
 CONF_CAPS = "caps"
 CONF_OD_WRITER = "od_writer"
+CONF_OD_WRITER_MPDO = "od_writer_mpdo"
 CONF_REMOTE_NODES = "remote_nodes"
 CONF_RPDO = "rpdo"
 CONF_NODE = "node"
@@ -230,14 +231,16 @@ def validate_unique_indices(config: ConfigType) -> ConfigType:
 
 
 def validate_od_writer_tpdo(config: ConfigType) -> ConfigType:
-    if not config[CONF_OD_WRITER]:
+    if config[CONF_OD_WRITER]:
+        message = f"TPDO {OD_WRITER_TPDO} is reserved for the OD writer (od_writer: false frees it)"
+    elif config[CONF_OD_WRITER_MPDO]:
+        # the commands go out on this node's TPDO 7 COB-ID
+        message = f"TPDO {OD_WRITER_TPDO} is reserved for the commands of od_writer_mpdo"
+    else:
         return config
     for pos, entity in enumerate(config[CONF_ENTITIES]):
         if CONF_TPDO in entity and layout.tpdo_number(entity) == OD_WRITER_TPDO:
-            raise cv.Invalid(
-                f"TPDO {OD_WRITER_TPDO} is reserved for the OD writer (od_writer: false frees it)",
-                path=[CONF_ENTITIES, pos, CONF_TPDO],
-            )
+            raise cv.Invalid(message, path=[CONF_ENTITIES, pos, CONF_TPDO])
     return config
 
 
@@ -250,6 +253,8 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_ENTITIES, default=[]): cv.ensure_list(ENTITY_SCHEMA),
             # node-to-node commands (OBJECT_DICTIONARY.md "OD writer"); reserves TPDO 7
             cv.Optional(CONF_OD_WRITER, default=True): cv.boolean,
+            # send those commands as DAM-MPDO on our own TPDO 7 COB-ID; reserves that TPDO
+            cv.Optional(CONF_OD_WRITER_MPDO, default=False): cv.boolean,
             # name -> YAML file of another node, see remote.py
             cv.Optional(CONF_REMOTE_NODES, default={}): cv.Schema(
                 {cv.string: cv.file_}
@@ -545,6 +550,8 @@ async def to_code(config: ConfigType) -> None:
     cg.add(var.set_node_id(node_id))
     if config[CONF_OD_WRITER]:
         cg.add(var.enable_od_writer())
+    if config[CONF_OD_WRITER_MPDO]:
+        cg.add(var.enable_od_writer_mpdo())
 
     # TPDOs: all 8 exist (can2mqtt reads them), unused ones disabled
     states = node_states(CORE.config, config)
@@ -757,6 +764,7 @@ def _remote_action(
             CONF_ENTITY: str(target.entity["id"]),
             "node_id": target.node.node_id,
             CONF_INDEX: target.entity["index"],
+            "_old_format": target.node.old_component,
             "_writes": writes(config, target),
         }
         if toggle:
@@ -778,6 +786,8 @@ def _remote_action(
         var = cg.new_Pvariable(action_id, template_arg)
         await cg.register_parented(var, config[CONF_ID])
         cg.add(var.set_target(config["node_id"], config[CONF_INDEX]))
+        if config["_old_format"]:
+            cg.add(var.set_old_format())
         for write in config["_writes"]:
             value = write["value"]
             if isinstance(value, tuple) and value[0] == "toggle":

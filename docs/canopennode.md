@@ -810,13 +810,14 @@ Open points for `canopen_entities` itself (not in the steps yet):
   one boots again. With `safe_mode: disabled: true` nothing confirms, so the OTA platform warns on Zephyr. Open:
   speed with bigger blocks / a bigger server buffer. Planned: move to the hub on CiA 302-3 objects,
   [canopen_ota.md](canopen_ota.md).
-- **MPDO for the OD writer (own step, changes the wire protocol, needs can2mqtt and all nodes updated):** today
-  `0x500 + target` is also the target's TPDO 7 (`0x500 + node`), so a TPDO 7 frame whose first byte equals another
-  node's id is applied there as an OD write, and the ID has several producers. Proposal: the CiA 301 MPDO format
-  (destination address mode: byte 0 = `0x80 | target`, 0 = all; index LE; subindex; 4 data bytes) on the
-  **sender's** TPDO 7 (`0x500 + sender`), TPDO 7 reserved in `layout.py`; can2mqtt needs a node id of its own if
-  it sends them. Alternatives: extended 29-bit IDs, or `0x680 + sender` (only senders up to 0x5F). Needs a
-  migration (accept both formats for a while).
+- **MPDO for the OD writer (changes the wire protocol):** the old format's `0x500 + target` is also the target's
+  TPDO 7 (`0x500 + node`), so a TPDO 7 frame whose first byte equals another node's id is applied there as an OD write,
+  and the ID has several producers. So: the CiA 301 MPDO format (destination address mode: byte 0 = `0x80 | target`;
+  index LE; subindex; 4 data bytes) on the **sender's** TPDO 7 (`0x500 + sender`). Receiving: both formats (2026-11-03).
+  Sending: `od_writer_mpdo: true`, default false (2026-11-03), rejected next to an entity on TPDO 7; targets in the
+  old component's YAML format keep getting old frames (`RemoteCommandAction::set_old_format()`), and the YAML can't
+  tell whether a migrated node's firmware is new enough, so update the targets first. Not on hardware yet. Later:
+  default true, then drop the old format.
 - **Raw RPDO linking ported** (2026-10-31): `rpdo: {node_id, tpdo, offset, cmd, tpdo_size}` on mapper entities, one
   byte at `offset` of the remote TPDO into command `cmd`, a source of the same `remote.rpdo_plan()` as the named form
   (grouped with named entries and slots of the same node / TPDO, overlaps rejected). New: optional `tpdo_size` (1..8),

@@ -168,11 +168,14 @@ class CANopenEntities : public Component {
   // our node id (the hub's, from codegen)
   void set_node_id(uint8_t node_id) { this->node_id_ = node_id; }
   void enable_od_writer() { this->od_writer_ = true; }
+  void enable_od_writer_mpdo() { this->od_writer_mpdo_ = true; }
 
   // OD writer (node-to-node commands, OBJECT_DICTIONARY.md "OD writer"): writes value (size 1..4 bytes, little endian)
-  // to index:sub of node_id's OD in one frame on 0x500 + node_id, without a reply; our own node is written directly.
-  // False if it wasn't sent / written.
-  bool send_od_write(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size);
+  // to index:sub of node_id's OD in one frame, without a reply; our own node is written directly. With od_writer_mpdo
+  // a DAM-MPDO on 0x500 + our node id (dropped unless we are OPERATIONAL), otherwise, or with old_format (a target
+  // that only knows the old format), the old format on 0x500 + node_id. False if it wasn't sent / written.
+  bool send_od_write(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size,
+                     bool old_format = false);
   // a received OD writer frame, either format (data / len of a 0x500..0x57F frame); public for tests
   void handle_od_writer_frame(const uint8_t *data, uint8_t len);
 
@@ -240,6 +243,7 @@ class CANopenEntities : public Component {
   canopen::CANopenComponent *hub_;
   uint8_t node_id_{0};
   bool od_writer_{false};
+  bool od_writer_mpdo_{false};
   // CANOPEN_ENTITIES_ENTITIES: from codegen, the number of entities
   StaticVector<MappedEntity, CANOPEN_ENTITIES_ENTITIES> entities_;
 #ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
@@ -272,6 +276,8 @@ template<typename... Ts> class RemoteCommandAction : public Action<Ts...>, publi
     this->node_id_ = node_id;
     this->entity_index_ = entity_index;
   }
+  // the target runs the old component, which doesn't know DAM-MPDO
+  void set_old_format() { this->old_format_ = true; }
   void add_write(uint8_t cmd, uint8_t size, uint8_t encoding, float min_value, float max_value,
                  TemplatableValue<float, Ts...> value) {
     if (this->count_ < MAX_WRITES)
@@ -282,7 +288,8 @@ template<typename... Ts> class RemoteCommandAction : public Action<Ts...>, publi
     for (uint8_t i = 0; i < this->count_; i++) {
       const Write &w = this->writes_[i];
       uint32_t raw = encode_remote_cmd(w.encoding, w.value.value(x...), w.size, w.min_value, w.max_value);
-      this->parent_->send_od_write(this->node_id_, 0x2002 + 0x10 * this->entity_index_, w.cmd + 1, raw, w.size);
+      this->parent_->send_od_write(this->node_id_, 0x2002 + 0x10 * this->entity_index_, w.cmd + 1, raw, w.size,
+                                   this->old_format_);
     }
   }
 
@@ -299,6 +306,7 @@ template<typename... Ts> class RemoteCommandAction : public Action<Ts...>, publi
   uint8_t count_{0};
   uint8_t node_id_{0};
   uint8_t entity_index_{0};
+  bool old_format_{false};
 };
 
 }  // namespace esphome::canopen_entities

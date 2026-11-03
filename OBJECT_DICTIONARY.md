@@ -244,7 +244,7 @@ Slots are numbered at build time (sorted by remote node, entity and state); the 
 
 When `od_writer` is enabled (default), a node accepts remote OD writes on COB-IDs `0x500..0x57F` whose byte 0 addresses it. Every node listens on the whole range, which also holds the TPDO 7 COB-IDs, so TPDO 7 is reserved on every node using it. Writes go through the OD like an SDO download (handlers run), without a reply. Two formats are accepted, told apart by bit 7 of byte 0.
 
-The sender uses the old format (`send_od_write()`, the `canopen_entities.*` actions), on `0x500 + target_node_id`:
+The sender (`send_od_write()`, the `canopen_entities.*` actions) uses the old format by default, on `0x500 + target_node_id`:
 
 | Byte  | Content |
 |-------|---------|
@@ -253,7 +253,7 @@ The sender uses the old format (`send_od_write()`, the `canopen_entities.*` acti
 | 2..3  | OD index (little endian) |
 | 4..7  | value (little endian), 1..4 bytes, DLC 5..8 |
 
-DAM-MPDO (CiA 301, destination address mode), receive only for now. The sender uses its own TPDO 7 COB-ID, `0x500 + sender_node_id`:
+DAM-MPDO (CiA 301, destination address mode), sent with `od_writer_mpdo: true`, on the sender's own TPDO 7 COB-ID, `0x500 + sender_node_id` (that TPDO is reserved on the sender, and frames go out only while it is OPERATIONAL). Targets whose YAML is in the old component's format still get the old format, because they ignore this one:
 
 | Byte  | Content |
 |-------|---------|

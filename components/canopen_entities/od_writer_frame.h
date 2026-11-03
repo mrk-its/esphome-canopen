@@ -36,4 +36,25 @@ inline bool decode_od_writer_frame(const uint8_t *data, uint8_t len, uint8_t nod
   return true;
 }
 
+// The old format: all 8 bytes are filled, the frame is 4 + size bytes long.
+inline void encode_old_od_writer_frame(uint8_t *data, uint8_t target, uint16_t index, uint8_t sub, uint32_t value) {
+  data[0] = target;
+  data[1] = sub;
+  data[2] = uint8_t(index);
+  data[3] = uint8_t(index >> 8);
+  for (uint8_t i = 0; i < 4; i++)
+    data[4 + i] = uint8_t(value >> (8 * i));
+}
+
+// A DAM-MPDO, always 8 bytes: the value's size bytes (1..4), padded with zeros.
+inline void encode_dam_mpdo_frame(uint8_t *data, uint8_t target, uint16_t index, uint8_t sub, uint32_t value,
+                                  uint8_t size) {
+  data[0] = 0x80 | target;
+  data[1] = uint8_t(index);
+  data[2] = uint8_t(index >> 8);
+  data[3] = sub;
+  for (uint8_t i = 0; i < 4; i++)
+    data[4 + i] = i < size ? uint8_t(value >> (8 * i)) : 0;
+}
+
 }  // namespace esphome::canopen_entities

@@ -308,6 +308,34 @@ def test_codegen_remote(tmp_path):
 
 
 @needs_esphome
+def test_codegen_od_writer_mpdo(tmp_path: Path) -> None:
+    """Off by default; the old component's nodes are marked for the old format, whatever the flag says."""
+    source = (REPO / "test" / "mapper" / "remote_node_mapper.yaml").read_text()
+    new_node = tmp_path / "new_node.yaml"
+    new_node.write_text(source.replace("od_writer: false", "od_writer: true"))
+    nodes = {"old": REMOTE_NODES["dimmer"], "new": str(new_node)}
+    extra = button(
+        {"canopen_entities.switch.turn_on": {"node": "old", "entity": "relay"}},
+        {"canopen_entities.switch.turn_on": {"node": "new", "entity": "pump"}},
+    )
+    main_cpp, _ = generate(tmp_path, [], extra, remote_nodes=nodes)
+    assert "enable_od_writer_mpdo()" not in main_cpp
+    assert main_cpp.count("->set_old_format();") == 1
+    main_cpp, _ = generate(tmp_path, [], extra, remote_nodes=nodes, od_writer_mpdo=True)
+    assert "enable_od_writer_mpdo()" in main_cpp
+    assert main_cpp.count("->set_old_format();") == 1
+    # ...after the old node's target, not the new one's
+    assert re.search(r"->set_target\(54, 8\);\s*\w+->set_old_format\(\);", main_cpp)
+
+
+@needs_esphome
+def test_od_writer_mpdo_reserves_tpdo7(tmp_path: Path) -> None:
+    message = "TPDO 7 is reserved for the commands of od_writer_mpdo"
+    entities = [{"id": "temp", "index": 1, "tpdo": 7}]
+    assert message in config_error(tmp_path, entities, od_writer=False, od_writer_mpdo=True)
+
+
+@needs_esphome
 def test_codegen_raw_rpdo(tmp_path: Path) -> None:
     entities = [
         # lamp (6): brightness (command 1) from byte 2 of node 0x40 TPDO 1, state from byte 0

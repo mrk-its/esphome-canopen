@@ -119,7 +119,7 @@ esphome:
         id(mapper).handle_od_writer_frame(dam_off, 8);
         ESP_LOGI("test", "DAM-MPDO: number %.1f (expect about 0), uptime %.1f (expect 1.0), switch %s (expect OFF)",
                  id(test_number).state, id(uptime_sensor).state, ONOFF(id(test_switch).state));
-    # a real one over the bus with a remote action: dimmer4 (node 0x37, old component) light5 "biuro" off
+    # a real one over the bus with a remote action: dimmer4 (node 0x37) light5 "biuro" off
     - canopen_entities.light.turn_off: {node: dimmer4, entity: light5}
     - delay: 1s
     - lambda: |-
@@ -400,7 +400,9 @@ binary_sensor:
 canopen_entities:
   id: mapper
   canopen_id: can_gate
-  # links to other nodes (docs/linking-nodes.md): dimmer4 is a real node on the bus (old component)
+  # the remote action below goes out as DAM-MPDO
+  od_writer_mpdo: true
+  # links to other nodes (docs/linking-nodes.md): dimmer4 is a real node on the bus
   remote_nodes:
     dimmer4: ../../zrodlana/esphome/dimmer4.yaml
   # remote logs for can2mqtt (OD 0x3100): a block goes out back to back, zephyr_can tx_buffer_size 32 takes it plus

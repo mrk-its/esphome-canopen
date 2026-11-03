@@ -465,13 +465,25 @@ void MappedEntity::alarm_command_(uint32_t value) {
 }
 #endif
 
-bool CANopenEntities::send_od_write(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size) {
+bool CANopenEntities::send_od_write(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size,
+                                    bool old_format) {
   if (size == 0 || size > 4 || node_id == 0 || node_id > 127)
     return false;
-  uint8_t data[8] = {node_id, sub, uint8_t(index), uint8_t(index >> 8),
-                     uint8_t(value), uint8_t(value >> 8), uint8_t(value >> 16), uint8_t(value >> 24)};
-  if (node_id == this->node_id_)
+  uint8_t data[8];
+  if (node_id == this->node_id_) {
+    encode_old_od_writer_frame(data, node_id, index, sub, value);
     return this->hub_->write_od(index, sub, data + 4, size) == OdResult::OD_RESULT_OK;
+  }
+  if (this->od_writer_mpdo_ && !old_format) {
+    // a PDO of ours (TPDO 7's COB-ID), so only in OPERATIONAL (CiA 301), which is also what the target requires
+    if (this->hub_->get_nmt_state() != canopen::NMTState::NMT_STATE_OPERATIONAL) {
+      ESP_LOGW(TAG, "OD writer: not OPERATIONAL, write to node 0x%02x 0x%04x:%u dropped", node_id, index, sub);
+      return false;
+    }
+    encode_dam_mpdo_frame(data, node_id, index, sub, value, size);
+    return this->hub_->send_frame(OD_WRITER_COB_ID + this->node_id_, data, 8);
+  }
+  encode_old_od_writer_frame(data, node_id, index, sub, value);
   return this->hub_->send_frame(OD_WRITER_COB_ID + node_id, data, 4 + size);
 }
 
@@ -544,6 +556,7 @@ void CANopenEntities::dump_config() {
   ESP_LOGCONFIG(TAG, "CANopen entities:");
   ESP_LOGCONFIG(TAG, "  TPDO layout hash: %08" PRIx32, this->layout_hash_);
   ESP_LOGCONFIG(TAG, "  OD writer: %s", YESNO(this->od_writer_));
+  ESP_LOGCONFIG(TAG, "  OD writer sends DAM-MPDO: %s", YESNO(this->od_writer_mpdo_));
 #ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
   for (size_t n = 0; n < this->slots_.size(); n++)
     ESP_LOGCONFIG(TAG, "  Remote state slot %u (0x%04x): %u B", (unsigned) n, remote_slot_index(n), this->slots_[n].size);

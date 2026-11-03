@@ -51,6 +51,11 @@ One `canopen_entities:` per firmware.
 * `entities` (Optional, list of `entity` objects): ESPHome entities exposed via CANopen, see the `entity` schema below.
 * `od_writer` (Optional, bool, default=true): node-to-node commands (the `canopen_entities.*` actions of other
   nodes, see [OD writer](../OBJECT_DICTIONARY.md#od-writer)). Reserves TPDO 7.
+* `od_writer_mpdo` (Optional, bool, default=false): this node sends its `canopen_entities.*` actions as CiA 301 DAM-MPDO
+  on its own TPDO 7 COB-ID instead of the old frames on the target's, and only while it is OPERATIONAL. Reserves TPDO 7
+  even with `od_writer: false`. The target must be OPERATIONAL and run firmware that accepts DAM-MPDO, otherwise it
+  silently ignores the command: update the targets first. Targets whose YAML is in the old component's format
+  still get the old frames.
 * `remote_nodes` (Optional, mapping of name to YAML file): other nodes this node receives states from or sends commands
   to, by the ESPHome YAML file they are built from (path relative to this config). Their TPDO layout is computed from
   that file, so `rpdo`, `platform: canopen_entities` entities and the `canopen_entities.*` actions can refer to remote

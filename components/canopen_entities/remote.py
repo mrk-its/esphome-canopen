@@ -162,6 +162,8 @@ class RemoteNode:
         self.name = name
         self.path = path
         canopen, self.od_writer = node_section(config, path)
+        # the old component only understands the old OD writer format
+        self.old_component = _single(config, MAPPER_KEY, path) is None
         try:
             canopen = _normalize_node_config(canopen)
         except (KeyError, TypeError, ValueError) as err:

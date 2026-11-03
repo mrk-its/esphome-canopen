@@ -142,7 +142,7 @@ go over CAN, see [OTA over CAN](docs/ota.md).
 
 A few rules:
 * `index` and `node_id` together identify the entity in Home Assistant. Don't renumber them after the node is in use.
-* TPDOs 0..6 are free to use; TPDO 7 is reserved for node-to-node commands (unless `od_writer: false`). Each TPDO
+* TPDOs 0..6 are free to use; TPDO 7 is reserved for node-to-node commands (unless `od_writer: false` and `od_writer_mpdo: false`). Each TPDO
   holds 8 bytes. The build fails if the states don't fit, and it logs the computed layout.
 * The `canopen` component from this repository replaces ESPHome's own, also once ESPHome has one. To use ESPHome's
   (when it is complete in your release), load only `components: [canopen_entities]` from here; with an incomplete
