@@ -1,4 +1,5 @@
 #include "canopen_entities.h"
+#include "od_writer_frame.h"
 
 #include <algorithm>
 #include <cmath>
@@ -475,15 +476,25 @@ bool CANopenEntities::send_od_write(uint8_t node_id, uint16_t index, uint8_t sub
 }
 
 void CANopenEntities::handle_od_writer_frame(const uint8_t *data, uint8_t len) {
-  if (len < 5 || data[0] != this->node_id_)
+  OdWriterFrame frame;
+  if (!decode_od_writer_frame(data, len, this->node_id_, frame))
     return;
-  uint8_t sub = data[1];
-  uint16_t index = data[2] | (data[3] << 8);
-  OdResult ret = this->hub_->write_od(index, sub, data + 4, len - 4);
+  size_t value_len = frame.len;
+  if (frame.dam) {
+    // PDOs exist only in OPERATIONAL (CiA 301); the old format has always been accepted in any state
+    if (this->hub_->get_nmt_state() != canopen::NMTState::NMT_STATE_OPERATIONAL)
+      return;
+    // the value is padded to 4 bytes; an object of another size is left for write_od() to reject
+    size_t size = this->hub_->get_od().value_size(frame.index, frame.sub);
+    if (size >= 1 && size < value_len)
+      value_len = size;
+  }
+  OdResult ret = this->hub_->write_od(frame.index, frame.sub, frame.value, value_len);
   if (ret != OdResult::OD_RESULT_OK) {
-    ESP_LOGW(TAG, "OD writer: 0x%04x:%u (%u bytes) not written: %d", index, sub, len - 4, static_cast<int>(ret));
+    ESP_LOGW(TAG, "OD writer: 0x%04x:%u (%u bytes) not written: %d", frame.index, frame.sub,
+             static_cast<unsigned>(value_len), static_cast<int>(ret));
   } else {
-    ESP_LOGD(TAG, "OD writer: 0x%04x:%u written", index, sub);
+    ESP_LOGD(TAG, "OD writer: 0x%04x:%u written", frame.index, frame.sub);
   }
 }
 

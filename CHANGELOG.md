@@ -1,3 +1,7 @@
+# Unreleased
+* `canopen_entities` accepts node-to-node commands as DAM-MPDO (CiA 301) on `0x500..0x57F`, next to the old OD writer frames
+
+
 # 2024-05-27, v0.3.0
 * add support for heartbeat consumers
 * fix serious timer driver bug

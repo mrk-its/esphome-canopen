@@ -99,6 +99,26 @@ esphome:
         bool local = id(mapper).send_od_write(0x7f, 0x2072, 1, 0, 1);  // light off, written directly
         ESP_LOGI("test", "OD writer: switch %s (expect OFF), send_od_write to us %s, light %s (expect OFF)",
                  ONOFF(id(test_switch).state), YESNO(local), ONOFF(id(test_light).remote_values.is_on()));
+        // DAM-MPDO: 0x80 | node, index, sub, value padded to 4 bytes
+        const uint8_t dam_on[8] = {0xff, 0x42, 0x20, 1, 1, 0, 0, 0};       // UINT8 0x2042:1 = 1
+        const uint8_t dam_other[8] = {0xe1, 0x42, 0x20, 1, 0, 0, 0, 0};    // for node 0x61: ignored
+        const uint8_t dam_all[8] = {0x80, 0x42, 0x20, 1, 0, 0, 0, 0};      // address 0: ignored
+        const uint8_t dam_short[7] = {0xff, 0x42, 0x20, 1, 0, 0, 0};       // not 8 bytes: ignored
+        const uint8_t dam_bad_index[8] = {0xff, 0x99, 0x50, 1, 1, 0, 0, 0};  // 0x5099: no such entry (warning)
+        id(mapper).handle_od_writer_frame(dam_on, 8);
+        id(mapper).handle_od_writer_frame(dam_other, 8);
+        id(mapper).handle_od_writer_frame(dam_all, 8);
+        id(mapper).handle_od_writer_frame(dam_short, 7);
+        id(mapper).handle_od_writer_frame(dam_bad_index, 8);
+        ESP_LOGI("test", "DAM-MPDO: switch %s (expect ON)", ONOFF(id(test_switch).state));
+        const uint8_t dam_u16[8] = {0xff, 0x52, 0x20, 1, 0xff, 0x7f, 0, 0};  // UINT16 0x2052:1, middle of -50..50
+        const uint8_t dam_real32[8] = {0xff, 0x12, 0x20, 1, 0, 0, 0x80, 0x3f};  // REAL32 0x2012:1 = 1.0
+        const uint8_t dam_off[8] = {0xff, 0x42, 0x20, 1, 0, 0, 0, 0};
+        id(mapper).handle_od_writer_frame(dam_u16, 8);
+        id(mapper).handle_od_writer_frame(dam_real32, 8);
+        id(mapper).handle_od_writer_frame(dam_off, 8);
+        ESP_LOGI("test", "DAM-MPDO: number %.1f (expect about 0), uptime %.1f (expect 1.0), switch %s (expect OFF)",
+                 id(test_number).state, id(uptime_sensor).state, ONOFF(id(test_switch).state));
     # a real one over the bus with a remote action: dimmer4 (node 0x37, old component) light5 "biuro" off
     - canopen_entities.light.turn_off: {node: dimmer4, entity: light5}
     - delay: 1s

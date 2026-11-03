@@ -242,7 +242,9 @@ Slots are numbered at build time (sorted by remote node, entity and state); the 
 
 ## OD writer
 
-When `pdo_od_writer` is enabled (default), a node accepts remote OD writes on COB-IDs `0x500..0x57F` whose byte 0 is its node id. The sender uses `0x500 + target_node_id`, which is also the target's TPDO 7 COB-ID, so TPDO 7 is reserved on every node using it. Writes go through the OD like an SDO download (handlers run), without a reply. Frame layout:
+When `od_writer` is enabled (default), a node accepts remote OD writes on COB-IDs `0x500..0x57F` whose byte 0 addresses it. Every node listens on the whole range, which also holds the TPDO 7 COB-IDs, so TPDO 7 is reserved on every node using it. Writes go through the OD like an SDO download (handlers run), without a reply. Two formats are accepted, told apart by bit 7 of byte 0.
+
+The sender uses the old format (`send_od_write()`, the `canopen_entities.*` actions), on `0x500 + target_node_id`:
 
 | Byte  | Content |
 |-------|---------|
@@ -250,3 +252,14 @@ When `pdo_od_writer` is enabled (default), a node accepts remote OD writes on CO
 | 1     | OD subindex |
 | 2..3  | OD index (little endian) |
 | 4..7  | value (little endian), 1..4 bytes, DLC 5..8 |
+
+DAM-MPDO (CiA 301, destination address mode), receive only for now. The sender uses its own TPDO 7 COB-ID, `0x500 + sender_node_id`:
+
+| Byte  | Content |
+|-------|---------|
+| 0     | `0x80` + target node_id |
+| 1..2  | OD index (little endian) |
+| 3     | OD subindex |
+| 4..7  | value (little endian), padded to 4 bytes, DLC always 8 |
+
+A DAM-MPDO is processed only in NMT state OPERATIONAL. Unlike CiA 301, address 0 (all nodes) is ignored, because the same index is a different entity on each node, and a write to a missing object only logs a warning, without EMCY `0x8230`. The old format isn't affected by the NMT state.

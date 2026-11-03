@@ -173,7 +173,7 @@ class CANopenEntities : public Component {
   // to index:sub of node_id's OD in one frame on 0x500 + node_id, without a reply; our own node is written directly.
   // False if it wasn't sent / written.
   bool send_od_write(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size);
-  // a received OD writer frame (data / len of a 0x500..0x57F frame); public for tests
+  // a received OD writer frame, either format (data / len of a 0x500..0x57F frame); public for tests
   void handle_od_writer_frame(const uint8_t *data, uint8_t len);
 
 #ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
@@ -219,8 +219,8 @@ class CANopenEntities : public Component {
 
  protected:
   MappedEntity *add_entity_(EntityBase *entity, uint8_t index, uint32_t type);
-  // byte 0 of the frame is the target, so every node listens on all of 0x500..0x57F (other nodes' TPDO 7 COB-IDs
-  // too: TPDO 7 is reserved while the OD writer is on)
+  // byte 0 of the frame holds the target (od_writer_frame.h), so every node listens on all of 0x500..0x57F (other
+  // nodes' TPDO 7 COB-IDs too: TPDO 7 is reserved while the OD writer is on)
   static constexpr uint32_t OD_WRITER_COB_ID = 0x500;
   static void on_od_writer_frame(void *context, uint32_t can_id, const uint8_t *data, uint8_t len) {
     static_cast<CANopenEntities *>(context)->handle_od_writer_frame(data, len);
