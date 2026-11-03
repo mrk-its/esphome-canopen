@@ -142,9 +142,9 @@ TEST_NAMES = [
     (r"CanopenSdoBlock", 6),
     (r"Sdo|SDO", 3),
     (
-        r"CanopenOD, (Handler|ManyEntries|Errors|AfterFinalize)",
+        r"CanopenOD, (Handler|ManyEntries|Errors|AfterFinalize|ValueSize|Read)",
         4,
-    ),  # od_test: these use OdObject handlers
+    ),  # od_test: these use OdObject handlers or the OD access of od_handler.cpp
 ]
 
 

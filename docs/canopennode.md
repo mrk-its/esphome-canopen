@@ -408,7 +408,7 @@ PR N from here: split PR N's part out of the "PRs 2-6" commit into its own commi
 | `sdo_client.cpp` | 3 | SDO client, 0x1280 |
 | `nmt_master.cpp` | 3 | `send_nmt()` |
 | `automation.h` | 3 | `SDOWriteAction` |
-| `od_handler.h` / `od_handler.cpp` | 4 | `OdResult`, `OdStream`, `OdObject`; `set_extension_()`, `write()` |
+| `od_handler.h` / `od_handler.cpp` | 4 | `OdResult`, `OdStream`, `OdObject`; `set_extension_()`, `write()`, `read()`, `value_size()` |
 | `canopen_node.h` / `canopen_node.cpp` | 4 | `CANopenNode` base class (profile API) |
 | `pdo.cpp` | 5 | `configure_tpdo/rpdo()`, 0x1400-0x1A00 records, `CO_CANopenInitPDO`, processing, `request_tpdo()` |
 | `pdo_storage.cpp` | 5 | 0x1010 / 0x1011, load / store / restore in preferences |
@@ -423,14 +423,14 @@ local ring in `to_code()`, the duplicate node id check in `_final_validate`; PR 
 helper in the chain (PR 3).
 
 **Line counts** (`scripts/pr_split_lines.py`, see below; non-blank lines, comments included, all `.cpp`, `.h`
-and `__init__.py`; 2263 in all; the port header is in the CANopenNode fork since 2026-11-01):
+and `__init__.py`; 2694 in all; the port header is in the CANopenNode fork since 2026-11-01):
 
 | PR | Content | .cpp | .h | .py | Total | Comment-only | Tests (non-blank) |
 |---|---|---|---|---|---|---|---|
-| 1 | Node core: library, driver, basic OD, NMT + HB producer, SDO server, identity / device info | 393 | 182 | 133 | **708** | 76 | 272: `common.yaml` + `test.*.yaml` 130, `fake_canbus.h` 45, `od_test` 75, `__init__.py` 22 |
+| 1 | Node core: library, driver, basic OD, NMT + HB producer, SDO server, identity / device info | 393 | 182 | 133 | **708** | 76 | 259: `common.yaml` + `test.*.yaml` 130, `fake_canbus.h` 45, `od_test` 62, `__init__.py` 22 |
 | 2 | Node monitoring, raw frames, heartbeat/EMCY triggers, loopback | 162 | 100 | 70 | **332** | 37 | 141: `frames_test` 59, `loopback_test` 82 |
 | 3 | SDO client, NMT master, `canopen.sdo_write` / `canopen.nmt` | 279 | 163 | 115 | **557** | 36 | 102: `loopback_test` (SDO tests) 77, `sdo_reply_test` 25 |
-| 4 | OD handler API (`OdObject`, `OdStream`, `write_od()`) + profile API (`CANopenNode`, `register_node()`) | 70 | 182 | 37 | **289** | 47 | 216: `canopen_node_test` 108, `od_test` (handler tests) 108 |
+| 4 | OD handler API (`OdObject`, `OdStream`, `write_od()`, `read_od()`, `value_size()`) + profile API (`CANopenNode`, `register_node()`) | 101 | 194 | 37 | **332** | 56 | 299: `canopen_node_test` 108, `od_test` (handler and OD access tests) 191 |
 | 5 | Own PDOs + store/restore 0x1010/0x1011 | 243 | 77 | 10 | **330** | 37 | 202: `pdo_test` 103, `storage_test` 99 |
 | 6 | SDO server block transfer (`sdo_block_size`) | 3 | 0 | 44 | **47** | 6 | 230: `sdo_block_test` |
 | 7 | OTA on CiA 302-3 objects (`ota: - platform: canopen`), see below | 199 | 110 | 79 | **388** | 32 | 277: `ota/program_download_test` 245, `test-ota.*.yaml` 27, `ota/__init__.py` 5 |
