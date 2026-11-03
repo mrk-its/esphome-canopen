@@ -62,6 +62,13 @@ class ObjectDictionary {
   }
   // Writes a value through the entry's handler, as an SDO download does. Needs write access. After finalize().
   OdResult write(uint16_t index, uint8_t sub, const void *data, size_t len);
+  // Reads a value through the entry's handler, as an SDO upload does, into data (max_len bytes); *len is the number of
+  // bytes read. Needs read access. DATA_LONG if the value doesn't fit. A handler may have side effects (e.g. consume
+  // what it returns), also when the value doesn't fit. After finalize().
+  OdResult read(uint16_t index, uint8_t sub, void *data, size_t max_len, size_t *len);
+  // Size in bytes of an entry's value, without running its handler; 0 if it has no fixed size (a domain) or doesn't
+  // exist, and before finalize().
+  size_t value_size(uint16_t index, uint8_t sub);
 
  protected:
   // an entry until finalize(): its object and extension by position in vars_ / arrays_ / records_ / extensions_

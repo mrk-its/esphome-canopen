@@ -32,8 +32,8 @@ NMTState to_nmt_state(CO_NMT_internalState_t state);
 //   of a component whose setup priority is above the hub's (setup_priority::PROCESSOR), e.g. PROCESSOR + 1. Calls
 //   made later are logged as errors and ignored.
 // The rest is runtime API, e.g. from loop() or automations: add_frame_listener() and the callbacks (any time),
-// send_frame(), SDO client and NMT master requests; write_od() and request_tpdo() need the OD, so they fail or do
-// nothing before the hub's setup().
+// send_frame(), SDO client and NMT master requests; write_od(), read_od() and request_tpdo() need the OD, so they fail
+// or do nothing before the hub's setup().
 //
 // The implementation is split by feature: canopen.cpp (setup, processing, NMT), driver_can.cpp (CANopenNode's CAN
 // driver, frame reception and transmission), device_info.cpp (identity, device information, SDO server),
@@ -91,6 +91,11 @@ class CANopenComponent : public Component {
   // frames). Synchronous; needs write access.
   OdResult write_od(uint16_t index, uint8_t sub, const void *data, size_t len) {
     return this->od_.write(index, sub, data, len);
+  }
+  // Reads a value from our own OD through its handler, as an SDO upload does; *len is the number of bytes read. A
+  // handler may have side effects. Synchronous; needs read access. DATA_LONG if the value doesn't fit in max_len.
+  OdResult read_od(uint16_t index, uint8_t sub, void *data, size_t max_len, size_t *len) {
+    return this->od_.read(index, sub, data, max_len, len);
   }
 
   // --- Node monitoring (node_monitor.cpp) ---
