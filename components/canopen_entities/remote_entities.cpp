@@ -44,6 +44,8 @@ const char *RemoteStateFormat::name(uint32_t raw) const {
   }
 }
 
+// attach() is generated only for entities with a remote state slot
+#ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
 #ifdef USE_BINARY_SENSOR
 void RemoteBinarySensor::attach(CANopenEntities *mapper, uint8_t slot, uint8_t kind, uint8_t size, float min_value,
                                 float max_value) {
@@ -77,5 +79,6 @@ void RemoteTextSensor::publish_raw_(uint32_t raw) {
   this->publish_state(buf);
 }
 #endif
+#endif  // CANOPEN_ENTITIES_REMOTE_SLOTS
 
 }  // namespace esphome::canopen_entities
