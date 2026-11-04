@@ -373,5 +373,180 @@ void AlarmEntity::setup(CanopenComponent *canopen) {
 }
 #endif
 
+#ifdef USE_CLIMATE
+static uint8_t climate_fan_mode_to_wire(esphome::climate::Climate *climate) {
+  return climate->fan_mode.has_value() ? (uint8_t) *climate->fan_mode : CLIMATE_NONE;
+}
+
+static uint8_t climate_preset_to_wire(esphome::climate::Climate *climate) {
+  return climate->preset.has_value() ? (uint8_t) *climate->preset : CLIMATE_NONE;
+}
+
+uint32_t ClimateEntity::temperature_to_wire(float value) {
+  if (size == 4) {
+    uint32_t raw;
+    std::memcpy(&raw, &value, sizeof(raw));
+    return raw;
+  }
+  return scale_to_wire(value, min_val, max_val, size == 1 ? 255 : 65535);
+}
+
+float ClimateEntity::temperature_from_wire(void *buffer) {
+  switch (size) {
+    case 1:
+      return scale_from_wire(*(uint8_t *) buffer, min_val, max_val, 255);
+    case 2:
+      return scale_from_wire(*(uint16_t *) buffer, min_val, max_val, 65535);
+    default: {
+      float value;
+      std::memcpy(&value, buffer, sizeof(value));
+      return value;
+    }
+  }
+}
+
+uint32_t ClimateEntity::add_temperature_state(float value) {
+  uint32_t raw = temperature_to_wire(value);
+  return canopen_->od_add_state(entity_id,
+                                size == 1   ? CO_TUNSIGNED8
+                                : size == 2 ? CO_TUNSIGNED16
+                                            : CO_TUNSIGNED32,
+                                &raw, size, tpdo);
+}
+
+void ClimateEntity::add_temperature_cmd(std::function<void(float)> &&set) {
+  canopen_->od_add_cmd(
+      entity_id,
+      [this, set = std::move(set)](void *buffer, uint32_t) {
+        float value = temperature_from_wire(buffer);
+        if (!std::isnan(value))  // 255 / 65535: unknown
+          set(value);
+      },
+      size == 1   ? CO_TCMD8
+      : size == 2 ? CO_TCMD16
+                  : CO_TCMD32);
+}
+
+void ClimateEntity::update_states() {
+  uint8_t mode = climate->mode;
+  od_set_state(canopen_, mode_key_, &mode, 1);
+
+  auto set_temperature = [this](uint32_t key, float value) {
+    if (key) {
+      uint32_t raw = temperature_to_wire(value);
+      od_set_state(canopen_, key, &raw, size);
+    }
+  };
+  set_temperature(target_key_, climate->target_temperature);
+  set_temperature(target_low_key_, climate->target_temperature_low);
+  set_temperature(target_high_key_, climate->target_temperature_high);
+
+  if (fan_mode_key_) {
+    uint8_t fan_mode = climate_fan_mode_to_wire(climate);
+    od_set_state(canopen_, fan_mode_key_, &fan_mode, 1);
+  }
+  if (preset_key_) {
+    uint8_t preset = climate_preset_to_wire(climate);
+    od_set_state(canopen_, preset_key_, &preset, 1);
+  }
+  if (swing_mode_key_) {
+    uint8_t swing_mode = climate->swing_mode;
+    od_set_state(canopen_, swing_mode_key_, &swing_mode, 1);
+  }
+
+  set_temperature(current_key_, climate->current_temperature);
+  uint8_t action = climate->action;
+  od_set_state(canopen_, action_key_, &action, 1);
+}
+
+void ClimateEntity::setup(CanopenComponent *canopen) {
+  namespace cl = esphome::climate;
+  this->canopen_ = canopen;
+  char dc_buf[MAX_DEVICE_CLASS_LENGTH];
+  uint32_t version = 1;
+
+  // caps (and so the OD layout) come from codegen (the `caps:` option), traits are only checked
+  auto traits = climate->get_traits();
+  uint32_t traits_caps = 0;
+  if (traits.has_feature_flags(cl::CLIMATE_SUPPORTS_TWO_POINT_TARGET_TEMPERATURE |
+                               cl::CLIMATE_REQUIRES_TWO_POINT_TARGET_TEMPERATURE))
+    traits_caps |= CLIMATE_CAP_TWO_POINT;
+  if (traits.get_supports_fan_modes())
+    traits_caps |= CLIMATE_CAP_FAN_MODE;
+  if (traits.get_supports_presets())
+    traits_caps |= CLIMATE_CAP_PRESET;
+  if (traits.get_supports_swing_modes())
+    traits_caps |= CLIMATE_CAP_SWING_MODE;
+  // leaving out a supported capability is fine, exposing an unsupported one or a single target
+  // temperature of a two-point only climate is not
+  bool needs_two_point = traits.has_feature_flags(cl::CLIMATE_REQUIRES_TWO_POINT_TARGET_TEMPERATURE) &&
+                         !(caps & CLIMATE_CAP_TWO_POINT);
+  if ((caps & ~traits_caps) || needs_two_point) {
+    ESP_LOGW(TAG, "climate '%s': caps from config 0x%02lx don't match traits 0x%02lx", climate->get_name().c_str(),
+             (unsigned long) caps, (unsigned long) traits_caps);
+  }
+
+  canopen->od_add_metadata(entity_id, ENTITY_TYPE_CLIMATE | (version << 8) | (caps << 16), climate->get_name(),
+                           climate->get_device_class_to(dc_buf), "°C", "");
+  canopen->od_add_min_max_metadata(entity_id, min_val, max_val);
+
+  // writable states first, in the order of layout.py: a state's position is also its command index
+  uint8_t mode = climate->mode;
+  mode_key_ = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &mode, 1, tpdo);
+  canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t) {
+    uint8_t value = *(uint8_t *) buffer;
+    if (value <= cl::CLIMATE_MODE_AUTO)
+      climate->make_call().set_mode((cl::ClimateMode) value).perform();
+  });
+
+  if (caps & CLIMATE_CAP_TWO_POINT) {
+    target_low_key_ = add_temperature_state(climate->target_temperature_low);
+    add_temperature_cmd([this](float value) { climate->make_call().set_target_temperature_low(value).perform(); });
+    target_high_key_ = add_temperature_state(climate->target_temperature_high);
+    add_temperature_cmd([this](float value) { climate->make_call().set_target_temperature_high(value).perform(); });
+  } else {
+    target_key_ = add_temperature_state(climate->target_temperature);
+    add_temperature_cmd([this](float value) { climate->make_call().set_target_temperature(value).perform(); });
+  }
+
+  if (caps & CLIMATE_CAP_FAN_MODE) {
+    uint8_t fan_mode = climate_fan_mode_to_wire(climate);
+    fan_mode_key_ = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &fan_mode, 1, tpdo);
+    canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t) {
+      uint8_t value = *(uint8_t *) buffer;
+      if (value <= cl::CLIMATE_FAN_QUIET)
+        climate->make_call().set_fan_mode((cl::ClimateFanMode) value).perform();
+    });
+  }
+
+  if (caps & CLIMATE_CAP_PRESET) {
+    uint8_t preset = climate_preset_to_wire(climate);
+    preset_key_ = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &preset, 1, tpdo);
+    canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t) {
+      uint8_t value = *(uint8_t *) buffer;
+      if (value <= cl::CLIMATE_PRESET_ACTIVITY)
+        climate->make_call().set_preset((cl::ClimatePreset) value).perform();
+    });
+  }
+
+  if (caps & CLIMATE_CAP_SWING_MODE) {
+    uint8_t swing_mode = climate->swing_mode;
+    swing_mode_key_ = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &swing_mode, 1, tpdo);
+    canopen->od_add_cmd(entity_id, [this](void *buffer, uint32_t) {
+      uint8_t value = *(uint8_t *) buffer;
+      if (value <= cl::CLIMATE_SWING_HORIZONTAL)
+        climate->make_call().set_swing_mode((cl::ClimateSwingMode) value).perform();
+    });
+  }
+
+  // read only states, no command
+  current_key_ = add_temperature_state(climate->current_temperature);
+  uint8_t action = climate->action;
+  action_key_ = canopen->od_add_state(entity_id, CO_TUNSIGNED8, &action, 1, tpdo);
+
+  climate->add_on_state_callback([this](cl::Climate &) { this->update_states(); });
+}
+#endif
+
 }  // namespace canopen
 }  // namespace esphome

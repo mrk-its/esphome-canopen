@@ -42,10 +42,26 @@ each node ([TPDO layout](../OBJECT_DICTIONARY.md#tpdo-layout)).
 * `index` (Required, int): index of entity, range 1..64. Together with `node_id` forms unique id of CAN-exposed entity, so it should be changed with a care. Indices must be unique.
 * `tpdo` (Optional, `TPDO` schema (see below)): when defined then state changes will be broadcasted via TPDO
 * `rpdo` (Optional, list of `RPDO` schema (see below)): when defined then received TPDO frames will be automatically mapped to OD entity command entries
-* `size` (Optional, int, `sensor` / `number` only): size of state on the wire: `4` (default, REAL32), `1` (scaled UINT8) or `2` (scaled UINT16). See [Sensor8 / Sensor16](../OBJECT_DICTIONARY.md#sensor8--sensor16)
-* `min_value` (Optional, float, default=0): minimal value for scaled states (`size` 1 or 2)
-* `max_value` (Optional, float, default=254 for `size: 1`, 65534 for `size: 2`): maximal value for scaled states (`size` 1 or 2)
-* `caps` (Optional, list, `light` / `cover` only): capabilities of the entity, needed only for platforms whose capabilities the component can't derive from the config (the build fails with a hint). Light: `on_off`, `brightness`, `color_temperature`; cover: `position`, `tilt`. See [TPDO layout](../OBJECT_DICTIONARY.md#tpdo-layout)
+* `size` (Optional, int, `sensor` / `number` / `climate` only): size of state on the wire: `4` (REAL32), `1` (scaled UINT8) or `2` (scaled UINT16). Defaults to `4` for sensors and numbers (see [Sensor8 / Sensor16](../OBJECT_DICTIONARY.md#sensor8--sensor16)), to `2` for the temperatures of a climate (see [Climate](../OBJECT_DICTIONARY.md#climate))
+* `min_value` (Optional, float, default=0, -40 for a climate): minimal value for scaled states (`size` 1 or 2)
+* `max_value` (Optional, float, default=254 for `size: 1`, 65534 for `size: 2`, 85 for a climate): maximal value for scaled states (`size` 1 or 2)
+* `caps` (Optional, list, `light` / `cover` / `climate` only): capabilities of the entity. Light: `on_off`, `brightness`, `color_temperature`; cover: `position`, `tilt` - needed only for platforms whose capabilities the component can't derive from the config (the build fails with a hint). Climate: `two_point`, `fan_mode`, `preset`, `swing_mode` - the optional states to expose, none by default (mode, target temperature, current temperature and action are always exposed). See [TPDO layout](../OBJECT_DICTIONARY.md#tpdo-layout)
+
+A climate, e.g. a radiator thermostat:
+
+```yaml
+canopen:
+  entities:
+    - id: radiator_living_room   # climate: mode, target and current temperature, action
+      index: 20
+      tpdo: 3                    # 6 bytes
+      min_value: 0               # optional: range of the scaled UINT16 temperatures, default -40..85 °C
+      max_value: 50
+    - id: heat_pump              # two-point: target_temperature_low / _high
+      index: 21
+      caps: [two_point]
+      tpdo: 4                    # 8 bytes, no room left for fan_mode / preset / swing_mode
+```
 
 ## `TPDO` schema
 Any of:
@@ -59,7 +75,7 @@ Any of:
 - remote entity of a node from `remote_nodes`:
   * `node` (Required, string): name of the node in `remote_nodes`
   * `entity` (string) or `index` (int) (one of them Required): id or index of the remote entity (must be in the remote node's `canopen.entities`, with `tpdo`)
-  * `state` (Optional, string): remote entity state, defaults to the first one: `state` (light, switch, binary sensor, cover, alarm) or `value` (sensor, number). Others: light `brightness`, `color_temp`; cover `position`, `tilt`
+  * `state` (Optional, string): remote entity state, defaults to the first one: `state` (light, switch, binary sensor, cover, alarm), `value` (sensor, number) or `mode` (climate). Others: light `brightness`, `color_temp`; cover `position`, `tilt`; climate `target_temperature` (`target_temperature_low`, `target_temperature_high` with `two_point`), `fan_mode`, `preset`, `swing_mode`, `current_temperature`, `action`
   * `cmd` (Optional, defaults to 0): entity command index the state is mapped to; its size must match the remote state's size
 - raw TPDO position:
   * `node_id` (Required, integer): id of node sending mapped TPDO frame

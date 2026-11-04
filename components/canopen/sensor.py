@@ -1,7 +1,8 @@
 """`sensor: - platform: canopen`: state of a remote node's entity, see remote_state_slots().
 
 Booleans are 0 / 1, percentages 0..1, color temperatures in mireds, cover / alarm
-states their codes (OBJECT_DICTIONARY.md), sensor / number values decoded.
+states and climate modes their codes (OBJECT_DICTIONARY.md), sensor / number values
+and climate temperatures decoded.
 """
 
 import esphome.config_validation as cv

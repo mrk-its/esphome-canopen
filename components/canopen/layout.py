@@ -15,6 +15,7 @@ DOMAIN_SWITCH = "switch"
 DOMAIN_LIGHT = "light"
 DOMAIN_COVER = "cover"
 DOMAIN_ALARM = "alarm_control_panel"
+DOMAIN_CLIMATE = "climate"
 
 TPDO_COUNT = 8
 
@@ -27,6 +28,26 @@ LIGHT_CAP_COLOR_TEMPERATURE = 4
 COVER_CAP_POSITION = 1
 COVER_CAP_TILT = 2
 
+# Climate capability bits: optional states, chosen with the entity's `caps:` option only
+CLIMATE_CAP_TWO_POINT = 1  # target_temperature_low / _high instead of target_temperature
+CLIMATE_CAP_FAN_MODE = 2
+CLIMATE_CAP_PRESET = 4
+CLIMATE_CAP_SWING_MODE = 8
+
+# Climate temperatures: scaled UINT16 by default, over this range (°C) unless min_value / max_value are set
+CLIMATE_DEFAULT_SIZE = 2
+CLIMATE_DEFAULT_MIN_VALUE = -40.0
+CLIMATE_DEFAULT_MAX_VALUE = 85.0
+
+# Wire codes of climate enums: ESPHome's ClimateMode, ClimateAction, ClimateFanMode, ClimatePreset and
+# ClimateSwingMode values (climate_mode.h); the list index is the code. Fan mode / preset 255: none (or custom).
+CLIMATE_MODES = ["off", "heat_cool", "cool", "heat", "fan_only", "dry", "auto"]
+CLIMATE_ACTIONS = ["off", None, "cooling", "heating", "idle", "drying", "fan", "defrosting"]
+CLIMATE_FAN_MODES = ["on", "off", "auto", "low", "medium", "high", "middle", "focus", "diffuse", "quiet"]
+CLIMATE_PRESETS = ["none", "home", "away", "boost", "comfort", "eco", "sleep", "activity"]
+CLIMATE_SWING_MODES = ["off", "both", "vertical", "horizontal"]
+CLIMATE_NONE = 255
+
 CAPS_NAMES = {
     DOMAIN_LIGHT: {
         "on_off": LIGHT_CAP_ON_OFF,
@@ -36,6 +57,12 @@ CAPS_NAMES = {
     DOMAIN_COVER: {
         "position": COVER_CAP_POSITION,
         "tilt": COVER_CAP_TILT,
+    },
+    DOMAIN_CLIMATE: {
+        "two_point": CLIMATE_CAP_TWO_POINT,
+        "fan_mode": CLIMATE_CAP_FAN_MODE,
+        "preset": CLIMATE_CAP_PRESET,
+        "swing_mode": CLIMATE_CAP_SWING_MODE,
     },
 }
 
@@ -156,10 +183,11 @@ def caps_from_names(domain, names):
 
 
 def entity_caps(domain, platform_config, caps_override=None):
-    """Capability bits of a light / cover entity, None for other domains.
+    """Capability bits of a light / cover / climate entity, None for other domains.
 
     `caps_override` (list of capability names from the `caps:` option) takes
-    precedence; otherwise caps are derived from the platform config.
+    precedence; otherwise light / cover caps are derived from the platform
+    config. Climate caps come from `caps:` only (none by default).
     """
     if domain not in CAPS_NAMES:
         if caps_override is not None:
@@ -167,6 +195,8 @@ def entity_caps(domain, platform_config, caps_override=None):
         return None
     if caps_override is not None:
         return caps_from_names(domain, caps_override)
+    if domain == DOMAIN_CLIMATE:
+        return 0
     platform = (platform_config or {}).get("platform")
     if domain == DOMAIN_LIGHT:
         modes = LIGHT_PLATFORM_COLOR_MODES.get(platform)
@@ -193,7 +223,12 @@ KIND_PERCENTAGE = "percentage"  # UINT8 0..254 -> 0..1, 255 unknown
 KIND_COLOR_TEMP = "color_temp"  # UINT8 0..254 -> 100..1000 mireds
 KIND_COVER_STATE = "cover_state"  # 0 open, 1 opening, 2 closed, 3 closing
 KIND_ALARM_STATE = "alarm_state"  # 0..9
-KIND_VALUE = "value"  # sensor / number: REAL32, or UINT8 / UINT16 scaled to min_value..max_value
+KIND_VALUE = "value"  # sensor / number / climate temperature: REAL32, or UINT8 / UINT16 scaled to min_value..max_value
+KIND_CLIMATE_MODE = "climate_mode"  # CLIMATE_MODES code
+KIND_CLIMATE_ACTION = "climate_action"  # CLIMATE_ACTIONS code
+KIND_CLIMATE_FAN_MODE = "climate_fan_mode"  # CLIMATE_FAN_MODES code, 255 none
+KIND_CLIMATE_PRESET = "climate_preset"  # CLIMATE_PRESETS code, 255 none
+KIND_CLIMATE_SWING_MODE = "climate_swing_mode"  # CLIMATE_SWING_MODES code
 
 # C++ RemoteStateKind (remote_entities.h)
 KIND_CODES = {
@@ -203,6 +238,16 @@ KIND_CODES = {
     KIND_COVER_STATE: 3,
     KIND_ALARM_STATE: 4,
     KIND_VALUE: 5,
+    KIND_CLIMATE_MODE: 6,
+    KIND_CLIMATE_ACTION: 7,
+    KIND_CLIMATE_FAN_MODE: 8,
+    KIND_CLIMATE_PRESET: 9,
+    KIND_CLIMATE_SWING_MODE: 10,
+}
+
+# states without a command, they come after the entity's writable states
+READ_ONLY_STATES = {
+    DOMAIN_CLIMATE: ("current_temperature", "action"),
 }
 
 
@@ -210,8 +255,29 @@ def entity_state_kinds(domain, caps=None, size=None):
     """(name, size in bytes, kind) of the entity's OD states, in subindex order.
 
     Must match the order of od_add_state() calls in entities.cpp. Commands are
-    added in the same order, so a state's position is also its command index.
+    added in the same order, so a state's position is also its command index;
+    READ_ONLY_STATES (last) have no command.
     """
+    if domain == DOMAIN_CLIMATE:
+        caps = caps or 0
+        size = CLIMATE_DEFAULT_SIZE if size is None else size
+        if size not in (1, 2, 4):
+            raise LayoutError(f"Unsupported {domain} size: {size}")
+        states = [("mode", 1, KIND_CLIMATE_MODE)]
+        if caps & CLIMATE_CAP_TWO_POINT:
+            states.append(("target_temperature_low", size, KIND_VALUE))
+            states.append(("target_temperature_high", size, KIND_VALUE))
+        else:
+            states.append(("target_temperature", size, KIND_VALUE))
+        if caps & CLIMATE_CAP_FAN_MODE:
+            states.append(("fan_mode", 1, KIND_CLIMATE_FAN_MODE))
+        if caps & CLIMATE_CAP_PRESET:
+            states.append(("preset", 1, KIND_CLIMATE_PRESET))
+        if caps & CLIMATE_CAP_SWING_MODE:
+            states.append(("swing_mode", 1, KIND_CLIMATE_SWING_MODE))
+        states.append(("current_temperature", size, KIND_VALUE))
+        states.append(("action", 1, KIND_CLIMATE_ACTION))
+        return states
     if domain in (DOMAIN_SENSOR, DOMAIN_NUMBER):
         size = 4 if size is None else size
         if size not in (1, 2, 4):
@@ -245,6 +311,26 @@ def entity_states(domain, caps=None, size=None):
 
 def entity_state_sizes(domain, caps=None, size=None):
     return [size for _, size in entity_states(domain, caps, size)]
+
+
+def entity_commands(domain, caps=None, size=None):
+    """(name, size in bytes) of the entity's commands, in subindex order (its writable states)."""
+    read_only = READ_ONLY_STATES.get(domain, ())
+    return [(name, size) for name, size in entity_states(domain, caps, size) if name not in read_only]
+
+
+def scale_range(domain, entity_config):
+    """(min_value, max_value) the scaled states (size 1 / 2) of an entity are mapped to, with defaults.
+
+    `entity_config` is a `canopen: entities:` item (validated or raw YAML).
+    """
+    if domain == DOMAIN_CLIMATE:
+        default_min, default_max = CLIMATE_DEFAULT_MIN_VALUE, CLIMATE_DEFAULT_MAX_VALUE
+    else:
+        default_min = 0.0
+        # 255 / 65535 reserved for NaN
+        default_max = 254.0 if entity_config.get("size") == 1 else 65534.0
+    return entity_config.get("min_value", default_min), entity_config.get("max_value", default_max)
 
 
 def tpdo_number(entity_config):

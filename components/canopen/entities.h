@@ -14,6 +14,10 @@
 #include "esphome/components/light/light_state.h"
 #endif
 
+#ifdef USE_CLIMATE
+#include "esphome/components/climate/climate.h"
+#endif
+
 #ifdef USE_CANOPEN_OTA
 #include "ota/ota.h"
 #endif
@@ -190,6 +194,54 @@ class AlarmEntity : public BaseCanopenEntity {
     this->alarm = alarm;
   }
   void setup(CanopenComponent *canopen) override;
+};
+#endif
+
+#ifdef USE_CLIMATE
+// climate capability bits (CLIMATE_CAP_* in layout.py)
+const uint32_t CLIMATE_CAP_TWO_POINT = 1;
+const uint32_t CLIMATE_CAP_FAN_MODE = 2;
+const uint32_t CLIMATE_CAP_PRESET = 4;
+const uint32_t CLIMATE_CAP_SWING_MODE = 8;
+// fan mode / preset state when the climate has none (or a custom one)
+const uint8_t CLIMATE_NONE = 255;
+
+class ClimateEntity : public BaseCanopenEntity {
+ public:
+  esphome::climate::Climate *climate;
+  uint32_t caps;  // from codegen (layout.py), not from traits
+  uint8_t size;   // of temperatures: 1 / 2 (scaled to min_val..max_val), 4 (REAL32)
+  float min_val;
+  float max_val;
+  ClimateEntity(esphome::climate::Climate *climate, uint32_t entity_id, TPDO tpdo, uint32_t caps, uint8_t size,
+                float min_val, float max_val)
+      : BaseCanopenEntity(entity_id, tpdo) {
+    this->climate = climate;
+    this->caps = caps;
+    this->size = size;
+    this->min_val = min_val;
+    this->max_val = max_val;
+  }
+  void setup(CanopenComponent *canopen) override;
+
+ protected:
+  uint32_t temperature_to_wire(float value);
+  float temperature_from_wire(void *buffer);
+  uint32_t add_temperature_state(float value);
+  void add_temperature_cmd(std::function<void(float)> &&set);
+  void update_states();
+
+  CanopenComponent *canopen_{nullptr};
+  // OD keys of the states, 0 if the state is not present
+  uint32_t mode_key_{0};
+  uint32_t target_key_{0};
+  uint32_t target_low_key_{0};
+  uint32_t target_high_key_{0};
+  uint32_t fan_mode_key_{0};
+  uint32_t preset_key_{0};
+  uint32_t swing_mode_key_{0};
+  uint32_t current_key_{0};
+  uint32_t action_key_{0};
 };
 #endif
 

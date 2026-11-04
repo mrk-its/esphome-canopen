@@ -17,6 +17,7 @@ const int8_t ENTITY_TYPE_SENSOR_UINT16 = 7;
 const int8_t ENTITY_TYPE_NUMBER = 8;
 const int8_t ENTITY_TYPE_NUMBER_UINT8 = 9;
 const int8_t ENTITY_TYPE_NUMBER_UINT16 = 10;
+const int8_t ENTITY_TYPE_CLIMATE = 11;
 const int8_t ENTITY_TYPE_ALARM = 16;
 
 const uint8_t ENTITY_TYPE_CAN_STATUS = 254;
@@ -277,6 +278,13 @@ class CanopenComponent : public Component {
 #ifdef USE_ALARM_CONTROL_PANEL
   void add_entity(esphome::alarm_control_panel::AlarmControlPanel *alarm, uint32_t entity_id, TPDO tpdo) {
     entities.push_back(new AlarmEntity(alarm, entity_id, tpdo));
+  }
+#endif
+
+#ifdef USE_CLIMATE
+  void add_entity(esphome::climate::Climate *climate, uint32_t entity_id, TPDO tpdo, uint32_t caps, uint8_t size,
+                  float min_val, float max_val) {
+    entities.push_back(new ClimateEntity(climate, entity_id, tpdo, caps, size, min_val, max_val));
   }
 #endif
 

@@ -155,9 +155,117 @@ def test_layout_table():
     assert layout.tpdo_mapping(states) == layout.tpdo_mapping([s[:3] for s in states])
 
 
+def climate_caps(*names):
+    return layout.entity_caps(layout.DOMAIN_CLIMATE, {"platform": "thermostat"}, list(names))
+
+
+def test_climate_caps():
+    # no platform table: nothing optional unless listed in `caps:`
+    assert layout.entity_caps(layout.DOMAIN_CLIMATE, {"platform": "thermostat"}) == 0
+    assert layout.entity_caps(layout.DOMAIN_CLIMATE, {"platform": "unknown_platform"}) == 0
+    assert climate_caps("two_point") == layout.CLIMATE_CAP_TWO_POINT
+    assert climate_caps("fan_mode", "preset", "swing_mode") == 2 | 4 | 8
+    with pytest.raises(layout.LayoutError, match="Unknown climate capability"):
+        climate_caps("humidity")
+
+
+@pytest.mark.parametrize(
+    "caps, size, states",
+    [
+        (
+            0,
+            None,
+            [("mode", 1), ("target_temperature", 2), ("current_temperature", 2), ("action", 1)],
+        ),
+        (
+            climate_caps("two_point"),
+            1,
+            [
+                ("mode", 1),
+                ("target_temperature_low", 1),
+                ("target_temperature_high", 1),
+                ("current_temperature", 1),
+                ("action", 1),
+            ],
+        ),
+        (
+            climate_caps("two_point", "fan_mode", "preset", "swing_mode"),
+            4,
+            [
+                ("mode", 1),
+                ("target_temperature_low", 4),
+                ("target_temperature_high", 4),
+                ("fan_mode", 1),
+                ("preset", 1),
+                ("swing_mode", 1),
+                ("current_temperature", 4),
+                ("action", 1),
+            ],
+        ),
+    ],
+)
+def test_climate_states(caps, size, states):
+    assert layout.entity_states(layout.DOMAIN_CLIMATE, caps, size) == states
+    # commands: the writable states, which come first
+    commands = layout.entity_commands(layout.DOMAIN_CLIMATE, caps, size)
+    assert commands == states[:-2]
+    assert [name for name, _ in states[-2:]] == ["current_temperature", "action"]
+
+
+def test_climate_sizes_and_tpdo():
+    with pytest.raises(layout.LayoutError, match="Unsupported climate size: 3"):
+        layout.entity_states(layout.DOMAIN_CLIMATE, 0, 3)
+    # core: 1 + 2 + 2 + 1 bytes, two-point: 1 + 2 + 2 + 2 + 1
+    core = [(1, 0, s) for s in layout.entity_state_sizes(layout.DOMAIN_CLIMATE, 0)]
+    two_point = [(2, 1, s) for s in layout.entity_state_sizes(layout.DOMAIN_CLIMATE, climate_caps("two_point"))]
+    mapping = layout.tpdo_mapping(core + two_point)
+    assert sum(word & 0xFF for word in mapping[0]) == 6 * 8
+    assert sum(word & 0xFF for word in mapping[1]) == 8 * 8
+    with pytest.raises(layout.LayoutError, match="exceeds 8 bytes"):
+        caps = climate_caps("two_point", "fan_mode")
+        layout.tpdo_mapping([(1, 0, s) for s in layout.entity_state_sizes(layout.DOMAIN_CLIMATE, caps)])
+
+
+def test_entity_commands_of_other_domains():
+    assert layout.entity_commands(layout.DOMAIN_COVER, 3) == layout.entity_states(layout.DOMAIN_COVER, 3)
+    assert layout.entity_commands(layout.DOMAIN_SENSOR, None, 2) == [("value", 2)]
+
+
+def test_scale_range():
+    assert layout.scale_range(layout.DOMAIN_CLIMATE, {}) == (-40.0, 85.0)
+    assert layout.scale_range(layout.DOMAIN_CLIMATE, {"size": 1, "min_value": 5, "max_value": 35}) == (5, 35)
+    assert layout.scale_range(layout.DOMAIN_SENSOR, {"size": 1}) == (0.0, 254.0)
+    assert layout.scale_range(layout.DOMAIN_NUMBER, {"size": 2, "min_value": -10}) == (-10, 65534.0)
+
+
+def test_climate_codes():
+    # ESPHome's enum values (climate_mode.h)
+    assert layout.CLIMATE_MODES.index("heat") == 3
+    assert layout.CLIMATE_MODES.index("auto") == 6
+    assert layout.CLIMATE_ACTIONS.index("heating") == 3
+    assert layout.CLIMATE_ACTIONS.index("defrosting") == 7
+    assert layout.CLIMATE_FAN_MODES.index("quiet") == 9
+    assert layout.CLIMATE_PRESETS.index("activity") == 7
+    assert layout.CLIMATE_SWING_MODES.index("horizontal") == 3
+
+
 @pytest.mark.parametrize(
     "domain, caps, size, kinds",
     [
+        (
+            layout.DOMAIN_CLIMATE,
+            climate_caps("fan_mode", "preset", "swing_mode"),
+            None,
+            [
+                ("mode", 1, "climate_mode"),
+                ("target_temperature", 2, "value"),
+                ("fan_mode", 1, "climate_fan_mode"),
+                ("preset", 1, "climate_preset"),
+                ("swing_mode", 1, "climate_swing_mode"),
+                ("current_temperature", 2, "value"),
+                ("action", 1, "climate_action"),
+            ],
+        ),
         (layout.DOMAIN_LIGHT, 4, None, [("state", 1, "bool"), ("brightness", 1, "percentage"), ("color_temp", 1, "color_temp")]),
         (layout.DOMAIN_SWITCH, None, None, [("state", 1, "bool")]),
         (layout.DOMAIN_BINARY_SENSOR, None, None, [("state", 1, "bool")]),
