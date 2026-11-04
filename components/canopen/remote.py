@@ -19,6 +19,7 @@ ENTITY_DOMAINS = {
     layout.DOMAIN_LIGHT,
     layout.DOMAIN_COVER,
     layout.DOMAIN_ALARM,
+    layout.DOMAIN_CLIMATE,
 }
 
 _cache = {}
@@ -180,10 +181,8 @@ class RemoteNode:
         return [name for name, _, _ in self.entity_states[entity["index"]][1]]
 
     def scaling(self, entity):
-        """(min_value, max_value) of a scaled (size 1 / 2) sensor / number, defaults as in __init__.py."""
-        size = entity.get("size")
-        default_max = 254 if size == 1 else 65534  # 255 / 65535 reserved for NaN
-        return entity.get("min_value", 0.0), entity.get("max_value", default_max)
+        """(min_value, max_value) of the scaled (size 1 / 2) states of a sensor / number / climate."""
+        return layout.scale_range(self.domain(index=entity["index"]), entity)
 
     def state(self, entity_id=None, index=None, state=None):
         """Locate a remote entity state in the remote TPDOs.

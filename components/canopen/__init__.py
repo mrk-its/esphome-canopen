@@ -121,7 +121,7 @@ ENTITY_SCHEMA = cv.Schema(
         cv.Optional("max_value"): cv.float_,
         cv.Optional("tpdo"): cv.Any(cv.int_, TPDO_SCHEMA),
         cv.Optional("rpdo"): cv.ensure_list(RPDO_SCHEMA),
-        # light / cover capabilities, for platforms not known to layout.py
+        # light / cover capabilities, for platforms not known to layout.py; climate optional states
         cv.Optional("caps"): cv.ensure_list(cv.string),
     }
 )
@@ -276,6 +276,7 @@ ENTITY_DOMAINS = [
         cg.esphome_ns.namespace("alarm_control_panel").class_("AlarmControlPanel"),
         layout.DOMAIN_ALARM,
     ),
+    (cg.esphome_ns.namespace("climate").class_("Climate"), layout.DOMAIN_CLIMATE),
 ]
 
 
@@ -302,10 +303,9 @@ def resolve_local_entity(full_config, entity_config):
 
 
 def entity_layout(full_config, entity_config):
-    """(caps, [(state name, size)]) of a locally exposed entity, see layout.py."""
+    """(domain, caps) of a locally exposed entity, see layout.py."""
     domain, platform_config = resolve_local_entity(full_config, entity_config)
-    caps = layout.entity_caps(domain, platform_config, entity_config.get("caps"))
-    return caps, layout.entity_states(domain, caps, entity_config.get("size"))
+    return domain, layout.entity_caps(domain, platform_config, entity_config.get("caps"))
 
 
 def node_states(full_config, config):
@@ -485,18 +485,19 @@ def validate_rpdo_plan(plan):
 def validate_remote_rpdo_sizes(full_config, config):
     """A remote state must have the size of the local command it's mapped to."""
     for entity_pos, entity in enumerate(config.get(CONF_ENTITIES, [])):
-        local_states = None
+        local_cmds = None
         for rpdo_pos, rpdo in enumerate(entity.get(CONF_RPDO, ())):
             if "remote" not in rpdo:
                 continue
-            if local_states is None:
-                local_states = entity_layout(full_config, entity)[1]
+            if local_cmds is None:
+                domain, caps = entity_layout(full_config, entity)
+                local_cmds = layout.entity_commands(domain, caps, entity.get("size"))
             path = [CONF_ENTITIES, entity_pos, CONF_RPDO, rpdo_pos]
-            if rpdo["cmd"] >= len(local_states):
+            if rpdo["cmd"] >= len(local_cmds):
                 raise cv.Invalid(
                     f"'{entity['id']}' has no command {rpdo['cmd']}", path=path
                 )
-            local_name, local_size = local_states[rpdo["cmd"]]
+            local_name, local_size = local_cmds[rpdo["cmd"]]
             if local_size != rpdo["size"]:
                 src = rpdo["remote"]
                 raise cv.Invalid(
@@ -672,7 +673,7 @@ def to_code(config_list):
 
         for entity_config in entities:
             entity = yield cg.get_variable(entity_config["id"])
-            caps, _ = entity_layout(CORE.config, entity_config)
+            domain, caps = entity_layout(CORE.config, entity_config)
             tpdo = entity_config.get("tpdo", -1)
             if not isinstance(tpdo, dict):
                 tpdo = {"number": tpdo, "immediate": False}
@@ -682,7 +683,20 @@ def to_code(config_list):
             )
 
             size = entity_config.get("size")
-            if size in (1, 2):
+            if domain == layout.DOMAIN_CLIMATE:
+                min_val, max_val = layout.scale_range(domain, entity_config)
+                cg.add(
+                    canopen.add_entity(
+                        entity,
+                        entity_config["index"],
+                        tpdo_struct,
+                        caps,
+                        layout.CLIMATE_DEFAULT_SIZE if size is None else size,
+                        min_val,
+                        max_val,
+                    )
+                )
+            elif size in (1, 2):
                 min_val = entity_config.get("min_value", 0)
                 max_val = entity_config.get(
                     "max_value", 254 if size == 1 else 65534
@@ -916,6 +930,8 @@ class _Target:
                 f"{self.action}: {self.node.name} {self.domain} '{self.entity['id']}' has no "
                 f"{state} (states: {', '.join(self.states)})"
             )
+        if state in layout.READ_ONLY_STATES.get(self.domain, ()):
+            raise cv.Invalid(f"{self.action}: {self.domain} {state} is read only")
         return self.states.index(state)
 
     def check_state(self, state):
@@ -1084,6 +1100,54 @@ _remote_action(
     (layout.DOMAIN_NUMBER,),
     _number_set_writes,
     {cv.Required("value"): cv.templatable(cv.float_)},
+)
+
+
+def _climate_codes(names):
+    """{NAME: wire code} of a climate enum (layout.CLIMATE_*)."""
+    return {name.upper(): code for code, name in enumerate(names) if name is not None}
+
+
+_CLIMATE_ENUMS = {
+    "mode": _climate_codes(layout.CLIMATE_MODES),
+    "fan_mode": _climate_codes(layout.CLIMATE_FAN_MODES),
+    "preset": _climate_codes(layout.CLIMATE_PRESETS),
+    "swing_mode": _climate_codes(layout.CLIMATE_SWING_MODES),
+}
+_CLIMATE_TEMPERATURES = ("target_temperature", "target_temperature_low", "target_temperature_high")
+
+
+def _climate_control_writes(config, target):
+    size = target.entity.get("size", layout.CLIMATE_DEFAULT_SIZE)
+    if size == 4:
+        encoding = {"size": 4, "encoding": ENC_REAL32}
+    else:
+        min_value, max_value = target.node.scaling(target.entity)
+        encoding = {"size": size, "encoding": ENC_SCALED, "min_value": min_value, "max_value": max_value}
+    writes = [
+        _write(target.cmd(option), config[option], **encoding)
+        for option in _CLIMATE_TEMPERATURES
+        if option in config
+    ]
+    # mode last: the target temperatures are already set when the mode switches the climate on
+    for option in ("fan_mode", "preset", "swing_mode", "mode"):
+        if option in config:
+            writes.append(_write(target.cmd(option), _CLIMATE_ENUMS[option][config[option]]))
+    if not writes:
+        raise cv.Invalid(
+            "canopen.climate.control: set 'mode', a target temperature, 'fan_mode', 'preset' or 'swing_mode'"
+        )
+    return writes
+
+
+_remote_action(
+    "canopen.climate.control",
+    (layout.DOMAIN_CLIMATE,),
+    _climate_control_writes,
+    {
+        **{cv.Optional(option): cv.enum(codes, upper=True) for option, codes in _CLIMATE_ENUMS.items()},
+        **{cv.Optional(option): cv.templatable(cv.temperature) for option in _CLIMATE_TEMPERATURES},
+    },
 )
 
 

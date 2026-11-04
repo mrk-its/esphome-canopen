@@ -91,6 +91,17 @@ def test_remote_node_kinds(node):
     assert node.state_names(entity_id="light_table") == ["state", "brightness"]
 
 
+def test_remote_node_climate(node):
+    assert node.domain(entity_id="heater") == "climate"
+    assert node.state_names(entity_id="heater") == ["mode", "target_temperature", "current_temperature", "action"]
+    mode = node.state(entity_id="heater")  # first state by default
+    assert (mode["state"], mode["kind"], mode["tpdo"], mode["offset"], mode["size"]) == ("mode", "climate_mode", 2, 4, 1)
+    current = node.state(entity_id="heater", state="current_temperature")
+    assert (current["kind"], current["offset"], current["size"], current["cmd"]) == ("value", 6, 1, 2)
+    assert (current["min_value"], current["max_value"]) == (5, 35)
+    assert node.state(entity_id="heater", state="action")["kind"] == "climate_action"
+
+
 def test_remote_node_errors(node):
     with pytest.raises(remote.RemoteError, match="not exposed"):
         node.state(entity_id="out1")
@@ -198,6 +209,22 @@ def test_actions(raw_config):
     assert _validate("canopen.switch.turn_on", entity="pump")["index"] == 9
 
 
+def test_climate_control_action(raw_config):
+    control = _validate("canopen.climate.control", entity="heater", mode="heat", target_temperature="21.5°C")
+    assert (control["node_id"], control["index"]) == (0x36, 10)
+    # target temperature scaled as the remote climate (size 1, 5..35), mode last
+    assert [
+        (w["cmd"], w["size"], w["encoding"], w["min_value"], w["max_value"], w["value"])
+        for w in control["_writes"]
+    ] == [
+        (1, 1, canopen.ENC_SCALED, 5, 35, 21.5),
+        (0, 1, canopen.ENC_RAW, 0.0, 0.0, 3),
+    ]
+    assert canopen.CONF_REMOTE_STATE not in control
+    off = _validate("canopen.climate.control", entity="heater", mode="OFF")
+    assert [(w["cmd"], w["value"]) for w in off["_writes"]] == [(0, 0)]
+
+
 @pytest.mark.parametrize(
     "name, conf, error",
     [
@@ -209,6 +236,11 @@ def test_actions(raw_config):
         ("canopen.number.set", {"entity": "temperature", "value": 1}, "is a sensor, expected number"),
         ("canopen.cover.stop", {"entity": "nope"}, "not exposed"),
         ("canopen.cover.stop", {"node": "unknown", "entity": "x"}, "Unknown node 'unknown'"),
+        ("canopen.climate.control", {"entity": "heater"}, "set 'mode', a target temperature"),
+        ("canopen.climate.control", {"entity": "heater", "target_temperature_low": 18}, "has no target_temperature_low"),
+        ("canopen.climate.control", {"entity": "heater", "fan_mode": "auto"}, "has no fan_mode"),
+        ("canopen.climate.control", {"entity": "heater", "mode": "boost"}, "Unknown value"),
+        ("canopen.climate.control", {"entity": "setpoint", "mode": "heat"}, "is a number, expected climate"),
     ],
 )
 def test_action_errors(raw_config, name, conf, error):
@@ -236,6 +268,18 @@ def test_remote_state_platform(raw_config):
     assert config["state"] == "value"
     assert config[canopen.CONF_REMOTE_STATE] == ["dimmer", "setpoint", "value"]
     assert config["_remote"]["kind"] == "value"
+
+
+def test_remote_climate_states(raw_config):
+    text_kinds = [layout.KIND_CLIMATE_MODE, layout.KIND_CLIMATE_ACTION]
+    mode = canopen.validate_remote_state("text_sensor", text_kinds)({"node": "dimmer", "entity": "heater"})
+    assert mode[canopen.CONF_REMOTE_STATE] == ["dimmer", "heater", "mode"]
+    current = canopen.validate_remote_state("sensor", list(layout.KIND_CODES))(
+        {"node": "dimmer", "entity": "heater", "state": "current_temperature"}
+    )
+    assert (current["_remote"]["min_value"], current["_remote"]["max_value"]) == (5, 35)
+    with pytest.raises(cv.Invalid, match="can't show"):
+        canopen.validate_remote_state("binary_sensor", [layout.KIND_BOOL])({"node": "dimmer", "entity": "heater"})
 
 
 # --- remote logs (__init__.py) ---

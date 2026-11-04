@@ -146,6 +146,46 @@ EntityTypeCode: 9 (Number8, `size: 1`), 10 (Number16, `size: 2`)
 |||||||
 | 0x2002 + 0x10 * N | 0x01     | Number #N Command       | UINT8 / UINT16 | W | [scaled](#scaled-values), publishes given value as number state |
 
+## Climate
+EntityTypeCode: 11, version: 1
+
+Capabilities (optional states, from the entity's `caps:` option only, see [TPDO layout](#tpdo-layout)): bit 0 - `two_point`
+(target temperatures low / high instead of a single target temperature), bit 1 - `fan_mode`, bit 2 - `preset`,
+bit 3 - `swing_mode`. States are present only when their capability is set, so subindices are assigned in order:
+writable states first, then the read only current temperature and action. Command K sets state K; the read only
+states have no command.
+
+Temperatures (°C) are sent as `size` from the entity config: `2` (default, UINT16) or `1` (UINT8),
+[scaled](#scaled-values) to `min_value..max_value` (default -40..85), or `4` (REAL32). Out of range commands, and
+unknown temperatures (255 / 65535), are ignored.
+
+| Index             | SubIndex | Object Name             | Type   | Access | Description     |
+|-------------------|----------|-------------------------|--------|:------:|-|
+| 0x2000 + 0x10 * N | 0x03     | Climate #N Unit         | String | R      | `°C` |
+|                   | 0x07     | Climate #N min_value    | REAL32 | R      | `min_value` of the scaled temperatures |
+|                   | 0x08     | Climate #N max_value    | REAL32 | R      | `max_value` of the scaled temperatures |
+|||||||
+| 0x2001 + 0x10 * N | 0x01     | Climate #N Mode         | UINT8  | R      | 0 - off, 1 - heat_cool, 2 - cool, 3 - heat, 4 - fan_only, 5 - dry, 6 - auto |
+|                   | K        | Climate #N Target Temperature | `size` | R | without `two_point` |
+|                   | K, K+1   | Climate #N Target Temperature Low, High | `size` | R | with `two_point` |
+|                   | K        | Climate #N Fan Mode     | UINT8  | R      | with `fan_mode`: 0 - on, 1 - off, 2 - auto, 3 - low, 4 - medium, 5 - high, 6 - middle, 7 - focus, 8 - diffuse, 9 - quiet, 255 - none or custom |
+|                   | K        | Climate #N Preset       | UINT8  | R      | with `preset`: 0 - none, 1 - home, 2 - away, 3 - boost, 4 - comfort, 5 - eco, 6 - sleep, 7 - activity, 255 - none or custom |
+|                   | K        | Climate #N Swing Mode   | UINT8  | R      | with `swing_mode`: 0 - off, 1 - both, 2 - vertical, 3 - horizontal |
+|                   | K        | Climate #N Current Temperature | `size` | R | |
+|                   | K        | Climate #N Action       | UINT8  | R      | 0 - off, 2 - cooling, 3 - heating, 4 - idle, 5 - drying, 6 - fan, 7 - defrosting |
+|||||||
+| 0x2002 + 0x10 * N | 0x01     | Climate #N SetMode      | UINT8  | W      | codes as the state |
+|                   | K        | Climate #N SetTargetTemperature (Low, High) | `size` | W | |
+|                   | K        | Climate #N SetFanMode, SetPreset, SetSwingMode | UINT8 | W | with their capability, codes as the states |
+
+Subindices without options: 1 - mode, 2 - target temperature, 3 - current temperature, 4 - action (6 bytes in the
+TPDO with the default UINT16 temperatures). With `two_point`: 1 - mode, 2 - target low, 3 - target high,
+4 - current temperature, 5 - action (8 bytes). More states don't fit a TPDO with UINT16 temperatures: use `size: 1`,
+or leave `tpdo` out and read the states by SDO.
+
+The codes are ESPHome's `ClimateMode`, `ClimateFanMode`, `ClimatePreset`, `ClimateSwingMode` and `ClimateAction`
+values. Custom fan modes and presets are not supported.
+
 ## Alarm Control Panel
 
 EntityTypeCode: 16
@@ -192,6 +232,10 @@ Light / cover capabilities come from the platform config (e.g. `cwww`, `monochro
 `template` with `has_position` / `tilt_action`). For platforms the component doesn't know, set them with the
 entity's `caps` option. The C++ side uses these capabilities as given and only logs a warning if the entity's
 traits differ.
+
+Climate capabilities are not derived from the platform: the optional states are the ones listed in `caps`
+(none by default). The C++ side logs a warning if `caps` lists one the climate's traits don't support, or if a
+two-point only climate (e.g. `bang_bang`) is exposed without `two_point`.
 
 At boot the node hashes its actual TPDO mapping and logs an error if it differs from the hash computed at
 build time. The hash is readable in the OD:

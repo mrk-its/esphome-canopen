@@ -30,7 +30,8 @@ their logs over CAN.
 ## Features
 
 * Entity types: `sensor`, `number`, `binary_sensor`, `switch`, `cover` (position / tilt), `light` (brightness /
-  color temperature) and `alarm_control_panel`
+  color temperature), `alarm_control_panel` and `climate` (mode, target / current temperature, action, optional
+  fan mode / preset / swing mode; not handled by can2mqtt yet)
 * State broadcast in up to 8 TPDOs, with compact 1- or 2-byte encoding of sensor values
 * [Linking nodes](docs/linking-nodes.md): actions such as `canopen.light.toggle` and remote states as local
   entities, with other nodes referred to by their YAML file and entity ids

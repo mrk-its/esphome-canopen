@@ -54,6 +54,12 @@ canopen:
       tpdo: 3
     - index: 9
       id: pump             # no tpdo: commands only
+    - index: 10
+      id: heater           # climate: mode, target_temperature, current_temperature, action
+      size: 1              # scaled UINT8 temperatures...
+      min_value: 5         # ...over 5..35 °C
+      max_value: 35
+      tpdo: 2              # after temperature: bytes 4..7
 
 output:
   - platform: template
@@ -126,3 +132,13 @@ switch:
     id: pump
     name: "Pump"
     optimistic: true
+
+climate:
+  - platform: pid
+    id: heater
+    name: "Heater"
+    sensor: temperature
+    default_target_temperature: 20°C
+    heat_output: out1
+    control_parameters:
+      kp: 0.5

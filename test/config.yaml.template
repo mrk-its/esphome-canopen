@@ -96,6 +96,18 @@ canopen:
     # `platform: canopen` entity exposed for debugging (state from a remote state slot)
     - index: 21
       id: remote_cover_position
+    # climates: core states (6 B with the default scaled UINT16 temperatures)...
+    - index: 22
+      id: climate_pid
+      tpdo: 4
+    # ...and two-point with scaled UINT8 temperatures (5 B)
+    - index: 23
+      id: climate_bang_bang
+      caps: [two_point]
+      size: 1
+      min_value: 5
+      max_value: 35
+      tpdo: 5
 
 output:
   - platform: template
@@ -223,6 +235,11 @@ sensor:
     node: dimmer
     entity: light_hall
     state: color_temp
+  - platform: canopen
+    id: remote_heater_temperature
+    node: dimmer
+    entity: heater
+    state: current_temperature
 
 text_sensor:
   - platform: canopen
@@ -233,6 +250,15 @@ text_sensor:
     id: remote_alarm_state
     node: dimmer
     entity: alarm_house
+  - platform: canopen
+    id: remote_heater_mode
+    node: dimmer
+    entity: heater
+  - platform: canopen
+    id: remote_heater_action
+    node: dimmer
+    entity: heater
+    state: action
 
 binary_sensor:
   - platform: template
@@ -277,6 +303,12 @@ binary_sensor:
           cmd: 1
           value: !lambda 'return id(table_brightness).state < 0.5 ? 254 : 0;'
       - canopen.entity_cmd: {node_id: 0x36, index: 2, value: 1}
+      - canopen.climate.control: {node: dimmer, entity: heater, mode: HEAT, target_temperature: 21.5°C}
+      - canopen.climate.control: {node: dimmer, entity: heater, mode: "OFF"}
+      - canopen.climate.control:
+          node: dimmer
+          entity: heater
+          target_temperature: !lambda 'return id(remote_heater_temperature).state + 0.5;'
   - platform: canopen
     id: remote_relay
     node: dimmer
@@ -321,3 +353,25 @@ alarm_control_panel:
     id: alarm1
     name: "Test Alarm 1"
     codes: ["1234"]
+
+climate:
+  - platform: pid
+    id: climate_pid
+    name: "Test Climate PID"
+    sensor: sensor1
+    default_target_temperature: 21°C
+    heat_output: output1
+    control_parameters:
+      kp: 0.5
+  - platform: bang_bang
+    id: climate_bang_bang
+    name: "Test Climate Bang Bang"
+    sensor: sensor1
+    default_target_temperature_low: 18°C
+    default_target_temperature_high: 24°C
+    idle_action:
+      - lambda: ''
+    heat_action:
+      - lambda: ''
+    cool_action:
+      - lambda: ''
