@@ -23,127 +23,158 @@ import re
 import sys
 
 PRS = {
-    1: "Node core, SDO server, identity",
-    2: "Node monitoring, raw frames, loopback",
-    3: "SDO client, NMT master, actions",
-    4: "OD handler API, profile API",
-    5: "PDOs, store/restore",
-    6: "SDO block transfer",
-    7: "OTA on CiA 302-3 objects",
+    1: "SDO client, sdo_read / sdo_write (hub without node_id)",
+    2: "Raw frames, heartbeat / EMCY triggers",
+    3: "Node core: node_id, runtime OD, NMT, HB producer, SDO server, identity; local loopback",
+    4: "Node monitoring (HB consumer), NMT master",
+    5: "OD handler API, profile API (CANopenNode)",
+    6: "PDOs, store / restore",
+    7: "SDO block transfer",
+    8: "OTA on CiA 302-3 objects",
 }
 
 FILES = {
     "canopen.cpp": 1,
     "driver_can.cpp": 1,
-    "device_info.cpp": 1,
-    "od.cpp": 1,
-    "od.h": 1,
     "types.h": 1,
     "canopen.h": 1,
     "__init__.py": 1,
-    "node_monitor.cpp": 2,
+    "sdo_client.cpp": 1,
+    "automation.h": 1,
     "frames.cpp": 2,
-    "sdo_client.cpp": 3,
-    "nmt_master.cpp": 3,
-    "automation.h": 3,
-    "od_handler.h": 4,
-    "od_handler.cpp": 4,
-    "canopen_node.h": 4,
-    "canopen_node.cpp": 4,
-    "pdo.cpp": 5,
-    "pdo_storage.cpp": 5,
+    # PR 1 sets up 0x1280 for the client without the runtime OD (a fixed entry, not in this tree, ~30 lines)
+    "od.cpp": 3,
+    "od.h": 3,
+    "device_info.cpp": 3,
+    "node_monitor.cpp": 4,
+    "nmt_master.cpp": 4,
+    "od_handler.h": 5,
+    "od_handler.cpp": 5,
+    "canopen_node.h": 5,
+    "canopen_node.cpp": 5,
+    "pdo.cpp": 6,
+    "pdo_storage.cpp": 6,
 }
+OTA_PR = 8
 
-# banner title (start) -> PR
+# banner title (start) -> PR; the first match wins
 BANNERS = [
-    ("Identity", 1),
-    ("Object dictionary", 4),  # get_od() / write_od(): the API for other components
-    ("Node monitoring", 2),
+    ("Identity", 3),
+    ("Object dictionary", 5),  # get_od() / write_od() / read_od(): the API for other components
+    ("Node monitoring", 4),
     ("Raw frames", 2),
-    ("SDO client", 3),
-    ("NMT master", 3),
-    ("PDO", 5),
-    ("Handlers", 4),
+    ("SDO client", 1),
+    ("NMT master", 4),
+    ("PDO", 6),
+    ("Handlers", 5),
 ]
 
 IFDEFS = {
-    "USE_CANOPEN_SDO_CLIENT": 3,
-    "USE_CANOPEN_NMT_MASTER": 3,
-    "USE_CANOPEN_PDO": 5,
-    "CANOPEN_SDO_BLOCK_SIZE": 6,
+    "USE_CANOPEN_NODE": 3,
+    "USE_CANOPEN_SDO_CLIENT": 1,
+    "USE_CANOPEN_NMT_MASTER": 4,
+    "USE_CANOPEN_PDO": 6,
+    "CANOPEN_SDO_BLOCK_SIZE": 7,
 }
 
-# C++ lines outside banners / ifdefs (in PR 1 files)
-CPP_KEYWORDS = [
-    (r"node_monitor|init_frame_listeners_|dispatch_frame_|next_local", 2),
-    (r"\bextension", 4),  # od.h / od.cpp: an entry's handler
+# C++ functions (a column-0 line ending in `{` up to the column-0 `}`) by their signature -> PR
+FUNCS = [
+    (r"nmt_state_to_string", 2),  # with NMTState: the heartbeat trigger's state
+    (r"to_nmt_state|set_nmt_state", 3),
 ]
 
-# types.h: keyword in a top-level declaration -> PR
+# C++ keyword lines (in PR 1 files)
+CPP_KEYWORDS = [
+    (r"node_monitor", 4),
+    (r"next_local", 3),
+    (r"init_frame_listeners_|dispatch_frame_", 2),
+    (r"\bextension", 5),  # od.h / od.cpp: an entry's handler
+    (r"is_client_only|NO_NODE_ID|heartbeat_interval|hb_producer|start_operational|nmt_state|NMTState|err_reg_|"
+     r"cob_emcy_|NMT state|ObjectDictionary od_|#include \"od.h\"", 3),
+]
+
+# A line belongs to the newest PR among its function, ifdefs, banner and keyword.
+
+# types.h: keyword in a top-level declaration -> PR (first match)
 TYPES = [
-    (r"NodeEvent|node_event", 2),
-    (r"FrameCallback|Emergency|decode_", 2),
-    (r"NMTCommand", 3),
-    (r"SDO", 3),
-    (r"PdoMapping", 5),
+    (r"NodeEvent|node_event", 4),
+    (r"NMTCommand", 4),
+    (r"PdoMapping", 6),
+    (r"FrameCallback|Emergency|decode_|NMTState|nmt_state", 2),
+    (r"SDO", 1),
 ]
 
 # __init__.py top-level names -> PR
 PY_BLOCKS = {
-    "NMT_COMMANDS": 3,
-    "_enable_once": 3,
-    "enable_sdo_client": 3,
-    "enable_nmt_master": 3,
-    "SDO_BLOCK_BUFFER_SIZE": 6,
-    "enable_sdo_block": 6,
-    "enable_pdo": 5,
-    "CANOPEN_NODE_SCHEMA": 4,
-    "final_validate_canopen_node": 4,
-    "register_node": 4,
-    "KEY_LOCAL_NODES": 2,
-    "HB_CLIENT_SCHEMA": 2,
-    "validate_heartbeat_clients": 2,
-    "validate_sdo_value": 3,
-    "SDO_WRITE_SCHEMA": 3,
-    "sdo_write_to_code": 3,
-    "NMT_SCHEMA": 3,
-    "_nmt_builder": 3,
-    "nmt_to_code": 3,
+    "_enable_once": 1,
+    "enable_sdo_client": 1,
+    "validate_sdo_value": 1,
+    "SDO_WRITE_SCHEMA": 1,
+    "sdo_write_to_code": 1,
+    "SDO_READ_SCHEMA": 1,
+    "sdo_read_to_code": 1,
+    "NO_NODE_ID": 3,
+    "_hub_configs": 3,
+    "IDENTITY_SCHEMA": 3,
+    "NODE_OPTIONS": 3,
+    "validate_client_only_options": 3,
+    "validate_client_only": 3,
+    "KEY_LOCAL_NODES": 3,
+    "HB_CLIENT_SCHEMA": 4,
+    "validate_heartbeat_clients": 4,
+    "NMT_COMMANDS": 4,
+    "enable_nmt_master": 4,
+    "NMT_SCHEMA": 4,
+    "_nmt_builder": 4,
+    "nmt_to_code": 4,
+    "CANOPEN_NODE_SCHEMA": 5,
+    "require_node_id": 5,
+    "final_validate_canopen_node": 5,
+    "register_node": 5,
+    "enable_pdo": 6,
+    "SDO_BLOCK_BUFFER_SIZE": 7,
+    "enable_sdo_block": 7,
 }
 
+# keyword lines inside the shared blocks (imports, CONFIG_SCHEMA, to_code(), ...); the first match wins
 PY_KEYWORDS = [
+    (r"HEARTBEAT_CLIENTS|ON_NODE_EVENT|monitor_node|NodeEvent|validate_heartbeat_clients|events of the heartbeat", 4),
+    (r"ON_HEARTBEAT|ON_EMCY|Emergency|every heartbeat / EMCY|add_on_heartbeat|add_on_emcy", 2),
+    (r"set_next_local|LOCAL_NODES|^\s*local = |if local:|local\.append|same canbus|CONF_CANBUS_ID\] ==", 3),
+    (r"SDO_BLOCK_SIZE|sdo_block|block transfer", 7),
+    (r"CANopenNode = |base class of components that drive", 5),
+    (r"NMTCommand|CONF_COMMAND", 4),
+    (r"NMTState = ", 2),
     (
-        r"HEARTBEAT_CLIENTS|ON_NODE_EVENT|ON_HEARTBEAT|ON_EMCY|monitor_node|NodeEvent|Emergency|"
-        r"set_next_local|LOCAL_NODES|^\s*local = |if local:|local\.append|same canbus|validate_heartbeat_clients|"
-        r"every heartbeat / EMCY|events of the heartbeat",
-        2,
+        r"NODE_ID|HEARTBEAT_INTERVAL|NMT_STARTUP|NMT_STATE|IDENTITY|DEVICE_NAME|HARDWARE_VERSION|SOFTWARE_VERSION|"
+        r"VENDOR_ID|PRODUCT_CODE|REVISION_NUMBER|SERIAL_NUMBER|set_identity|USE_CANOPEN_NODE|CONF_SDO_CLIENT|"
+        r"sdo_client applies|validate_client_only|NO_NODE_ID|EsphomeError|0x1016 \(consumer|CONF_TIMEOUT|"
+        r"_final_validate|FINAL_VALIDATE|for other in fv",
+        3,
     ),
-    (r"RESPONSE_TIMEOUT|SDOWriteAction|SDOResult|NMTCommand", 3),
-    (r"SDO_BLOCK_SIZE|sdo_block|block transfer", 6),
-    (r"CANopenNode = |base class of components that drive", 4),
 ]
 
 
 # tests (tests/components/canopen): file -> PR, and TEST names -> PR (a test goes with the newest feature it uses)
 TEST_FILES = {
-    "od_test.cpp": 1,
     "fake_canbus.h": 1,
     "__init__.py": 1,
     "common.yaml": 1,
+    "sdo_reply_test.cpp": 1,
     "frames_test.cpp": 2,
-    "loopback_test.cpp": 2,
-    "sdo_reply_test.cpp": 3,
-    "canopen_node_test.cpp": 4,
-    "pdo_test.cpp": 5,
-    "storage_test.cpp": 5,
-    "sdo_block_test.cpp": 6,
+    "od_test.cpp": 3,
+    "client_only_test.cpp": 3,  # its server is a local node
+    "loopback_test.cpp": 3,
+    "canopen_node_test.cpp": 5,
+    "pdo_test.cpp": 6,
+    "storage_test.cpp": 6,
+    "sdo_block_test.cpp": 7,
 }
 TEST_NAMES = [
-    (r"CanopenSdoBlock", 6),
-    (r"Sdo|SDO", 3),
+    (r"CanopenSdoBlock", 7),
     (
         r"CanopenOD, (Handler|ManyEntries|Errors|AfterFinalize|ValueSize|Read)",
-        4,
+        5,
     ),  # od_test: these use OdObject handlers or the OD access of od_handler.cpp
 ]
 
@@ -158,6 +189,7 @@ def match(rules, text, default):
 def classify_cpp(lines: list[str], default: int) -> list[int]:
     out = []
     banner = None  # PR of the current banner section
+    func = None  # PR of the current function (FUNCS)
     ifdef_stack: list[int | None] = []
     for line in lines:
         s = line.strip()
@@ -166,16 +198,23 @@ def classify_cpp(lines: list[str], default: int) -> list[int]:
             banner = match([(re.escape(t), p) for t, p in BANNERS], m.group(1), None)
         elif s in ("public:", "protected:") or s == "};":
             banner = None
+        if (
+            line[:1] not in ("", " ", "#", "/", "}")
+            and line.rstrip().endswith("{")
+            and not line.startswith(("namespace", "extern"))
+        ):
+            func = match(FUNCS, line, None)
         if s.startswith("#if"):
             ifdef_stack.append(match([(k, p) for k, p in IFDEFS.items()], s, None))
-        pr = next((p for p in reversed(ifdef_stack) if p is not None), None)
-        if pr is None:
-            pr = banner
-        if pr is None:
-            pr = match(CPP_KEYWORDS, s, default) if default == 1 else default
-        out.append(pr)
+        candidates = [p for p in ifdef_stack if p is not None]
+        for p in (banner, func, match(CPP_KEYWORDS, s, None) if default == 1 else None):
+            if p is not None:
+                candidates.append(p)
+        out.append(max(candidates) if candidates else default)
         if s.startswith("#endif") and ifdef_stack:
             ifdef_stack.pop()
+        if line.startswith("}"):
+            func = None
     return out
 
 
@@ -293,7 +332,7 @@ def classify_py(lines: list[str]) -> list[int]:
 def classify(path: Path, rel: str) -> list[int]:
     lines = path.read_text(encoding="utf-8").splitlines()
     if rel.startswith("ota/"):
-        return [7] * len(lines)
+        return [OTA_PR] * len(lines)
     default = FILES.get(rel, 1)
     if rel == "types.h":
         return classify_types(lines)
@@ -307,7 +346,7 @@ def classify(path: Path, rel: str) -> list[int]:
 def classify_test(path: Path) -> list[int]:
     lines = path.read_text(encoding="utf-8").splitlines()
     if path.parent.name == "ota" or path.name.startswith("test-ota."):
-        return [7] * len(lines)
+        return [OTA_PR] * len(lines)
     default = TEST_FILES.get(path.name, 1)
     out = [default] * len(lines)
     if path.suffix != ".cpp":

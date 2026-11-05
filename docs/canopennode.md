@@ -347,8 +347,9 @@ lines of production code, without tests/docs). All PRs target `dev`, so a chaine
 until the parent is merged (as #21533 does with #21522): the chain is reviewed serially, so the first PR should go
 out early and the next ones are prepared here meanwhile.
 
-### New split (2026-10-31, branch `canopen-full`) — current plan
-(PR order changes with "SDO client only first" below: PR 1 becomes the SDO client, the node core moves to PR 2.)
+### New split (2026-10-31, branch `canopen-full`) — superseded by "SDO client only first" below
+(The refactor, the file layout and the cutting steps still apply; the PR numbers, the line count table and the
+`defines.h` table are of this split. `scripts/pr_split_lines.py` now prints the 2026-11-05 split.)
 **Why.** The old split (tables further down) followed the order the work was done in: every PR edited the same
 functions (`setup()` mixed every feature, 7 `#ifdef` blocks), so a fix in one PR had to be rebased through all later
 ones. None of the old branches (`canopen-1-node` .. `canopen-4-profile`, deleted 2026-11-01, locally and on mrk-its/esphome) was opened as an upstream PR
@@ -508,13 +509,13 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
 `0x1F57`) instead of the mapper's `0x3000`, which stays in the manufacturer area only for the old component. The mapper
 then has no OTA. Branch `canopen-pr7-ota`, stacked on PR 6.
 
-### SDO client only first (2026-11-05) — planned re-split
+### SDO client only first (2026-11-05) — current plan
 **Why.** A hub without `node_id` is a self-contained first PR: an SDO client that reads and writes objects of existing
 CANopen devices (drives, sensors, I/O modules) from automations, without being a CANopen node. The node itself (NMT,
-heartbeat, SDO server, identity, OD) follows in PR 2. Implemented on branch `feature/canopen-sdo-client-only` in
+heartbeat, SDO server, identity, OD) follows in PR 3, after the raw frames (PR 2). Implemented on branch `feature/canopen-sdo-client-only` in
 `~/repos/esphome` (`0c6e7cad40`, on `canopen-full` `e1d4a2afaa`; not merged into `canopen-full` yet, not pushed) and
 in `~/repos/esphome-docs` (same branch name, `bae1c36ff`), synced here from the feature branch; PR 1 below
-(`canopen-pr1-node`, the node core) is to be re-cut, not opened as it is.
+(`canopen-pr1-node`, the node core, now PR 3's base) is to be re-cut, not opened as it is.
 
 **What it is.**
 - `node_id` is optional. Without it, `setup_client_only_()` runs `CO_new()` with only `CNT_SDO_CLI = 1`, then
@@ -536,15 +537,58 @@ in `~/repos/esphome-docs` (same branch name, `bae1c36ff`), synced here from the 
   initialised `CO_EM_t`, and `CO_EM_init()` rejects node id 0 (the workaround would be a fake id with the EMCY
   producer disabled). If needed later: our own monitor on top of the decoded heartbeat frames.
 
-**New order.** 1 SDO client only (driver, `0x1280` on the runtime OD, `sdo_client.cpp`, `canopen.sdo_read` /
-`sdo_write`, `sdo_client:`); 2 node core (`node_id`, NMT + HB producer, SDO server, identity, local SDO transfers);
-3 monitoring, raw frames, heartbeat / EMCY triggers, loopback; 4 NMT master (`canopen.nmt`); then the OD handler /
-profile API, PDOs, SDO block transfer, OTA as before. Open for the cut: whether the runtime OD (`od.*`, ~180 lines)
-goes into PR 1 (the client needs `0x1280` as an `OD_entry_t`) or PR 1 gets a small static entry and the OD comes
-with PR 2; whether raw frames (`frames.cpp`, used by `on_heartbeat` / `on_emcy` without a node) move to PR 1 or 2.
-`scripts/pr_split_lines.py` still uses the old numbering (table above): its `PRS` / `FILES` / `BANNERS` / `IFDEFS`
-need the new order (and `USE_CANOPEN_NODE`, `setup_client_only_`, `init_sdo_client_`, `SDOReadAction`) before the
-re-cut.
+**New split** (2026-11-05; `scripts/pr_split_lines.py` on `feature/canopen-sdo-client-only` `0c6e7cad40`; non-blank
+lines, comments included, all `.cpp`, `.h` and `__init__.py`; 2945 in all):
+
+| PR | Content | .cpp | .h | .py | Total | Comment-only | Tests (non-blank, today's files) |
+|---|---|---|---|---|---|---|---|
+| 1 | SDO client (values, buffers, `cancel_sdo()`), `canopen.sdo_read` / `canopen.sdo_write`; a hub without `node_id` | 473 | 260 | 165 | **898** (+~30) | 87 | 254 (`common.yaml`, `fake_canbus.h`, `sdo_reply_test`, `__init__.py`) + a new client test |
+| 2 | Raw frames (`add_frame_listener()`, `send_frame()`), `on_heartbeat` / `on_emcy`, `NMTState` | 61 | 77 | 17 | **155** | 17 | 59: `frames_test` |
+| 3 | Node core: `node_id`, runtime OD, NMT + HB producer, SDO server, identity / device info, `sdo_client:`, `USE_CANOPEN_NODE`; several local nodes (loopback) | 257 | 144 | 184 | **585** | 65 | 329: `client_only_test` 108, `loopback_test` 159, `od_test` (strings, record) 62 |
+| 4 | Node monitoring (`heartbeat_clients`, `on_node_event`), NMT master (`canopen.nmt`) | 124 | 44 | 86 | **254** | 23 | none yet (hardware-tested only) |
+| 5 | OD handler API (`OdObject`, `write_od()` / `read_od()`), profile API (`CANopenNode`, `register_node()`, `require_node_id()`) | 99 | 154 | 47 | **300** | 45 | 299: `canopen_node_test` 108, `od_test` 191 |
+| 6 | Own PDOs, store / restore 0x1010 / 0x1011 | 243 | 77 | 10 | **330** | 37 | 202: `pdo_test` 103, `storage_test` 99 |
+| 7 | SDO server block transfer (`sdo_block_size`) | 3 | 0 | 30 | **33** | 3 | 230: `sdo_block_test` |
+| 8 | OTA on CiA 302-3 objects (`ota: - platform: canopen`) | 199 | 110 | 81 | **390** | 33 | 278 |
+
+Per PR:
+- **1** is the whole SDO client, with no node: `setup()` is today's `setup_client_only_()`, no `node_id`, no
+  `NO_NODE_ID` / `is_client_only()`. ~930 lines with the fixed entry (~840 without comment-only lines), under the
+  ~1000-line limit. The buffer transfers and `cancel_sdo()` (~80 lines) stay in: they are interleaved with the value
+  path in `start_sdo_()` / `process_sdo_()` / `finish_sdo_()`, so cutting them out would mean rewriting those
+  functions, not deleting lines. `CO_SDOclient_init()` needs `0x1280` as an `OD_entry_t`: PR 1 has a fixed entry (an
+  `OD_obj_record_t[4]` + `OD_entry_t` + `OD_t`, ~30 lines, not in the tree yet, counted as "+~30"); PR 3 replaces it
+  with the runtime OD (`od.*`, 139 lines), which PR 1 would otherwise carry for one record. Files: `driver_can.cpp`
+  (without the loopback and `dispatch_frame_()`), `sdo_client.cpp`, `canopen.h`, `canopen.cpp`, `types.h` (the SDO
+  types), `automation.h`, `__init__.py` (library, `canbus_id`, `response_timeout`, `canopennode_path`,
+  `enable_sdo_client()`, the two actions). Tests: the existing client tests run against a local node (PR 3), so PR 1
+  needs its own (~100 lines): the hub against canned server replies through `TestHub::frame()` (expedited and
+  segmented read / write, timeout + abort frame, a server abort, the queue, cancel, the actions' codegen).
+- **2** works without `node_id`: frames reach `dispatch_frame_()` from the driver's `receive_()`; listeners and
+  `send_frame()` need only the CAN module. It brings `NMTState` and `nmt_state_to_string()` (the heartbeat trigger's
+  state); the node's own NMT state uses them from PR 3 on.
+- **3** makes the hub a CiA 301 node. Also: local SDO transfers (requests to the own id served from the OD), the
+  `sdo_client:` option (auto / `true` / `false`; it only means something once a hub can be without the client), the
+  node-option checks for a hub without `node_id`, and the loopback between local nodes (24 lines: it only matters
+  once hubs answer each other, and its duplicate check needs node ids).
+- **4**: both need a node (CANopenNode's HB consumer needs the EM object; the NMT master the NMT object).
+- **5**: `require_node_id()` comes with its first user (profile components); OTA and `canopen_entities` use it later.
+- **7** needs CANopenNode's `CO_CONFIG_SDO_SRV_BLKSIZE` patch (fork branch `sdo-srv-blksize`).
+
+Dependencies: 2 needs only 1 (the driver); 3 adds the node next to 1's client-only setup and uses 2's `NMTState`;
+4 needs the node (3) and decodes heartbeats with 2's types; 5's OD API needs the runtime OD (3) and `CANopenNode`
+forwards the SDO client / NMT master (1, 4); 6 maps OD entries with handlers (5); 7's test downloads into an
+`OdObject` (5); 8 uses block transfer (7) and handlers (5).
+
+`defines.h` lines (the clang-tidy setup, see "Cutting the branches"): PR 1 `USE_CANOPEN_SDO_CLIENT`,
+`CO_CONFIG_SDO_CLI`, `CO_CONFIG_FIFO`; PR 3 `USE_CANOPEN_NODE`; PR 4 `USE_CANOPEN_NMT_MASTER`, `CO_CONFIG_NMT`; PR 6
+`USE_CANOPEN_PDO`, `CO_CONFIG_PDO`, `CO_CONFIG_STORAGE`; PR 7 `CANOPEN_SDO_BLOCK_SIZE`, `CO_CONFIG_SDO_SRV*`,
+`CO_CONFIG_CRC16`. The `platformio.ini` CANopenNode line goes with PR 1.
+
+Accuracy: `scripts/pr_split_lines.py` classifies by markers (rules at its top); a line belongs to the newest PR among
+its function, `#ifdef`s, banner and keyword. The `setup()` / `process_()` lines that pick the client-only path count
+as PR 1 although they only exist from PR 3: a few lines each way. The cut follows the old "Cutting the branches"
+steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
 
 ### Old split (superseded)
 Kept for the history of what each part contained; the branches below are not used any more.
