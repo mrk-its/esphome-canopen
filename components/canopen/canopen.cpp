@@ -41,6 +41,13 @@ NMTState to_nmt_state(CO_NMT_internalState_t state) {
 }
 
 void CANopenComponent::setup() {
+  if (this->is_client_only()) {
+    this->setup_client_only_();
+    return;
+  }
+  // USE_CANOPEN_NODE: some hub has a node id. Without it nothing references CANopenNode's node part, so it isn't
+  // linked.
+#ifdef USE_CANOPEN_NODE
   auto &od = this->od_;
   od.add_var(0x1001, ODA_SDO_R, &this->err_reg_, sizeof(this->err_reg_));
   od.add_var(0x1014, ODA_SDO_RW, &this->cob_emcy_, sizeof(this->cob_emcy_));
@@ -114,10 +121,55 @@ void CANopenComponent::setup() {
   CO_CANsetNormalMode(this->co_->CANmodule);
   this->last_us_ = micros();
   ESP_LOGI(TAG, "CANopenNode initialized, node 0x%02x, heap %" PRIu32 " B", this->node_id_, heap);
+#endif  // USE_CANOPEN_NODE
+}
+
+// Client-only mode: only the CAN module and the SDO client, without CO_CANopenInit() (it needs a node id and starts
+// NMT, heartbeat, EMCY and the SDO server). The OD holds only the client's 0x1280.
+void CANopenComponent::setup_client_only_() {
+#ifdef USE_CANOPEN_SDO_CLIENT
+  this->add_sdo_client_od_();
+  if (!this->od_.finalize()) {
+    this->mark_failed(LOG_STR("invalid object dictionary"));
+    return;
+  }
+  this->config_sdo_client_(this->config_);
+  uint32_t heap = 0;
+  this->co_ = CO_new(&this->config_, &heap);
+  if (this->co_ == nullptr) {
+    this->mark_failed(LOG_STR("CO_new failed"));
+    return;
+  }
+  CO_ReturnError_t err = CO_CANinit(this->co_, this, 0);
+  if (err != CO_ERROR_NO) {
+    ESP_LOGE(TAG, "CO_CANinit failed: %d", err);
+    this->mark_failed();
+    return;
+  }
+  if (!this->init_sdo_client_()) {
+    this->mark_failed();
+    return;
+  }
+  this->init_frame_listeners_();
+  CO_CANsetNormalMode(this->co_->CANmodule);
+  this->last_us_ = micros();
+  ESP_LOGI(TAG, "CANopenNode initialized, SDO client only, heap %" PRIu32 " B", heap);
+#else
+  // codegen enables the SDO client for a hub without node id
+  this->mark_failed(LOG_STR("no node id and no SDO client"));
+#endif
 }
 
 void CANopenComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "CANopen (CANopenNode):");
+  if (this->is_client_only()) {
+    ESP_LOGCONFIG(TAG, "  Mode: SDO client only (no node ID)");
+#ifdef USE_CANOPEN_SDO_CLIENT
+    ESP_LOGCONFIG(TAG, "  SDO client: response timeout %u ms", this->response_timeout_ms_);
+#endif
+    return;
+  }
+#ifdef USE_CANOPEN_NODE
   ESP_LOGCONFIG(TAG, "  Node ID: 0x%02x", this->node_id_);
   ESP_LOGCONFIG(TAG, "  Heartbeat interval: %u ms", this->hb_producer_ms_);
 #ifdef CANOPEN_SDO_BLOCK_SIZE
@@ -130,6 +182,7 @@ void CANopenComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  SDO client: response timeout %u ms", this->response_timeout_ms_);
 #endif
   this->dump_node_monitor_config_();
+#endif
 }
 
 void CANopenComponent::loop() { this->process_(); }
@@ -140,6 +193,15 @@ void CANopenComponent::process_() {
   uint32_t now = micros();
   uint32_t dt = now - this->last_us_;
   this->last_us_ = now;
+  if (this->is_client_only()) {
+    // CO_process() would process the node's objects, which aren't initialised
+    CO_CANmodule_process(this->co_->CANmodule);
+#ifdef USE_CANOPEN_SDO_CLIENT
+    this->process_sdo_(dt);
+#endif
+    return;
+  }
+#ifdef USE_CANOPEN_NODE
   CO_NMT_reset_cmd_t reset = CO_process(this->co_, false, dt, nullptr);
   if (reset == CO_RESET_APP) {
     ESP_LOGW(TAG, "NMT reset node");
@@ -160,10 +222,12 @@ void CANopenComponent::process_() {
 #ifdef USE_CANOPEN_SDO_CLIENT
   this->process_sdo_(dt);
 #endif
+#endif  // USE_CANOPEN_NODE
 }
 
 bool CANopenComponent::set_nmt_state(NMTState state) {
-  if (this->co_ == nullptr || this->is_failed())
+#ifdef USE_CANOPEN_NODE
+  if (this->co_ == nullptr || this->is_failed() || this->is_client_only())
     return false;
   CO_NMT_command_t command;
   switch (state) {
@@ -182,6 +246,9 @@ bool CANopenComponent::set_nmt_state(NMTState state) {
   // applied by the next CO_process()
   CO_NMT_sendInternalCommand(this->co_->NMT, command);
   return true;
+#else
+  return false;
+#endif
 }
 
 }  // namespace esphome::canopen

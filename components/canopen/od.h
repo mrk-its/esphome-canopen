@@ -8,7 +8,8 @@
 #include "esphome/core/defines.h"  // before CANopenNode: clang-tidy gets the CO_CONFIG_* values from it
 
 #define OD_DEFINITION
-#include "CANopen.h"
+// Use the library search path: quoted includes match our canopen.h on Windows.
+#include <CANopen.h>
 
 #include "od_handler.h"
 

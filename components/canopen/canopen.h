@@ -35,13 +35,22 @@ NMTState to_nmt_state(CO_NMT_internalState_t state);
 // send_frame(), SDO client and NMT master requests; write_od(), read_od() and request_tpdo() need the OD, so they fail
 // or do nothing before the hub's setup().
 //
+// Client-only mode: without a node id (NO_NODE_ID) the hub is no CANopen node, only an SDO client on the bus (plus
+// raw frames). CANopenNode's node part (NMT, heartbeat, EMCY, SDO server) isn't initialised, so it isn't linked either.
+//
 // The implementation is split by feature: canopen.cpp (setup, processing, NMT), driver_can.cpp (CANopenNode's CAN
 // driver, frame reception and transmission), device_info.cpp (identity, device information, SDO server),
 // node_monitor.cpp (heartbeat consumer), frames.cpp (raw frames, heartbeat / EMCY callbacks), sdo_client.cpp,
 // nmt_master.cpp, pdo.cpp and pdo_storage.cpp (0x1010 / 0x1011).
 class CANopenComponent : public Component {
  public:
+  // CiA 301 node ids are 1..127; 0 is reserved (NMT broadcast), so it can't clash with a real node. It's also
+  // CANopenNode's "no own node" value (CO_SDOclient_init()).
+  static constexpr uint8_t NO_NODE_ID = 0;
+
   explicit CANopenComponent(uint8_t node_id) : node_id_(node_id) {}
+  // no node id: SDO client only, see above
+  bool is_client_only() const { return this->node_id_ == NO_NODE_ID; }
 
   void setup() override;
   void loop() override;
@@ -193,6 +202,7 @@ class CANopenComponent : public Component {
   void on_frame_(uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data);
   void receive_(uint16_t ident, const uint8_t *data, uint8_t len);
   void process_();
+  void setup_client_only_();
   // The features' parts of setup(), called in this order: add_*_od_() add OD entries (before the OD is finalized),
   // config_*_() fill in their CO_config_t counts and entries, init_*_() run once CANopenNode is initialised.
 
@@ -276,6 +286,8 @@ class CANopenComponent : public Component {
   static constexpr size_t SDO_MAX_UPLOAD = 1024;
   void add_sdo_client_od_();
   void config_sdo_client_(CO_config_t &cfg);
+  // client-only mode; a node's client is initialised by CO_CANopenInit()
+  bool init_sdo_client_();
   bool queue_sdo_(SDORequest &&request);
   void process_sdo_(uint32_t dt_us);
   bool start_sdo_();

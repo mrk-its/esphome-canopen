@@ -47,6 +47,18 @@ void CANopenComponent::config_sdo_client_(CO_config_t &cfg) {
   cfg.ENTRY_H1280 = this->od_.find(0x1280);
 }
 
+bool CANopenComponent::init_sdo_client_() {
+  uint32_t err_info = 0;
+  CO_ReturnError_t err =
+      CO_SDOclient_init(this->co_->SDOclient, this->od_.od(), this->od_.find(0x1280), NO_NODE_ID, this->co_->CANmodule,
+                        this->co_->RX_IDX_SDO_CLI, this->co_->CANmodule, this->co_->TX_IDX_SDO_CLI, &err_info);
+  if (err != CO_ERROR_NO) {
+    ESP_LOGE(TAG, "CO_SDOclient_init failed: %d (OD 0x%04" PRIx32 ")", err, err_info);
+    return false;
+  }
+  return true;
+}
+
 static void reject(SDOCallback callback, void *context) {
   if (callback != nullptr)
     callback(context, SDOReply{SDOResult::SDO_RESULT_REJECTED, 0, 0, 0, nullptr, 0});
@@ -259,7 +271,8 @@ void CANopenComponent::abort_sdo_() {
     ret = CO_SDOclientDownload(cli, 0, true, false, &abort, nullptr, nullptr);
   }
   // CANopenNode sends the abort frame only if its TX buffer is free; otherwise the server would stay in the transfer
-  // and reject the next request (0x05040001). Requests to our own node have no server to tell.
+  // and reject the next request (0x05040001). Requests to our own node have no server to tell (a client-only hub
+  // has no own node: NO_NODE_ID is never a request's node id).
   if (ret != CO_SDO_RT_endedWithClientAbort && r.node_id != this->node_id_) {
     const uint8_t frame[8] = {0x80, (uint8_t) r.index, (uint8_t) (r.index >> 8), r.sub, 0x00, 0x00, 0x00, 0x08};
     this->canbus_->send_data(0x600 + r.node_id, false, false, frame, sizeof(frame));

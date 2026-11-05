@@ -21,6 +21,8 @@ loopback between local nodes, SDO block transfer) done).
 Upstream PRs are being re-split (the old `canopen-1..4` branches are deleted, `docs/upstream_prs_1-3.md` is superseded): the hub
 refactored by feature on branch `canopen-full` in `~/repos/esphome`, the file -> PR map, line counts and cutting
 steps in `docs/canopennode.md`, "Upstream PRs" -> "New split"; per-PR line counts with `scripts/pr_split_lines.py`.
+New PR order (2026-11-05, "SDO client only first"): PR 1 = the hub without `node_id` (SDO client only, `USE_CANOPEN_NODE`
+compiles the node part), the node core moves to PR 2; to be re-cut.
 OTA in the hub on CiA 302-3 program download objects (`0x1F50`/`0x1F51`/`0x1F56`/`0x1F57`) instead of the mapper's `0x3000`:
 `docs/canopen_ota.md`. Implemented on `canopen-full` and in can2mqtt `dev`, tested over CAN on the nucleo only; the mapper's
 OTA stays until the rest is tested. Next upstream: PR 7 (`canopen_ota.md`, "Upstream").

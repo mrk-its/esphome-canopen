@@ -201,8 +201,9 @@ REMOTE_LOGS_SCHEMA = cv.Schema(
 ).extend(cv.COMPONENT_SCHEMA)
 
 
-# what canopen_entities needs from the hub beyond its first upstream PR: own PDOs (PR 5), SDO block transfer (PR 6)
-HUB_REQUIRED = ("enable_pdo", "enable_sdo_block", "CONF_SDO_BLOCK_SIZE")
+# what canopen_entities needs from the hub beyond its first upstream PR: own PDOs (PR 5), SDO block transfer (PR 6),
+# the node check (require_node_id(), with the SDO-client-only mode)
+HUB_REQUIRED = ("enable_pdo", "enable_sdo_block", "CONF_SDO_BLOCK_SIZE", "require_node_id")
 # this repo ships the full hub (components/canopen, a copy of mrk-its/esphome canopen-full)
 HUB_SOURCE = "github://mrk-its/esphome-canopen"
 
@@ -355,6 +356,8 @@ def hub_config(full_config: fv.FinalValidateConfig, canopen_id: Any) -> ConfigTy
 
 
 def _final_validate(config: ConfigType) -> ConfigType:
+    # entities live in the node's OD and PDOs: a hub without node_id (SDO client only) can't hold them
+    canopen.require_node_id(config[canopen.CONF_CANOPEN_ID], "canopen_entities")
     full_config = fv.full_config.get()
     try:
         layout.tpdo_mapping(node_states(full_config, config))

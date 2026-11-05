@@ -76,6 +76,8 @@ CONFIG_SCHEMA = cv.All(
 def _final_validate(config: ConfigType) -> ConfigType:
     """On Zephyr the backend installs a test upgrade, which MCUboot keeps only once the image is confirmed, and
     safe_mode is what confirms it: without it every update is rolled back at the next reset."""
+    # the program download objects are in the node's OD
+    canopen.require_node_id(config[canopen.CONF_CANOPEN_ID], "ota canopen")
     safe_mode = fv.full_config.get().get("safe_mode") or {}
     if _is_zephyr() and safe_mode.get(CONF_DISABLED, False):
         _LOGGER.warning(

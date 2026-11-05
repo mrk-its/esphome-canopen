@@ -348,6 +348,7 @@ until the parent is merged (as #21533 does with #21522): the chain is reviewed s
 out early and the next ones are prepared here meanwhile.
 
 ### New split (2026-10-31, branch `canopen-full`) — current plan
+(PR order changes with "SDO client only first" below: PR 1 becomes the SDO client, the node core moves to PR 2.)
 **Why.** The old split (tables further down) followed the order the work was done in: every PR edited the same
 functions (`setup()` mixed every feature, 7 `#ifdef` blocks), so a fix in one PR had to be rebased through all later
 ones. None of the old branches (`canopen-1-node` .. `canopen-4-profile`, deleted 2026-11-01, locally and on mrk-its/esphome) was opened as an upstream PR
@@ -506,6 +507,44 @@ with the PR of every line. Add new files / blocks to its tables. Accuracy: a few
 "Upstream"): `ota: - platform: canopen` on the CiA 302-3 program download objects (`0x1F50` / `0x1F51` / `0x1F56` /
 `0x1F57`) instead of the mapper's `0x3000`, which stays in the manufacturer area only for the old component. The mapper
 then has no OTA. Branch `canopen-pr7-ota`, stacked on PR 6.
+
+### SDO client only first (2026-11-05) — planned re-split
+**Why.** A hub without `node_id` is a self-contained first PR: an SDO client that reads and writes objects of existing
+CANopen devices (drives, sensors, I/O modules) from automations, without being a CANopen node. The node itself (NMT,
+heartbeat, SDO server, identity, OD) follows in PR 2. Implemented on branch `feature/canopen-sdo-client-only` in
+`~/repos/esphome` (`0c6e7cad40`, on `canopen-full` `e1d4a2afaa`; not merged into `canopen-full` yet, not pushed) and
+in `~/repos/esphome-docs` (same branch name, `bae1c36ff`), synced here from the feature branch; PR 1 below
+(`canopen-pr1-node`, the node core) is to be re-cut, not opened as it is.
+
+**What it is.**
+- `node_id` is optional. Without it, `setup_client_only_()` runs `CO_new()` with only `CNT_SDO_CLI = 1`, then
+  `CO_CANinit()` and `CO_SDOclient_init()` with node id `NO_NODE_ID` (0), on an OD that holds only `0x1280`. There is
+  no `CO_CANopenInit()`: CiA 301 ids are 1..127, and LSS "unconfigured" stops it before the client. `process_()`
+  runs `CO_CANmodule_process()` + the client.
+- `USE_CANOPEN_NODE` (set if any hub has a node id) compiles the node path. Without it CANopenNode's node code isn't
+  linked: ESP8266 (d1_mini + mcp2515, one `canopen.sdo_write`): node 292,095 B flash / 29,384 B RAM, client-only
+  281,907 B / 29,372 B; STM32L4 (nucleo_l476rg, zephyr_can, fork venv): node 93,880 B flash, client-only 85,172 B
+  (RAM 18,176 B both: Zephyr's static heap). CANopenNode symbols on ESP8266 drop from 12.2 KB (`CO_CANopenInit`, `CO_process`, NMT, HB consumer,
+  EM, SDO server) to 6.0 KB (driver, SDO client, fifo, OD access).
+- `sdo_client:` option: unset = auto (compiled in if an action or component uses it), `true` = always (lambdas),
+  `false` = never (an error if something uses it). Firmware-wide, like `sdo_block_size`.
+- `canopen.sdo_read` action (`on_value` with `x`, `on_error`).
+- Allowed without `node_id`: `canbus_id`, `response_timeout`, `sdo_client`, `on_heartbeat` / `on_emcy` (raw frames),
+  the SDO actions and lambdas. Node options are rejected on the raw config (before the schema's defaults);
+  `require_node_id()` rejects profile components, OTA and `canopen_entities`; `canopen.nmt` fails in codegen.
+- Node monitoring (`heartbeat_clients`, `on_node_event`) stays node-only: CANopenNode's HB consumer needs an
+  initialised `CO_EM_t`, and `CO_EM_init()` rejects node id 0 (the workaround would be a fake id with the EMCY
+  producer disabled). If needed later: our own monitor on top of the decoded heartbeat frames.
+
+**New order.** 1 SDO client only (driver, `0x1280` on the runtime OD, `sdo_client.cpp`, `canopen.sdo_read` /
+`sdo_write`, `sdo_client:`); 2 node core (`node_id`, NMT + HB producer, SDO server, identity, local SDO transfers);
+3 monitoring, raw frames, heartbeat / EMCY triggers, loopback; 4 NMT master (`canopen.nmt`); then the OD handler /
+profile API, PDOs, SDO block transfer, OTA as before. Open for the cut: whether the runtime OD (`od.*`, ~180 lines)
+goes into PR 1 (the client needs `0x1280` as an `OD_entry_t`) or PR 1 gets a small static entry and the OD comes
+with PR 2; whether raw frames (`frames.cpp`, used by `on_heartbeat` / `on_emcy` without a node) move to PR 1 or 2.
+`scripts/pr_split_lines.py` still uses the old numbering (table above): its `PRS` / `FILES` / `BANNERS` / `IFDEFS`
+need the new order (and `USE_CANOPEN_NODE`, `setup_client_only_`, `init_sdo_client_`, `SDOReadAction`) before the
+re-cut.
 
 ### Old split (superseded)
 Kept for the history of what each part contained; the branches below are not used any more.

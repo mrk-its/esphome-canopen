@@ -509,3 +509,15 @@ def test_partial_hub(tmp_path):
     output = result.stdout + result.stderr
     assert "lacks enable_pdo, enable_sdo_block, CONF_SDO_BLOCK_SIZE" in output
     assert "github://mrk-its/esphome-canopen" in output
+
+
+@needs_esphome
+def test_client_only_hub(tmp_path: Path) -> None:
+    """A hub without node_id is an SDO client only: no OD or PDOs for the entities."""
+    path = write_config(tmp_path, [{"id": "temp", "index": 1, "tpdo": 0}])
+    config = json.loads(path.read_text(encoding="utf-8"))
+    del config["canopen"]["node_id"]
+    path.write_text(json.dumps(config, indent=1), encoding="utf-8")
+    result = run_esphome(tmp_path, "config")
+    assert result.returncode != 0
+    assert "canopen_entities needs a CANopen node: canopen can_hub has no node_id" in result.stdout + result.stderr
