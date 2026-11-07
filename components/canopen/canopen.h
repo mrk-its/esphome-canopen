@@ -2,7 +2,6 @@
 
 #include <array>
 #include <initializer_list>
-#include <memory>
 #include <vector>
 
 #include "esphome/core/automation.h"
@@ -20,6 +19,8 @@
 #endif
 
 namespace esphome::canopen {
+
+void discard_pending_tx(CO_CANmodule_t *mod, CO_CANtx_t *buf);
 
 NMTState to_nmt_state(CO_NMT_internalState_t state);
 
@@ -305,12 +306,13 @@ class CANopenComponent : public Component {
   bool sdo_busy_{false};
   size_t sdo_offset_{0};  // WRITE/WRITE_DATA: bytes handed to the client fifo
   // READ/READ_DATA: bytes received (also those beyond the buffer, for the size checks), kept in sdo_rx_value_ (READ)
-  // or sdo_rx_buf_ (READ_DATA, SDO_MAX_UPLOAD bytes, allocated on the first buffer read and kept)
+  // or sdo_rx_buf_ (READ_DATA)
   size_t sdo_rx_len_{0};
   std::array<uint8_t, 4> sdo_rx_value_{};
-  std::unique_ptr<uint8_t[]> sdo_rx_buf_;
-  uint8_t sdo_abort_node_{0};  // node of the last cancelled transfer, see ABORT_GUARD_MS
-  uint32_t sdo_abort_ms_{0};
+  std::array<uint8_t, SDO_MAX_UPLOAD> sdo_rx_buf_{};
+  uint8_t sdo_abort_node_{0};       // node of the last cancelled transfer, see ABORT_GUARD_US
+  uint32_t sdo_abort_guard_us_{0};  // time left before a request to sdo_abort_node_ may start
+  bool sdo_abort_pending_{false};
 #endif
 
 #ifdef USE_CANOPEN_PDO

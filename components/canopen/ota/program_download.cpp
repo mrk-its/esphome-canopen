@@ -4,7 +4,6 @@
 #include <cstring>
 
 #include "esphome/core/application.h"
-#include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 
 namespace esphome::canopen {
@@ -23,10 +22,10 @@ void ProgramDownload::set_canopen(CANopenComponent *hub) {
 }
 
 void ProgramDownload::loop() {
-  if (millis() - this->phase_start_ms_ < this->delay_ms_)
+  if (App.get_loop_component_start_time() - this->phase_start_ms_ < this->delay_ms_)
     return;
   if (this->phase_ == PHASE_END_WAIT) {
-    ota::OTAResponseTypes ret = this->backend_end_();
+    ota::OTAResponseTypes ret = this->backend_end();
     if (ret != ota::OTA_RESPONSE_OK) {
       this->fail_(ret);
       return;
@@ -36,7 +35,7 @@ void ProgramDownload::loop() {
     this->notify_state_(ota::OTA_COMPLETED, 100.0f, 0);
 #endif
     this->phase_ = PHASE_REBOOT_WAIT;
-    this->phase_start_ms_ = millis();
+    this->phase_start_ms_ = App.get_loop_component_start_time();
   } else if (this->phase_ == PHASE_REBOOT_WAIT) {
     this->phase_ = PHASE_IDLE;
     this->disable_loop();
@@ -82,7 +81,7 @@ OdResult ProgramDownload::stop_() {
     return OdResult::OD_RESULT_NO_DATA;
   if (this->phase_ != PHASE_IDLE) {
     ESP_LOGW(TAG, "Update stopped");
-    this->backend_abort_();
+    this->backend_abort();
 #ifdef USE_OTA_STATE_LISTENER
     this->notify_state_(ota::OTA_ABORT, 0.0f, 0);
 #endif
@@ -102,7 +101,7 @@ OdResult ProgramDownload::start_() {
   // (on some platforms the backend reboots right away).
   if (this->phase_ == PHASE_DOWNLOADED) {
     this->phase_ = PHASE_END_WAIT;
-    this->phase_start_ms_ = millis();
+    this->phase_start_ms_ = App.get_loop_component_start_time();
     this->enable_loop();
   }
   return OdResult::OD_RESULT_OK;
@@ -112,13 +111,13 @@ OdResult ProgramDownload::clear_() {
   if (this->control_ != CONTROL_STOP || this->finishing_())
     return OdResult::OD_RESULT_NO_DATA;
   if (this->phase_ != PHASE_IDLE)
-    this->backend_abort_();
+    this->backend_abort();
   this->phase_ = PHASE_IDLE;
   this->program_id_ = 0;
   this->flash_status_ = 0;
   this->crc_ = 0;
   this->received_ = 0;
-  ota::OTAResponseTypes ret = this->backend_begin_();
+  ota::OTAResponseTypes ret = this->backend_begin();
   if (ret != ota::OTA_RESPONSE_OK) {
     this->fail_(ret);
     return OdResult::OD_RESULT_HARDWARE;
@@ -156,7 +155,7 @@ OdResult ProgramDownload::data_write_(OdStream stream, const uint8_t *data, size
       return OdResult::OD_RESULT_HARDWARE;
     }
 #endif
-    ota::OTAResponseTypes ret = this->backend_write_(data, count);
+    ota::OTAResponseTypes ret = this->backend_write(data, count);
     if (ret != ota::OTA_RESPONSE_OK) {
       this->fail_(ret);
       return OdResult::OD_RESULT_HARDWARE;
@@ -190,21 +189,22 @@ OdResult ProgramDownload::data_write_(OdStream stream, const uint8_t *data, size
   return OdResult::OD_RESULT_OK;
 }
 
-void ProgramDownload::set_error_(uint8_t error, ota::OTAResponseTypes response) {
-  this->flash_status_ = (uint32_t(error) << 1) | (uint32_t(response) << 16);
+void ProgramDownload::set_error_(uint8_t status, ota::OTAResponseTypes response) {
+  this->flash_status_ = (uint32_t(status) << 1) | (uint32_t(response) << 16);
 }
 
 void ProgramDownload::fail_(ota::OTAResponseTypes error) {
   ESP_LOGE(TAG, "Update failed: %d", static_cast<int>(error));
-  this->backend_abort_();
+  this->backend_abort();
   this->phase_ = PHASE_IDLE;
   this->control_ = CONTROL_STOP;
   this->program_id_ = 0;
   uint8_t status = FLASH_UNSPECIFIED;
-  if (error == ota::OTA_RESPONSE_ERROR_MAGIC)
+  if (error == ota::OTA_RESPONSE_ERROR_MAGIC) {
     status = FLASH_FORMAT_UNKNOWN;
-  else if (error == ota::OTA_RESPONSE_ERROR_WRITING_FLASH)
+  } else if (error == ota::OTA_RESPONSE_ERROR_WRITING_FLASH) {
     status = FLASH_WRITE_ERROR;
+  }
   this->set_error_(status, error);
   this->disable_loop();
 #ifdef USE_OTA_STATE_LISTENER

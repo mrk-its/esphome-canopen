@@ -4,7 +4,9 @@
 with this platform: nothing here is compiled for a node without it.
 """
 
+from collections.abc import Callable
 import logging
+from typing import Any
 
 import esphome.codegen as cg
 from esphome.components import canopen
@@ -39,7 +41,7 @@ def _is_zephyr() -> bool:
     )
 
 
-def _mcuboot():
+def _mcuboot() -> tuple[Callable[[ConfigType], ConfigType], Callable[..., Any]]:
     """The fork's swap method helpers. Deferred: esphome.components.zephyr is heavy."""
     try:
         from esphome.components.zephyr import apply_swap_method, validate_swap_method

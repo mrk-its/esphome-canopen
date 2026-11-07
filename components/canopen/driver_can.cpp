@@ -7,6 +7,13 @@
 
 namespace esphome::canopen {
 
+void discard_pending_tx(CO_CANmodule_t *mod, CO_CANtx_t *buf) {
+  if (buf->bufferFull) {
+    buf->bufferFull = false;
+    mod->CANtxCount--;
+  }
+}
+
 static bool send_frame(CO_CANmodule_t *mod, CO_CANtx_t *buf) {
   return static_cast<CANopenComponent *>(mod->CANptr)->transmit(buf->ident, buf->data, buf->DLC);
 }

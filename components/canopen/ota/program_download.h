@@ -70,10 +70,10 @@ class ProgramDownload : public ota::OTAComponent, public OdObject {
     PHASE_REBOOT_WAIT,
   };
 
-  virtual ota::OTAResponseTypes backend_begin_() = 0;
-  virtual ota::OTAResponseTypes backend_write_(const uint8_t *data, size_t len) = 0;
-  virtual ota::OTAResponseTypes backend_end_() = 0;
-  virtual void backend_abort_() = 0;
+  virtual ota::OTAResponseTypes backend_begin() = 0;
+  virtual ota::OTAResponseTypes backend_write(const uint8_t *data, size_t len) = 0;
+  virtual ota::OTAResponseTypes backend_end() = 0;
+  virtual void backend_abort() = 0;
 
   OdResult control_write_(OdStream stream, const void *buf, size_t count, size_t *done);
   OdResult stop_();
@@ -81,7 +81,7 @@ class ProgramDownload : public ota::OTAComponent, public OdObject {
   OdResult clear_();
   OdResult data_write_(OdStream stream, const uint8_t *data, size_t count, size_t *done);
   bool finishing_() const { return this->phase_ == PHASE_END_WAIT || this->phase_ == PHASE_REBOOT_WAIT; }
-  void set_error_(uint8_t error, ota::OTAResponseTypes response);
+  void set_error_(uint8_t status, ota::OTAResponseTypes response);
   void fail_(ota::OTAResponseTypes error);
 
   // end() after the reply to "start" has left, the reboot after end()

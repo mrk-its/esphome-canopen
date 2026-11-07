@@ -1,4 +1,6 @@
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from esphome import automation
 import esphome.codegen as cg
@@ -77,13 +79,23 @@ NMT_COMMANDS = {
     "reset_communication": NMTCommand.NMT_COMMAND_RESET_COMMUNICATION,
 }
 
-KEY_CANOPEN = "canopen"
-# canbus id -> the canopen nodes on it, in config order (to_code links them, see set_next_local())
-KEY_LOCAL_NODES = "canopen_local_nodes"
+
+@dataclass
+class CANopenData:
+    # the enable_*() parts already compiled in
+    enabled: set[str] = field(default_factory=set)
+    # canbus id -> the canopen nodes on it, in config order (to_code links them, see set_next_local())
+    local_nodes: dict[str, list[MockObj]] = field(default_factory=dict)
+
+
+def _get_data() -> CANopenData:
+    if DOMAIN not in CORE.data:
+        CORE.data[DOMAIN] = CANopenData()
+    return CORE.data[DOMAIN]
 
 
 def _enable_once(key: str) -> bool:
-    enabled = CORE.data.setdefault(KEY_CANOPEN, set())
+    enabled = _get_data().enabled
     if key in enabled:
         return False
     enabled.add(key)
@@ -176,7 +188,7 @@ CANOPEN_NODE_SCHEMA = cv.Schema(
 )
 
 
-def require_node_id(hub_id, what: str):
+def require_node_id(hub_id: ID, what: str) -> ConfigType:
     """Final validation helper for things that need a CANopen node (OD, PDOs, NMT, ...): the hub hub_id must have a
     node_id. Returns the hub's config."""
     full_config = fv.full_config.get()
@@ -189,7 +201,7 @@ def require_node_id(hub_id, what: str):
     return hub
 
 
-def final_validate_canopen_node(config):
+def final_validate_canopen_node(config: ConfigType) -> ConfigType:
     """FINAL_VALIDATE_SCHEMA helper for CANOPEN_NODE_SCHEMA: the hub must be a node, and the node can't be the hub's own
     node id."""
     hub = require_node_id(config[CONF_CANOPEN_ID], "a canopen profile component")
@@ -202,8 +214,12 @@ def final_validate_canopen_node(config):
 
 
 async def register_node(
-    var, config, sdo: bool = False, nmt: bool = False, heartbeat_timeout=None
-):
+    var: MockObj,
+    config: ConfigType,
+    sdo: bool = False,
+    nmt: bool = False,
+    heartbeat_timeout: cv.TimePeriod | None = None,
+) -> MockObj:
     """Codegen for a CANopenNode subclass built from CANOPEN_NODE_SCHEMA.
 
     Compiles the parts of the hub the component uses (SDO client, NMT master) and, with a heartbeat_timeout
@@ -249,7 +265,7 @@ CALLBACK_AUTOMATIONS = (
 )
 
 
-def absolute_path(value):
+def absolute_path(value: Any) -> str:
     # the zephyr library converter rejects relative file:// sources
     return str(Path(cv.string(value)).expanduser().resolve())
 
@@ -285,7 +301,7 @@ NODE_OPTIONS = (
 )
 
 
-def validate_client_only_options(config):
+def validate_client_only_options(config: Any) -> Any:
     """Without node_id the hub is an SDO client only: no node options. Runs on the raw config, before the schema
     fills in the node options' defaults."""
     if not isinstance(config, dict) or CONF_NODE_ID in config:
@@ -299,7 +315,7 @@ def validate_client_only_options(config):
     return config
 
 
-def validate_client_only(config):
+def validate_client_only(config: ConfigType) -> ConfigType:
     """Without node_id the SDO client can't be turned off."""
     if CONF_NODE_ID not in config and config.get(CONF_SDO_CLIENT) is False:
         raise cv.Invalid(
@@ -317,7 +333,7 @@ HB_CLIENT_SCHEMA = cv.Schema(
 )
 
 
-def validate_heartbeat_clients(config):
+def validate_heartbeat_clients(config: ConfigType) -> ConfigType:
     for client in config[CONF_HEARTBEAT_CLIENTS]:
         if client[CONF_NODE_ID] == config.get(CONF_NODE_ID):
             raise cv.Invalid(
@@ -368,7 +384,7 @@ CONFIG_SCHEMA = cv.All(
 )
 
 
-def _final_validate(config):
+def _final_validate(config: ConfigType) -> ConfigType:
     for other in fv.full_config.get().get(DOMAIN, []):
         # CANopenNode build flags (enable_sdo_block()): one value for the whole firmware
         if (
@@ -422,7 +438,7 @@ def add_canopennode_library(path: str | None = None) -> None:
         cg.add_library("CANopenNode", None, CANOPENNODE_SOURCE)
 
 
-async def to_code(config):
+async def to_code(config: ConfigType) -> None:
     add_canopennode_library(config.get(CONF_CANOPENNODE_PATH))
 
     var = cg.new_Pvariable(config[CONF_ID], config.get(CONF_NODE_ID, NO_NODE_ID))
@@ -431,9 +447,7 @@ async def to_code(config):
     canbus = await cg.get_variable(config[CONF_CANBUS_ID])
     cg.add(var.set_canbus(canbus))
     # other nodes on this canbus: a ring in config order (each call closes it again)
-    local = CORE.data.setdefault(KEY_LOCAL_NODES, {}).setdefault(
-        str(config[CONF_CANBUS_ID]), []
-    )
+    local = _get_data().local_nodes.setdefault(str(config[CONF_CANBUS_ID]), [])
     if local:
         cg.add(local[-1].set_next_local(var))
         cg.add(var.set_next_local(local[0]))
@@ -479,7 +493,7 @@ async def to_code(config):
     await automation.build_callback_automations(var, config, CALLBACK_AUTOMATIONS)
 
 
-def validate_sdo_value(config):
+def validate_sdo_value(config: ConfigType) -> ConfigType:
     value = config[CONF_VALUE]
     if isinstance(value, int):
         bits = 8 * config[CONF_SIZE]
@@ -512,7 +526,12 @@ SDO_WRITE_SCHEMA = cv.All(
 @automation.register_action(
     "canopen.sdo_write", SDOWriteAction, SDO_WRITE_SCHEMA, synchronous=True
 )
-async def sdo_write_to_code(config, action_id, template_arg, args):
+async def sdo_write_to_code(
+    config: ConfigType,
+    action_id: ID,
+    template_arg: cg.TemplateArguments,
+    args: TemplateArgsType,
+) -> MockObj:
     enable_sdo_client()
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])
@@ -594,7 +613,12 @@ SDO_READ_SCHEMA = cv.Schema(
 @automation.register_action(
     "canopen.sdo_read", SDOReadAction, SDO_READ_SCHEMA, synchronous=True
 )
-async def sdo_read_to_code(config, action_id, template_arg, args):
+async def sdo_read_to_code(
+    config: ConfigType,
+    action_id: ID,
+    template_arg: cg.TemplateArguments,
+    args: TemplateArgsType,
+) -> MockObj:
     enable_sdo_client()
     var = cg.new_Pvariable(action_id, template_arg)
     await cg.register_parented(var, config[CONF_ID])
