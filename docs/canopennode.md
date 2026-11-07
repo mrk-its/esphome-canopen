@@ -20,10 +20,12 @@ see "Hub for the entity mapper"). **Next:** cut the upstream PRs again from the 
   services use a stack-neutral API, but there is no runtime choice of backend.
 
 ## Current state (handoff)
-Where to continue (2026-10-31):
-- **Upstream split:** "Upstream PRs" -> "New split": what `canopen-full` changed, the file -> PR map, the line counts
-  (`scripts/pr_split_lines.py`), and the cutting steps. PR 1 is cut (2026-11-01, `canopen-pr1-node` in
-  `~/repos/esphome` and `~/repos/esphome-docs`, pushed); `canopen-full` is now stacked on it; next: PR 2.
+Where to continue (2026-11-07):
+- **Upstream split:** "Upstream PRs" -> "SDO client only first" (the current split) and its "PR 1 as cut": PR 1 (the
+  SDO client, no node) is cut on `canopen-pr1-sdo-client` in `~/repos/esphome` and `~/repos/esphome-docs`, pushed,
+  hardware-tested on the nucleo; the docs PR is open as a draft (esphome/esphome.io#8059), the esphome PR is not open
+  yet (waiting for the #21522 line). "New split" holds the refactor and the cutting steps; the old
+  `canopen-pr1-node` (the node core) is superseded.
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
 - **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
   `components_next`); the old component (`components/canopen`, canopen-stack) and `components_next/canopen` (a stale
@@ -512,10 +514,10 @@ then has no OTA. Branch `canopen-pr7-ota`, stacked on PR 6.
 ### SDO client only first (2026-11-05) — current plan
 **Why.** A hub without `node_id` is a self-contained first PR: an SDO client that reads and writes objects of existing
 CANopen devices (drives, sensors, I/O modules) from automations, without being a CANopen node. The node itself (NMT,
-heartbeat, SDO server, identity, OD) follows in PR 3, after the raw frames (PR 2). Implemented on branch `feature/canopen-sdo-client-only` in
-`~/repos/esphome` (`0c6e7cad40`, on `canopen-full` `e1d4a2afaa`; not merged into `canopen-full` yet, not pushed) and
-in `~/repos/esphome-docs` (same branch name, `bae1c36ff`), synced here from the feature branch; PR 1 below
-(`canopen-pr1-node`, the node core, now PR 3's base) is to be re-cut, not opened as it is.
+heartbeat, SDO server, identity, OD) follows in PR 3, after the raw frames (PR 2). Implemented on branch
+`feature/canopen-sdo-client-only` in `~/repos/esphome` (`0c6e7cad40`), merged into `canopen-full` (`85ca51ceaf`), and
+in `~/repos/esphome-docs` (same branch name, `bae1c36ff`). The old PR 1 (`canopen-pr1-node`, the node core, see "New
+split") is superseded: PR 1 is cut anew, see "PR 1 as cut" below.
 
 **What it is.**
 - `node_id` is optional. Without it, `setup_client_only_()` runs `CO_new()` with only `CNT_SDO_CLI = 1`, then
@@ -589,6 +591,46 @@ Accuracy: `scripts/pr_split_lines.py` classifies by markers (rules at its top); 
 its function, `#ifdef`s, banner and keyword. The `setup()` / `process_()` lines that pick the client-only path count
 as PR 1 although they only exist from PR 3: a few lines each way. The cut follows the old "Cutting the branches"
 steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
+
+#### PR 1 as cut (2026-11-07)
+- **Branches** (pushed to mrk-its, one commit each, no Claude attribution in commits or PR text):
+  `canopen-pr1-sdo-client` in `~/repos/esphome`, `e7c453772f` on `upstream/dev` `a9ba8e9743`, "[canopen] Add CANopen
+  SDO client component (on CANopenNode)"; `canopen-pr1-sdo-client` in `~/repos/esphome-docs`, `c85f70139` on
+  `origin/next` (the page cut to PR 1, the index and CAN Bus "See Also" links; `node script/lint.mjs` clean).
+  Docs PR: esphome/esphome.io#8059 (draft). esphome PR: not open yet; title `[canopen] Add CANopen SDO client
+  component`; the description draft still needs the line on #21522 and the Test Environment (STM32 nucleo, see below).
+  Until reviews start, fixes are amended and force-pushed; afterwards only new commits.
+- **Content:** `__init__.py` (library, `canbus_id`, `response_timeout`, `canopennode_path`, `enable_sdo_client()`,
+  the two actions), `automation.h`, `canopen.cpp/.h`, `driver_can.cpp`, `sdo_client.cpp`, `types.h` (SDO types only);
+  CODEOWNERS, `platformio.ini` CANopenNode line, `defines.h` (`USE_CANOPEN_SDO_CLIENT`, `CO_CONFIG_SDO_CLI 0x03`,
+  `CO_CONFIG_FIFO`). 875 non-blank production lines (~810 without comment-only lines). Tests: `sdo_client_test.cpp`
+  (new, 10 tests against canned server replies through `TestHub::frame()`), `sdo_cancel_test.cpp` (without the NMT
+  frame), `sdo_reply_test.cpp`, `test_canopen.py` (codegen, defaults, `response_timeout` range, `sdo_write` values,
+  `node_id` rejected); 24 C++ + 14 Python tests, the four build targets and clang-tidy (4 envs) clean.
+- **Differences from `canopen-full`, kept in the cut** (later cuts and the rebase after the merge must know them):
+  - fixed `0x1280` entry (`sdo_cli_record_`, `od_entries_`, `od_` in `canopen.h`) instead of the runtime OD; PR 3
+    replaces it;
+  - `CO_CONFIG_SDO_CLI=0x03` (no local transfers); PR 3 brings back `0x0B`;
+  - `canbus::add_frame_callback()` (upstream `dev` #22008, 2026-11-04; `add_callback()` is deprecated there).
+    `canopen-full` keeps `add_callback()` until esphomeplatformzephyr has #22008 (its `canbus.h` doesn't, as of
+    `origin/framework-zephyr` `c5dfed5e8`), since the copy here is built with the fork venv;
+  - the `USE_CANOPEN_SDO_CLIENT` `#ifdef`s stay although PR 1's codegen always sets it (smaller PR 3 diff);
+  - left for review: the canbus as a constructor parameter instead of `set_canbus()` (esphome's "required invariant"
+    rule; `set_canbus()` also registers the frame callback).
+- **esphome conventions** (its AGENTS.md, checked before opening): fixed on `canopen-full` (`bf0f7c20cf`) and folded
+  into the cut: the SDO client's 1 KB read buffer is a member (no heap after `setup()`), the abort guard counts down
+  with the client's `dt` instead of `millis()` (the OTA phases use `App.get_loop_component_start_time()`), codegen
+  state in a `CANopenData` dataclass under `DOMAIN`, type hints everywhere; `script/build_language_schema.py`
+  extracts the whole schema. OTA clang-tidy findings fixed on `canopen-full` (`4676376312`).
+- **Hardware test** (nucleo, 2026-11-07; config `test/stm32l4_sdo_client.yaml` + `test/sdo_client_test.h`, not
+  committed: it built a temporary copy of the cut with `set_canbus()` back on `add_callback()`): over 20 house nodes read (device name, software version, identity,
+  heartbeat time); `canopen.sdo_read` value, size mismatch, missing object (`0x06020000`), absent node (timeout
+  `0x05040000`), queue full (16 of 17); `canopen.sdo_write` (B1 toggles dimmer4 light5: state `0x2051:1`, command
+  `0x2052:1`). The only aborts (`0x05040001` / `0x06040043`, ~7% of requests on 0x61 and 0x67, none with can2mqtt
+  stopped) came from can2mqtt polling the same nodes' default SDO channel for remote logs (the stm32 nodes flashed
+  since 2026-11-03 have `remote_logs` from `common/stm32_zephyr_can_node.yaml`, level INFO, and can2mqtt's `AUTO`
+  subscribes to them): two SDO clients on one server channel collide. Worth a sentence in the docs (another SDO
+  master on the bus: handle `on_error`).
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
