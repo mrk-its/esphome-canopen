@@ -88,12 +88,15 @@ pushing the fork, in both places: `CANOPENNODE_SOURCE` and the CANopenNode line 
 
 ## Remote logs
 - Spec: `docs/can-logs-plan.md`. Host polls (Log Pending `0x3100:2`, then uploads Log Data `:1`), writes Log Level
-  `:3` as subscribe/keepalive; the node turns itself off after `timeout` without polls.
+  `:3` as level/keepalive. Flight recorder: the node records from boot at `remote_logs: level:` whether a host reads
+  or not; a host's level returns to it on a `:3` write of 0 or after `timeout` without polls (the buffer is kept).
 - `canopen_entities: remote_logs:` (the old component's options and OD). `log_buffer.*` is the ring buffer / level /
   keepalive logic without OD glue (host test `test/logs/log_buffer_test.cpp`), `remote_logs.*` the 0x3100 handler:
   the snapshot of `pending` is taken at the first read (`offset == 0`), reads copy at most the rest (CANopenNode asks
-  for its free buffer space). Overflow drops the newest line, marker `[W][canopen.logs]: N messages dropped` in the
-  stream. Tag filter uses `ESPHOME_strcmp_P` (tags in flash on ESP8266).
+  for its free buffer space). Overflow evicts the oldest lines (never the snapshot of an upload in progress: the
+  lines behind it, moved within the ring); the marker `[W][canopen.logs]: N messages dropped` is sent at the start of
+  the next upload (`read()` prepends it, Log Pending counts it), so every gap must be at the front: see
+  `cancel_upload_()` and the long-line case in `on_log()`. Tag filter uses `ESPHOME_strcmp_P` (tags in flash on ESP8266).
 - No locking: log callbacks and SDO processing both run on the main loop. Nothing in `log_buffer.cpp` /
   `remote_logs.cpp` may log.
 - Log upload block size: `remote_logs: block_size:` (default 3 = STM32 TX mailboxes only), advertised in `0x3100:7`,

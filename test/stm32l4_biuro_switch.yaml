@@ -147,6 +147,7 @@ canopen_entities:
   # TPDOs and the heartbeat
   remote_logs:
     level: DEBUG
+    buffer_size: 8192
     block_size: 16
 
 output:

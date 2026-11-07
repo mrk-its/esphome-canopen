@@ -180,11 +180,11 @@ REMOTE_LOGS_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(RemoteLogs),
         cv.Optional(CONF_BUFFER_SIZE, default=2048): cv.int_range(min=256, max=16384),
-        # the level from boot until a host subscribes
+        # the node records at this level from boot (keeping the most recent lines); a host's level returns to it
         cv.Optional(CONF_LEVEL, default="INFO"): cv.one_of(
             *LOG_LEVEL_SEVERITY, upper=True
         ),
-        # logging turns off without a host poll for this long
+        # a host's level returns to `level` without a poll for this long
         cv.Optional(CONF_TIMEOUT, default="30s"): cv.Any(
             cv.one_of(LOG_TIMEOUT_NEVER, lower=True),
             cv.All(
@@ -396,7 +396,7 @@ def validate_remote_logs(
         )
     if remote_logs[CONF_TIMEOUT] == LOG_TIMEOUT_NEVER and level == "NONE":
         _LOGGER.warning(
-            "%s: 'timeout: never' with 'level: NONE' never expires a host subscription",
+            "%s: 'timeout: never' with 'level: NONE': a level set by a host never returns to NONE",
             CONF_REMOTE_LOGS,
         )
 

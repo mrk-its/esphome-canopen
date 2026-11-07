@@ -14,9 +14,10 @@ namespace esphome::canopen_entities {
 
 // Remote logs (`canopen_entities: remote_logs:`), OD 0x3100 as can2mqtt reads it (OBJECT_DICTIONARY.md,
 // docs/remote-logs.md):
-//   :1 Log Data (domain, an upload consumes it), :2 Log Pending, :3 Log Level (RW, the host's subscription),
-//   :4 Log Dropped, :5 default level, :6 timeout (ms, 0 = never), :7 SDO block size for Log Data uploads
-// The handlers must not log (see LogBuffer). loop() only runs while logging is on with a timeout.
+//   :1 Log Data (domain, an upload consumes it), :2 Log Pending, :3 Log Level (RW, the host's level, 0 = back to the
+//   default), :4 Log Dropped, :5 default level, :6 timeout (ms, 0 = never), :7 SDO block size for Log Data uploads
+// Records from boot at the default level, evicting the oldest lines when full (LogBuffer). The handlers must not log
+// (see LogBuffer). loop() only runs while there is a timeout to check (LogBuffer::needs_timeout_check()).
 class RemoteLogs : public Component, public canopen::OdObject {
  public:
   static constexpr uint16_t OD_INDEX = 0x3100;

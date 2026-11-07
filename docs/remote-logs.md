@@ -13,15 +13,15 @@ canopen_entities:
 * `buffer_size` (Optional, int, 256..16384, default=2048): RAM buffer for log lines (static, shows up in the build's
   RAM summary).
 * `level` (Optional, default=INFO): `NONE`, `ERROR`, `WARN`, `INFO`, `CONFIG`, `DEBUG`, `VERBOSE` or `VERY_VERBOSE`.
-  The node buffers at this level from boot (so boot logs and `dump_config` are kept until can2mqtt reads them, or
-  dropped after `timeout` if nobody does). can2mqtt reads a node's logs once a level is chosen with the node's
-  **Remote log level** select in Home Assistant (or always, at this level, with `can2mqtt --remote-log-level AUTO`).
-  The choice survives node reboots: to see the boot logs, choose a level and restart the node. With `NONE` nothing
-  is buffered until a host subscribes. Levels more verbose than `logger: level:` are compiled out (the build warns).
-* `timeout` (Optional, time 1s..1h or `never`, default=30s): the node turns remote logging off when no host polled for
-  this long. Short: stops buffering soon after can2mqtt goes away, but a busy host (e.g. a long OTA to another node)
-  turns it off sooner. Long: survives a can2mqtt restart (up to `buffer_size` of lines). `never`: the subscription
-  never expires.
+  The node records at this level from boot, all the time, whether a host reads or not (a flight recorder, see
+  below). can2mqtt reads a node's logs once a level is chosen with the node's **Remote log level** select in Home
+  Assistant (or always, at this level, with `can2mqtt --remote-log-level AUTO`); it first gets what the node
+  recorded before, then the live lines. A host's level applies while it polls; NONE in the select (Log Level 0) or
+  no poll for `timeout` returns the node to this level. With `NONE` nothing is recorded until a host sets a level.
+  Levels more verbose than `logger: level:` are compiled out (the build warns).
+* `timeout` (Optional, time 1s..1h or `never`, default=30s): without a poll for this long, a level set by a host
+  returns to `level:` (and an upload the host abandoned is given up). The recorded lines are kept. `never`: a host's
+  level stays until it writes another one or the node reboots.
 * `block_size` (Optional, int, 1..127, default=3): frames per SDO block of a log upload (can2mqtt requests it). The
   node sends a block back to back, so it must fit the canbus TX queue next to frames that may already be waiting (up
   to 8 TPDOs and a heartbeat); frames that don't fit are lost and each loss costs an SDO timeout (2 s) and a
@@ -31,7 +31,10 @@ canopen_entities:
 Requires `logger:`. Without `remote_logs:` the feature costs nothing (no code, no RAM). Remote logs use SDO block
 transfer, which `canopen_entities` turns on (with `sdo_block_size: 16` if `canopen:` doesn't set it).
 
-When logs are produced faster than they are read, the newest lines are dropped and the gap is marked in the stream
-with `[W][canopen.logs]: N messages dropped`. A larger `buffer_size` absorbs bursts; for sustained load lower the
-level (or per-tag `logger: logs:` levels). The OD objects are described in
+The buffer keeps the most recent lines: when it is full, the oldest lines are evicted, and the next upload starts
+with `[W][canopen.logs]: N messages dropped`. A host reading after a while (e.g. after choosing a level in Home
+Assistant) gets the last `buffer_size` bytes the node logged, so a node that logs little at `level:` (INFO on a
+quiet node) still has its boot logs; a chatty one has only its recent past. Recording costs a copy of each
+formatted line into the static buffer. For sustained load while a host reads, a larger `buffer_size` absorbs
+bursts, or lower the level (or per-tag `logger: logs:` levels). The OD objects are described in
 [OBJECT_DICTIONARY.md](../OBJECT_DICTIONARY.md#logs). The protocol design is in [can-logs-plan.md](can-logs-plan.md).

@@ -1,5 +1,11 @@
 # Remote ESPHome logging over CANopen
 
+> Changed on 2026-11-08 (flight recorder): the node records from boot at its default level whether a host reads or
+> not, evicts the **oldest** lines when full (the marker is sent at the start of the next upload), a Log Level write
+> never clears the buffer, 0 means "back to the default level", and the timeout only returns a host's level to the
+> default. Current behaviour: [OBJECT_DICTIONARY.md](../OBJECT_DICTIONARY.md#logs), [remote-logs.md](remote-logs.md);
+> the "subscribe / auto-off / drop newest" parts below are the original design.
+
 ## Context
 Nodes on the CAN bus (often STM32/Zephyr without WiFi) can only be debugged over a serial cable. Goal: stream
 ESPHome log output over CAN to can2mqtt, which prints it in its own log. Decisions made:

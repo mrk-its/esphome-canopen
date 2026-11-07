@@ -203,30 +203,33 @@ build time. The hash is readable in the OD:
 ## Logs
 
 Present only with `remote_logs:` in the node config (see [Remote logging over CAN](docs/remote-logs.md)).
-The node is a plain SDO server here: the host subscribes by writing a level and polls for log data, the node never
-sends unsolicited frames.
+The node is a plain SDO server here: it records log lines from boot at its default level (keeping the most recent
+ones), the host polls for log data and may change the level while it polls; the node never sends unsolicited
+frames.
 
 | Index  | SubIndex | Object Name       | Type   | Access | Description |
 |--------|----------|-------------------|--------|:------:|-|
 | 0x3100 | 0x01     | Log Data          | DOMAIN | R      | buffered log lines (`\n`-terminated, with ESPHome's ANSI colors); an upload **consumes** what it returns |
 |        | 0x02     | Log Pending       | UINT32 | R      | bytes currently buffered; reading it counts as keepalive |
-|        | 0x03     | Log Level         | UINT8  | RW     | 0 = off, 1..7 = ERROR, WARN, INFO, CONFIG, DEBUG, VERBOSE, VERY_VERBOSE; a write subscribes and counts as keepalive |
-|        | 0x04     | Log Dropped       | UINT32 | R      | lines dropped because the buffer was full, since boot |
-|        | 0x05     | Log Default Level | UINT8  | R      | `remote_logs: level:`, the level the node starts with at boot (0 = NONE) |
+|        | 0x03     | Log Level         | UINT8  | RW     | current recording level, 0 = off, 1..7 = ERROR, WARN, INFO, CONFIG, DEBUG, VERBOSE, VERY_VERBOSE; a write sets it (0: back to Log Default Level) and counts as keepalive |
+|        | 0x04     | Log Dropped       | UINT32 | R      | lines evicted or dropped because the buffer was full, since boot |
+|        | 0x05     | Log Default Level | UINT8  | R      | `remote_logs: level:`, the level the node records at from boot and returns to (0 = NONE) |
 |        | 0x06     | Log Timeout       | UINT32 | R      | `remote_logs: timeout:` in ms, 0 = never |
 |        | 0x07     | Log Block Size    | UINT8  | R      | SDO block size to request for Log Data block uploads, `remote_logs: block_size:` |
 
-- Log Level: the buffer is cleared only on a 0 → >0 transition; rewriting the current level (the keepalive) keeps it.
+- Log Level: writing it never clears the buffer. The node records at Log Default Level from boot whether a host
+  reads or not.
 - Keepalive: a Log Pending read, a Log Data upload or a Log Level write. Without one for Log Timeout ms the node sets
-  Log Level to 0 and clears the buffer. After that it stays off until a host writes a level, the default level
-  applies at boot only.
+  Log Level back to Log Default Level and gives up an upload in progress (its unread bytes stay for the next one).
 - Log Data: the size in the upload response is a snapshot of Log Pending at the start of the upload, exactly that
   many bytes are sent and consumed; lines logged during the transfer stay for the next one. Uploading while the
   buffer is empty aborts (size 0), so read Log Pending first. An aborted or timed-out upload loses the bytes already
   sent. Block uploads must request Log Block Size: the node sends a block back to back (it must fit its TX queue) and caps
   larger requests at `sdo_block_transfer_size` silently.
-- Overflow: a line that doesn't fit is dropped whole (never blocks, never overwrites unread data). Once there is
-  room again, the next line is preceded by `[W][canopen.logs]: <N> messages dropped`.
+- Overflow: the oldest whole lines are evicted to make room (never blocks); the next upload starts with
+  `[W][canopen.logs]: <N> messages dropped` (also counted in Log Pending). An upload's snapshot is never evicted:
+  during an upload the lines behind it are, and a line that doesn't fit beside the snapshot is dropped (with the
+  lines behind the snapshot, so the gap is always at the start of the next upload).
 
 ## Remote state slots
 

@@ -49,7 +49,7 @@ void RemoteLogs::start() {
 void RemoteLogs::setup() { this->update_loop_(); }
 
 void RemoteLogs::update_loop_() {
-  if (this->buffer_.level() != 0 && this->timeout_ms_ != 0) {
+  if (this->buffer_.needs_timeout_check()) {
     this->enable_loop();
   } else {
     this->disable_loop();
@@ -57,18 +57,17 @@ void RemoteLogs::update_loop_() {
 }
 
 void RemoteLogs::loop() {
-  if (this->buffer_.check_timeout(millis())) {
-    // logged after turning off: not buffered
-    ESP_LOGI(TAG, "Remote logging off (no poll for %" PRIu32 " ms)", this->timeout_ms_);
-    this->disable_loop();
-  }
+  if (this->buffer_.check_timeout(millis()))
+    ESP_LOGI(TAG, "Remote log level back to %u (no poll for %" PRIu32 " ms)", unsigned(this->default_level_),
+             this->timeout_ms_);
+  this->update_loop_();
 }
 
 void RemoteLogs::dump_config() {
   ESP_LOGCONFIG(TAG,
                 "CANopen remote logs (OD 0x%04x):\n"
                 "  Buffer: %u bytes\n"
-                "  Level at boot: %u (0 = off)\n"
+                "  Default level: %u (0 = off)\n"
                 "  Timeout: %" PRIu32 " ms (0 = never)\n"
                 "  Block size: %u",
                 OD_INDEX, unsigned(this->storage_.size()), this->default_level_, this->timeout_ms_, this->block_size_);
@@ -85,6 +84,9 @@ OdResult RemoteLogs::od_read(canopen::OdStream stream, void *buf, size_t count, 
       this->buffer_.keepalive(millis());
       stream.set_offset(stream.offset() + n);
       *done = n;
+      // after the read (its VERY_VERBOSE log is buffered like any line logged during the upload): the loop gives up
+      // an upload the host abandons
+      this->update_loop_();
       return this->buffer_.upload_remaining() != 0 ? OdResult::OD_RESULT_PARTIAL : OdResult::OD_RESULT_OK;
     }
     case SUB_PENDING:
@@ -108,7 +110,7 @@ OdResult RemoteLogs::od_write(canopen::OdStream stream, const void *buf, size_t 
     return stream.write_original(buf, count, done);
   if (count != 1)
     return count > 1 ? OdResult::OD_RESULT_DATA_LONG : OdResult::OD_RESULT_DATA_SHORT;
-  // the subscription and its keepalive
+  // the host's level (0 = back to the default) and its keepalive
   if (!this->buffer_.set_level(*static_cast<const uint8_t *>(buf), millis()))
     return OdResult::OD_RESULT_VALUE_HIGH;
   this->level_ = this->buffer_.level();
