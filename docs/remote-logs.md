@@ -13,9 +13,11 @@ canopen_entities:
 * `buffer_size` (Optional, int, 256..16384, default=2048): RAM buffer for log lines (static, shows up in the build's
   RAM summary).
 * `level` (Optional, default=INFO): `NONE`, `ERROR`, `WARN`, `INFO`, `CONFIG`, `DEBUG`, `VERBOSE` or `VERY_VERBOSE`.
-  The node buffers at this level from boot (so boot logs and `dump_config` are kept until can2mqtt reads them) and
-  can2mqtt subscribes with it. With `NONE` the node waits until a host subscribes with an explicit level
-  (`can2mqtt --remote-log-level DEBUG`). Levels more verbose than `logger: level:` are compiled out (the build warns).
+  The node buffers at this level from boot (so boot logs and `dump_config` are kept until can2mqtt reads them, or
+  dropped after `timeout` if nobody does). can2mqtt reads a node's logs once a level is chosen with the node's
+  **Remote log level** select in Home Assistant (or always, at this level, with `can2mqtt --remote-log-level AUTO`).
+  The choice survives node reboots: to see the boot logs, choose a level and restart the node. With `NONE` nothing
+  is buffered until a host subscribes. Levels more verbose than `logger: level:` are compiled out (the build warns).
 * `timeout` (Optional, time 1s..1h or `never`, default=30s): the node turns remote logging off when no host polled for
   this long. Short: stops buffering soon after can2mqtt goes away, but a busy host (e.g. a long OTA to another node)
   turns it off sooner. Long: survives a can2mqtt restart (up to `buffer_size` of lines). `never`: the subscription
