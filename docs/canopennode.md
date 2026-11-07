@@ -23,8 +23,7 @@ see "Hub for the entity mapper"). **Next:** cut the upstream PRs again from the 
 Where to continue (2026-11-07):
 - **Upstream split:** "Upstream PRs" -> "SDO client only first" (the current split) and its "PR 1 as cut": PR 1 (the
   SDO client, no node) is cut on `canopen-pr1-sdo-client` in `~/repos/esphome` and `~/repos/esphome-docs`, pushed,
-  hardware-tested on the nucleo; the docs PR is open as a draft (esphome/esphome.io#8059), the esphome PR is not open
-  yet (waiting for the #21522 line). "New split" holds the refactor and the cutting steps; the old
+  hardware-tested on the nucleo; both PRs are open as drafts: esphome/esphome#22410 and esphome/esphome.io#8059. "New split" holds the refactor and the cutting steps; the old
   `canopen-pr1-node` (the node core) is superseded.
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
 - **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
@@ -597,8 +596,9 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   `canopen-pr1-sdo-client` in `~/repos/esphome`, `e7c453772f` on `upstream/dev` `a9ba8e9743`, "[canopen] Add CANopen
   SDO client component (on CANopenNode)"; `canopen-pr1-sdo-client` in `~/repos/esphome-docs`, `c85f70139` on
   `origin/next` (the page cut to PR 1, the index and CAN Bus "See Also" links; `node script/lint.mjs` clean).
-  Docs PR: esphome/esphome.io#8059 (draft). esphome PR: not open yet; title `[canopen] Add CANopen SDO client
-  component`; the description draft still needs the line on #21522 and the Test Environment (STM32 nucleo, see below).
+  PRs (drafts, opened 2026-11-07): esphome/esphome#22410 and esphome/esphome.io#8059, both `[canopen] Add CANopen SDO
+  client component`, linked to each other. The esphome PR says it replaces #21522 (kj4dxk's hub); Test Environment:
+  the STM32 nucleo, in a sentence (no box ticked).
   Until reviews start, fixes are amended and force-pushed; afterwards only new commits.
 - **Content:** `__init__.py` (library, `canbus_id`, `response_timeout`, `canopennode_path`, `enable_sdo_client()`,
   the two actions), `automation.h`, `canopen.cpp/.h`, `driver_can.cpp`, `sdo_client.cpp`, `types.h` (SDO types only);

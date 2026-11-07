@@ -25,7 +25,7 @@ refactor and the cutting steps); per-PR line counts with `scripts/pr_split_lines
 Current split (2026-11-05, "SDO client only first", 8 PRs): PR 1 = the hub without `node_id` (the SDO client,
 `sdo_read` / `sdo_write`), PR 2 raw frames + heartbeat / EMCY triggers, PR 3 the node core (`USE_CANOPEN_NODE`) +
 loopback. PR 1 is cut (2026-11-07) on `canopen-pr1-sdo-client` in `~/repos/esphome` and `~/repos/esphome-docs`
-(pushed, hardware-tested; docs PR esphome/esphome.io#8059 draft, esphome PR not open yet); its differences from
+(pushed, hardware-tested; draft PRs esphome/esphome#22410 and esphome/esphome.io#8059); its differences from
 `canopen-full` and the test results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then
 into the cut. Before work in `~/repos/esphome` or `~/repos/esphome-docs`, read their AGENTS.md / CLAUDE.md
 (conventions, `node script/lint.mjs` for the docs).
