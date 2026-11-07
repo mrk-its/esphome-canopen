@@ -593,7 +593,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
 
 #### PR 1 as cut (2026-11-07)
 - **Branches** (pushed to mrk-its, one commit each, no Claude attribution in commits or PR text):
-  `canopen-pr1-sdo-client` in `~/repos/esphome`, `466d773586` on `upstream/dev` `a9ba8e9743`, "[canopen] Add CANopen
+  `canopen-pr1-sdo-client` in `~/repos/esphome`, `79f5437814` on `upstream/dev` `a9ba8e9743`, "[canopen] Add CANopen
   SDO client component (on CANopenNode)"; `canopen-pr1-sdo-client` in `~/repos/esphome-docs`, `0bbf9e1bf` on
   `origin/next` (the page cut to PR 1, the index and CAN Bus "See Also" links; `node script/lint.mjs` clean).
   PRs (drafts, opened 2026-11-07): esphome/esphome#22410 and esphome/esphome.io#8059, both `[canopen] Add CANopen SDO
@@ -612,7 +612,10 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   (`CO_CONFIG_SDO_CLI 0x03`, `CO_CONFIG_FIFO`). Tests: `sdo_client_test.cpp` (new, 10 tests against canned server
   replies through `TestHub::frame()`), `sdo_reply_test.cpp`, `test_canopen.py` (codegen, defaults,
   `response_timeout` range, `sdo_write` values, `node_id` rejected); 14 C++ + 14 Python tests, the four build targets
-  and clang-tidy (4 envs) clean.
+  and clang-tidy (4 envs) clean. Upstream CI also runs clang-tidy on the test files, with esp32-idf-tidy only (the
+  other tidy envs have no gtest): `script/clang-tidy -e esp32-idf-tidy esphome/components/canopen
+  tests/components/canopen`, after committing. The first push failed it on `sdo_client_test.cpp`: fixture members
+  need the trailing `_` too (`bus_`, `hub_`, `requests_()`; gtest's `SetUp()` / `TEST_F` are accepted).
 - **Differences from `canopen-full`, kept in the cut** (later cuts and the rebase after the merge must know them):
   - fixed `0x1280` entry (`sdo_cli_record_`, `od_entries_`, `od_` in `canopen.h`) instead of the runtime OD; PR 3
     replaces it;
