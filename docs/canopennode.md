@@ -593,20 +593,26 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
 
 #### PR 1 as cut (2026-11-07)
 - **Branches** (pushed to mrk-its, one commit each, no Claude attribution in commits or PR text):
-  `canopen-pr1-sdo-client` in `~/repos/esphome`, `e7c453772f` on `upstream/dev` `a9ba8e9743`, "[canopen] Add CANopen
-  SDO client component (on CANopenNode)"; `canopen-pr1-sdo-client` in `~/repos/esphome-docs`, `c85f70139` on
+  `canopen-pr1-sdo-client` in `~/repos/esphome`, `466d773586` on `upstream/dev` `a9ba8e9743`, "[canopen] Add CANopen
+  SDO client component (on CANopenNode)"; `canopen-pr1-sdo-client` in `~/repos/esphome-docs`, `0bbf9e1bf` on
   `origin/next` (the page cut to PR 1, the index and CAN Bus "See Also" links; `node script/lint.mjs` clean).
   PRs (drafts, opened 2026-11-07): esphome/esphome#22410 and esphome/esphome.io#8059, both `[canopen] Add CANopen SDO
   client component`, linked to each other. The esphome PR says it replaces #21522 (kj4dxk's hub); Test Environment:
   the STM32 nucleo, in a sentence (no box ticked).
   Until reviews start, fixes are amended and force-pushed; afterwards only new commits.
-- **Content:** `__init__.py` (library, `canbus_id`, `response_timeout`, `canopennode_path`, `enable_sdo_client()`,
-  the two actions), `automation.h`, `canopen.cpp/.h`, `driver_can.cpp`, `sdo_client.cpp`, `types.h` (SDO types only);
-  CODEOWNERS, `platformio.ini` CANopenNode line, `defines.h` (`USE_CANOPEN_SDO_CLIENT`, `CO_CONFIG_SDO_CLI 0x03`,
-  `CO_CONFIG_FIFO`). 875 non-blank production lines (~810 without comment-only lines). Tests: `sdo_client_test.cpp`
-  (new, 10 tests against canned server replies through `TestHub::frame()`), `sdo_cancel_test.cpp` (without the NMT
-  frame), `sdo_reply_test.cpp`, `test_canopen.py` (codegen, defaults, `response_timeout` range, `sdo_write` values,
-  `node_id` rejected); 24 C++ + 14 Python tests, the four build targets and clang-tidy (4 envs) clean.
+- **Size:** the esphome bot labels a PR `too-big` above 1000 changed lines outside `tests/` (additions minus
+  deletions, blank lines and comments included; `TOO_BIG_THRESHOLD` in `.github/workflows/auto-label-pr.yml`). The
+  first cut had 1031; trimmed (2026-11-07) to 901 by leaving out `canopennode_path:`, the SDO client switch
+  (`enable_sdo_client()`, the `CANopenData` dataclass, the `USE_CANOPEN_SDO_CLIENT` `#ifdef`s: the client is all PR 1
+  runs) and `cancel_sdo()` (with the abort guard, `abort_sdo_()`, `discard_pending_tx()` and `sdo_cancel_test.cpp`).
+  Count with `git diff --numstat upstream/dev -- . ':!tests'`. Keep fixes during review under the limit.
+- **Content:** `__init__.py` (library + the two `CO_CONFIG_*` build flags in `add_canopennode_library()`,
+  `canbus_id`, `response_timeout`, the two actions), `automation.h`, `canopen.cpp/.h`, `driver_can.cpp`,
+  `sdo_client.cpp`, `types.h` (SDO types only); CODEOWNERS, `platformio.ini` CANopenNode line, `defines.h`
+  (`CO_CONFIG_SDO_CLI 0x03`, `CO_CONFIG_FIFO`). Tests: `sdo_client_test.cpp` (new, 10 tests against canned server
+  replies through `TestHub::frame()`), `sdo_reply_test.cpp`, `test_canopen.py` (codegen, defaults,
+  `response_timeout` range, `sdo_write` values, `node_id` rejected); 14 C++ + 14 Python tests, the four build targets
+  and clang-tidy (4 envs) clean.
 - **Differences from `canopen-full`, kept in the cut** (later cuts and the rebase after the merge must know them):
   - fixed `0x1280` entry (`sdo_cli_record_`, `od_entries_`, `od_` in `canopen.h`) instead of the runtime OD; PR 3
     replaces it;
@@ -614,7 +620,9 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   - `canbus::add_frame_callback()` (upstream `dev` #22008, 2026-11-04; `add_callback()` is deprecated there).
     `canopen-full` keeps `add_callback()` until esphomeplatformzephyr has #22008 (its `canbus.h` doesn't, as of
     `origin/framework-zephyr` `c5dfed5e8`), since the copy here is built with the fork venv;
-  - the `USE_CANOPEN_SDO_CLIENT` `#ifdef`s stay although PR 1's codegen always sets it (smaller PR 3 diff);
+  - no `canopennode_path:`, no SDO client switch (`enable_sdo_client()`, `CANopenData`, `USE_CANOPEN_SDO_CLIENT`),
+    no `cancel_sdo()`: see "Size". `cancel_sdo()` and `sdo_cancel_test.cpp` go to PR 2, the client switch (with
+    `sdo_client:`) to PR 3, `canopennode_path:` to whichever PR needs it next;
   - left for review: the canbus as a constructor parameter instead of `set_canbus()` (esphome's "required invariant"
     rule; `set_canbus()` also registers the frame callback).
 - **esphome conventions** (its AGENTS.md, checked before opening): fixed on `canopen-full` (`bf0f7c20cf`) and folded
