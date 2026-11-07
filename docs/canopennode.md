@@ -590,6 +590,47 @@ its function, `#ifdef`s, banner and keyword. The `setup()` / `process_()` lines 
 as PR 1 although they only exist from PR 3: a few lines each way. The cut follows the old "Cutting the branches"
 steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
 
+### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
+An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
+decoded heartbeat frames, so node monitoring works on a hub without `node_id` and can come right after PR 2.
+
+**Why it came up.** kj4dxk's `cia402` port (fork `kj4dxk/esphome`, branch `cia402-canopennode`, `52dd4d0222`, one
+commit on `canopen-full` `613abd0cf7`, 1186 lines; its only hub change is the `<CANopen.h>` include, already on
+`canopen-full`) needs more than PRs 1 + 2:
+
+| cia402 uses | PR |
+|---|---|
+| `read_sdo()` / `write_sdo()` / `cancel_sdo()` (all drive steps) | 1 |
+| `on_node_emcy()` (fails a running command), `Emergency`, `NMTState` | 2 |
+| `is_operational()` (`is_node_online()` + `get_node_state()`), checked in `begin_()`: without monitoring every command is `DRIVE_RESULT_REJECTED` | 4 |
+| `on_node_offline()` / `on_node_reset()` / `on_node_nmt_changed()`, `heartbeat_timeout` (default 1500 ms) | 4 |
+| `CANopenNode`, `register_node()`, `final_validate_canopen_node()` | 5 |
+| a hub with `node_id` (`final_validate_canopen_node()` -> `require_node_id()`) | 3 |
+| `register_node(..., nmt=True)`: compiles the NMT master, but cia402 never calls `send_nmt()` | (4, unused) |
+
+The hard dependency is monitoring (PR 4), which needs the node core (PR 3): CANopenNode's HB consumer reports
+timeouts through the EM object, and `CO_EM_init()` rejects node id 0.
+
+**Design (one implementation, not a second one next to the HB consumer).** `node_monitor.cpp` drops the
+CANopenNode glue (`0x1016`, `CNT_HB_CONS`, the four `on_hb_*` callbacks) and keeps its API: `monitor_node()`,
+`is_node_online()`, `get_node_state()`, `add_on_node_event_callback()`, `heartbeat_clients`, `on_node_event`.
+- Monitored nodes in a fixed list filled before setup (node id, timeout, last state, time left).
+- From PR 2's frame path (`decode_heartbeat()`): boot-up (state 0) -> `RESET`; first heartbeat (or the first after a
+  timeout) -> `ONLINE`, then `NMT_CHANGED` (unknown -> state); another state -> `NMT_CHANGED`; every heartbeat
+  restarts the node's timer.
+- Timeouts counted down with the hub's `dt` in `process_()` -> `OFFLINE`, then `NMT_CHANGED` (state -> unknown).
+  Same event order as today, so `CANopenNode` and its users don't change.
+- Lost: OD `0x1016` (optional in CiA 301; the node core could add it back as a record whose handler sets the
+  timeouts) and CANopenNode's EMCY on a consumer timeout (the hub sends no EMCY anyway). Gained: works without
+  `node_id`, `CO_CONFIG_HB_CONS` not compiled, unit tests with `TestHub::frame()`.
+- About the size of today's glue (~100 lines + tests).
+
+**Resulting order:** 1 SDO client -> 2 raw frames -> 3 node monitoring + profile API (`CANopenNode`,
+`register_node()` without `require_node_id()`, which stays with the node core) -> cia402 (kj4dxk; drop
+`nmt=True`) -> node core, NMT master, OD API, PDOs, block transfer, OTA. `send_nmt()` could also move before the node
+core (an NMT command is one frame to `0x000`, `send_frame()` is enough), but nothing needs it there yet. This is close
+to the feature set of kj4dxk's #21522 ("CANopen client with SDO, NMT and node events").
+
 ### Old split (superseded)
 Kept for the history of what each part contained; the branches below are not used any more.
 
