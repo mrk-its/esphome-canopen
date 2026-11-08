@@ -656,6 +656,21 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   since 2026-11-03 have `remote_logs` from `common/stm32_zephyr_can_node.yaml`, level INFO, and can2mqtt's `AUTO`
   subscribes to them): two SDO clients on one server channel collide. Worth a sentence in the docs (another SDO
   master on the bus: handle `on_error`).
+- **Hardware test of the first review's fixes** (nucleo, 2026-11-08; the cut with the same compat patch, a test-only
+  `CANtxCount` getter and a temporary test header, in the session's scratchpad). `can_stop()` from a lambda makes the
+  real driver refuse frames (no wiring touched); only absent node 0x7E is written to, dimmer4 only read. To see whether
+  a discarded frame went out (the host has no CAN interface), the nucleo reads the unusual `0x1018:4` and listens on
+  `0x5B7`: 1 answer in the control read, 0 after the bus came back.
+  - `tx_buffer_size: 0`: three stuck requests ended with `TRANSPORT_ERROR` at +516, +1074, +1631 ms, 24 canbus warnings
+    each (72); `CANtxCount` 0; a read after `can_start()` succeeded in ~17 ms. An abort refused at the timeout: one
+    warning, then dropped.
+  - `tx_buffer_size: 32`: `zephyr_can` takes the frame and drops it itself while stopped (`send_next_()`), so the hub
+    never sees a refusal: the same requests end with an ordinary `TIMEOUT`, no warnings. `TRANSPORT_ERROR` only appears
+    without the queue or with the queue full. A disconnected bus (frames stuck in the mailboxes, not a stopped
+    controller) wasn't tried.
+  - Found here, not by the gtests: a read whose last frame overflows the buffer gave `SDO_RESULT_ABORT` with code 0,
+    because `CO_SDOclientUpload()` clears it when the transfer is already over. Fixed (`ff116ed538`, in the cut).
+  - One pass over the house nodes: all reads succeeded, no aborts or timeouts.
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's

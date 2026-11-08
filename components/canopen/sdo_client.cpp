@@ -224,7 +224,8 @@ void CANopenComponent::process_sdo_(uint32_t dt_us) {
       if (this->sdo_rx_len_ > limit) {
         abort = CO_SDO_AB_OUT_OF_MEM;
         CO_SDOclientUpload(cli, 0, true, &abort, nullptr, nullptr, nullptr);
-        this->finish_sdo_(SDOResult::SDO_RESULT_ABORT, abort);
+        // not abort: it comes back empty when the last frame ended the transfer, with nothing left to abort
+        this->finish_sdo_(SDOResult::SDO_RESULT_ABORT, CO_SDO_AB_OUT_OF_MEM);
         return;
       }
     }
