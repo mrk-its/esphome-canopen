@@ -243,6 +243,21 @@ can2mqtt doesn't see them:
 
 Slots are numbered at build time (sorted by remote node, entity and state); the build logs them.
 
+## TPDO request
+
+Sends TPDOs on request, so a node that starts doesn't have to wait for the next state change of the remote nodes it
+listens to.
+
+| Index  | SubIndex | Object Name  | Type  | Access | Description |
+|--------|----------|--------------|-------|:------:|-|
+| 0x3001 | 0x01     | TPDO request | UINT8 | W      | bit n: send TPDO n now; TPDOs without mapped objects send nothing |
+
+A node writes it through the [OD writer](#od-writer) on every remote node it has RPDOs from, with the bits of those
+TPDOs, one frame per remote node: 50..500 ms after becoming OPERATIONAL (the delay depends on its node id, so nodes
+that boot together don't ask at once), and again when it sees a boot-up message (`0x700 + id`, data `0x00`) from one of
+them. Nodes on the old component or with `od_writer: false` aren't asked. Older firmware without the object logs a
+warning and sends nothing.
+
 ## OD writer
 
 When `od_writer` is enabled (default), a node accepts remote OD writes on COB-IDs `0x500..0x57F` whose byte 0 addresses it. Every node listens on the whole range, which also holds the TPDO 7 COB-IDs, so TPDO 7 is reserved on every node using it. Writes go through the OD like an SDO download (handlers run), without a reply. Two formats are accepted, told apart by bit 7 of byte 0.

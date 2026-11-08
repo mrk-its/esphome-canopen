@@ -4,12 +4,16 @@
 #include <cstring>
 
 #include "od_writer_frame.h"
+#include "tpdo_request.h"
 
 using esphome::canopen_entities::decode_od_writer_frame;
 using esphome::canopen_entities::encode_dam_mpdo_frame;
 using esphome::canopen_entities::encode_old_od_writer_frame;
 using esphome::canopen_entities::od_writer_state_index;
+using esphome::canopen_entities::mark_tpdo_request;
 using esphome::canopen_entities::OdWriterFrame;
+using esphome::canopen_entities::tpdo_request_delay_ms;
+using esphome::canopen_entities::TpdoRequest;
 
 #define CHECK(cond) \
   do { \
@@ -83,6 +87,24 @@ int main() {
   CHECK(!od_writer_state_index(0x3002, state));  // not an entity, ends in 2 too
   CHECK(!od_writer_state_index(0x1FF2, state));
   CHECK(state == 0);
+
+  // targeted TPDO requests: never too early for a target that isn't OPERATIONAL yet, and spread over the window
+  bool used[501] = {};
+  int distinct = 0;
+  for (int id = 1; id <= 127; id++) {
+    uint16_t delay = tpdo_request_delay_ms(id);
+    CHECK(delay >= 50 && delay <= 500);
+    distinct += !used[delay];
+    used[delay] = true;
+  }
+  CHECK(distinct == 127);
+  // a repeated mark stays one pending request; an unknown node marks nothing
+  TpdoRequest requests[2] = {{0x37, 0x02, false}, {0x36, 0x05, false}};
+  CHECK(mark_tpdo_request(requests, 2, 0x36) && mark_tpdo_request(requests, 2, 0x36));
+  CHECK(requests[1].pending && !requests[0].pending);
+  requests[1].pending = false;
+  CHECK(!mark_tpdo_request(requests, 2, 0x38));
+  CHECK(!requests[0].pending && !requests[1].pending);
 
   printf("OK\n");
   return 0;

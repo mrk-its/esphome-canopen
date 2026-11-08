@@ -84,6 +84,13 @@ def test_rpdo_plan(old_node):
     assert words == [layout.co_link(5, 0, 40), layout.co_link(0x4002, 1, 8)]
 
 
+def test_tpdo_requests() -> None:
+    plan = [(0x36, 0, []), (0x36, 3, []), (0x37, 1, []), (0x38, 7, [])]
+    assert remote.tpdo_requests(plan) == [(0x36, 0x09), (0x37, 0x02), (0x38, 0x80)]
+    assert remote.tpdo_requests(plan, {0x36, 0x38}) == [(0x37, 0x02)]
+    assert remote.tpdo_requests([]) == []
+
+
 def test_rpdo_plan_errors(old_node):
     with pytest.raises(remote.PlanError, match="light_hall.state overlaps light_hall.state in TPDO 0"):
         remote.rpdo_plan(

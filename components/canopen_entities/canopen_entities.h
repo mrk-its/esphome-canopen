@@ -4,6 +4,8 @@
 #include <span>
 
 #include "esphome/components/canopen/canopen.h"
+
+#include "tpdo_request.h"
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
@@ -160,6 +162,26 @@ class RemoteSlot : public canopen::OdObject {
   }
 };
 
+// 0x3001 (OBJECT_DICTIONARY.md "TPDO request"): writing a bitmask sends those TPDOs now. Only TPDOs with mapped objects
+// are valid, the others send nothing.
+class TpdoRequestObject : public canopen::OdObject {
+ public:
+  canopen::CANopenComponent *hub{nullptr};
+  uint8_t highest{1};
+  uint8_t mask{0};
+
+  canopen::OdResult od_write(canopen::OdStream stream, const void *buf, size_t count, size_t *done) {
+    auto ret = stream.write_original(buf, count, done);
+    if (ret == canopen::OdResult::OD_RESULT_OK && stream.sub() == 1) {
+      for (uint8_t n = 0; n < 8; n++) {
+        if (this->mask & (1 << n))
+          this->hub->request_tpdo(n);
+      }
+    }
+    return ret;
+  }
+};
+
 class CANopenEntities : public Component {
  public:
   explicit CANopenEntities(canopen::CANopenComponent *hub) : hub_(hub) {}
@@ -169,6 +191,10 @@ class CANopenEntities : public Component {
   void set_node_id(uint8_t node_id) { this->node_id_ = node_id; }
   void enable_od_writer() { this->od_writer_ = true; }
   void enable_od_writer_mpdo() { this->od_writer_mpdo_ = true; }
+#ifdef CANOPEN_ENTITIES_TPDO_REQUESTS
+  // a remote node whose TPDOs (bits of mask) we listen to: asked for them when we start and when it boots
+  void add_tpdo_request(uint8_t node_id, uint8_t mask) { this->tpdo_requests_.push_back({node_id, mask, false}); }
+#endif
 
   // OD writer (node-to-node commands, OBJECT_DICTIONARY.md "OD writer"): writes value (size 1..4 bytes, little endian)
   // to index:sub of node_id's OD in one frame, without a reply; our own node is written directly. With od_writer_mpdo
@@ -222,6 +248,11 @@ class CANopenEntities : public Component {
 
  protected:
   MappedEntity *add_entity_(EntityBase *entity, uint8_t index, uint32_t type);
+#ifdef CANOPEN_ENTITIES_TPDO_REQUESTS
+  static constexpr uint32_t TPDO_REQUEST_TIMEOUT_ID = 0;
+  void schedule_tpdo_requests_();
+  void send_tpdo_requests_();
+#endif
   // byte 0 of the frame holds the target (od_writer_frame.h), so every node listens on all of 0x500..0x57F (other
   // nodes' TPDO 7 COB-IDs too: TPDO 7 is reserved while the OD writer is on)
   static constexpr uint32_t OD_WRITER_COB_ID = 0x500;
@@ -249,6 +280,11 @@ class CANopenEntities : public Component {
 #ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
   std::array<RemoteSlot, CANOPEN_ENTITIES_REMOTE_SLOTS> slots_{};
 #endif
+#ifdef CANOPEN_ENTITIES_TPDO_REQUESTS
+  StaticVector<TpdoRequest, CANOPEN_ENTITIES_TPDO_REQUESTS> tpdo_requests_;
+  bool tpdo_requests_scheduled_{false};
+#endif
+  TpdoRequestObject tpdo_request_object_;
   // 0x2001: entity types, sub N = type of entity N
   uint8_t types_highest_{0};
   // 0x3002: TPDO layout hash (layout.py)

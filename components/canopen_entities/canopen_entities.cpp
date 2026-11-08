@@ -555,13 +555,70 @@ void CANopenEntities::setup() {
   }
   od.add_record(0x2001, types.data(), types.size());
   od.add_record(0x3002, {{0, OD_READ, &this->layout_highest_, 1}, {1, OD_READ, &this->layout_hash_, 4}});
+  this->tpdo_request_object_.hub = this->hub_;
+  od.add_record(0x3001, {{0, OD_READ, &this->tpdo_request_object_.highest, 1},
+                         {1, OD_WRITE, &this->tpdo_request_object_.mask, 1}});
+  od.set_object(0x3001, &this->tpdo_request_object_);
+#ifdef CANOPEN_ENTITIES_TPDO_REQUESTS
+  this->hub_->add_on_nmt_state_callback([this](canopen::NMTState state) {
+    if (state != canopen::NMTState::NMT_STATE_OPERATIONAL)
+      return;
+    for (auto &request : this->tpdo_requests_)
+      request.pending = true;
+    this->schedule_tpdo_requests_();
+  });
+  this->hub_->add_on_heartbeat_callback([this](uint8_t node_id, canopen::NMTState state) {
+    // becoming OPERATIONAL asks everyone anyway
+    if (state != canopen::NMTState::NMT_STATE_BOOTUP ||
+        this->hub_->get_nmt_state() != canopen::NMTState::NMT_STATE_OPERATIONAL)
+      return;
+    if (mark_tpdo_request(this->tpdo_requests_.data(), this->tpdo_requests_.size(), node_id))
+      this->schedule_tpdo_requests_();
+  });
+#endif
 }
+
+#ifdef CANOPEN_ENTITIES_TPDO_REQUESTS
+// One timer for all: requests marked while it runs go out with it, at most one per remote node.
+void CANopenEntities::schedule_tpdo_requests_() {
+  if (this->tpdo_requests_scheduled_)
+    return;
+  this->tpdo_requests_scheduled_ = true;
+  this->set_timeout(TPDO_REQUEST_TIMEOUT_ID, tpdo_request_delay_ms(this->node_id_), [this]() {
+    this->tpdo_requests_scheduled_ = false;
+    this->send_tpdo_requests_();
+  });
+}
+
+void CANopenEntities::send_tpdo_requests_() {
+  // left pending: becoming OPERATIONAL again asks everyone
+  if (this->hub_->get_nmt_state() != canopen::NMTState::NMT_STATE_OPERATIONAL)
+    return;
+  bool retry = false;
+  for (auto &request : this->tpdo_requests_) {
+    if (!request.pending)
+      continue;
+    // the bus may be busy now
+    if (this->send_od_write(request.node_id, 0x3001, 1, request.mask, 1, false)) {
+      request.pending = false;
+    } else {
+      retry = true;
+    }
+  }
+  if (retry)
+    this->schedule_tpdo_requests_();
+}
+#endif
 
 void CANopenEntities::dump_config() {
   ESP_LOGCONFIG(TAG, "CANopen entities:");
   ESP_LOGCONFIG(TAG, "  TPDO layout hash: %08" PRIx32, this->layout_hash_);
   ESP_LOGCONFIG(TAG, "  OD writer: %s", YESNO(this->od_writer_));
   ESP_LOGCONFIG(TAG, "  OD writer sends DAM-MPDO: %s", YESNO(this->od_writer_mpdo_));
+#ifdef CANOPEN_ENTITIES_TPDO_REQUESTS
+  for (const auto &request : this->tpdo_requests_)
+    ESP_LOGCONFIG(TAG, "  TPDO request: node 0x%02x, mask 0x%02x", request.node_id, request.mask);
+#endif
 #ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
   for (size_t n = 0; n < this->slots_.size(); n++)
     ESP_LOGCONFIG(TAG, "  Remote state slot %u (0x%04x): %u B", (unsigned) n, remote_slot_index(n), this->slots_[n].size);

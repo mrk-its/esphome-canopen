@@ -299,6 +299,15 @@ class PlanError(Exception):
     pass
 
 
+def tpdo_requests(plan, skip=()):
+    """[(node_id, mask of the TPDOs we listen to)] from rpdo_plan(), without the nodes in `skip`."""
+    masks = {}
+    for node_id, tpdo, _entries in plan:
+        if node_id not in skip:
+            masks[node_id] = masks.get(node_id, 0) | (1 << tpdo)
+    return sorted(masks.items())
+
+
 def rpdo_plan(sources):
     """RPDOs of a node: [(node_id, tpdo, [(od index, subindex, bits)])], one per remote (node_id, tpdo).
 

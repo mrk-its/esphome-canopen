@@ -1,4 +1,5 @@
 # Unreleased
+* `canopen_entities`: a node asks the remote nodes it listens to for their TPDOs when it starts and when one of them boots (new object `0x3001`), so its remote states are right from the first press. Remote nodes on older firmware ignore the request.
 * `canopen_entities`: a command received through the OD writer always sends the entity's state in its TPDO, even if nothing changed, so a toggle with a stale state works by the second press again (the old component did this).
 * `canopen_entities` accepts node-to-node commands as DAM-MPDO (CiA 301) on `0x500..0x57F`, next to the old OD writer frames
 * `canopen_entities: od_writer_mpdo: true` sends them as DAM-MPDO (default: the old frames); update the target nodes first, firmware without DAM-MPDO ignores these frames

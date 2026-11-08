@@ -329,6 +329,34 @@ def test_codegen_od_writer_mpdo(tmp_path: Path) -> None:
 
 
 @needs_esphome
+def test_codegen_tpdo_requests(tmp_path: Path) -> None:
+    """The TPDOs we listen to, per node that can answer: not the old component, not with the OD writer off."""
+    source = (REPO / "test" / "mapper" / "remote_node_mapper.yaml").read_text()
+    new_node = tmp_path / "new_node.yaml"
+    new_node.write_text(source.replace("od_writer: false", "od_writer: true"))
+    off_node = tmp_path / "off_node.yaml"
+    off_node.write_text(source.replace('dimmer_node_id: "0x38"', 'dimmer_node_id: "0x39"'))
+    nodes = {"old": REMOTE_NODES["dimmer"], "new": str(new_node)}
+    extra = {
+        **remote_entity("binary_sensor", "hall_on", "new", "light_hall"),
+        **remote_entity("sensor", "mudroom", "new", "light_mudroom"),
+        **button({"canopen_entities.light.toggle": {"node": "old", "entity": "light_hall"}}),
+    }
+    main_cpp, defines = generate(tmp_path, [], extra, remote_nodes=nodes)
+    assert re.findall(r"->add_tpdo_request\((\d+), (\d+)\);", main_cpp) == [("56", "3")]
+    assert "#define CANOPEN_ENTITIES_TPDO_REQUESTS 1" in defines
+
+    # only nodes that can't answer: nothing to ask, nothing compiled
+    extra = {
+        **remote_entity("binary_sensor", "hall_on", "off", "light_hall"),
+        **button({"canopen_entities.light.toggle": {"node": "old", "entity": "light_hall"}}),
+    }
+    main_cpp, defines = generate(tmp_path, [], extra, remote_nodes={"old": REMOTE_NODES["dimmer"], "off": str(off_node)})
+    assert "add_tpdo_request" not in main_cpp
+    assert "CANOPEN_ENTITIES_TPDO_REQUESTS" not in defines
+
+
+@needs_esphome
 def test_od_writer_mpdo_reserves_tpdo7(tmp_path: Path) -> None:
     message = "TPDO 7 is reserved for the commands of od_writer_mpdo"
     entities = [{"id": "temp", "index": 1, "tpdo": 7}]

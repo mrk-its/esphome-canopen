@@ -51,10 +51,15 @@ remote node's TPDOs. They don't show up in Home Assistant. The node has one RPDO
 each with at most 8 mapping entries, shared with the `rpdo` entries of `entities`; a remote state can't be mapped by
 both a slot and an entity's `rpdo`.
 
-The remote state is only known after the remote node has sent its TPDO, e.g. after a reboot of this node a toggle
-may switch a light on even if it's already on, see [#32](https://github.com/mrk-its/esphome-canopen/issues/32). The
-remote node answers every command it gets through the OD writer with its state, even if nothing changed, so the second
-press works.
+The remote state is only known after the remote node has sent its TPDO. A node therefore asks the remote nodes it
+listens to for the TPDOs it needs ([TPDO request](../OBJECT_DICTIONARY.md#tpdo-request)): 50..500 ms after it becomes
+OPERATIONAL, and again when one of them boots. Until the answer arrives, or if the remote node's firmware is too old to
+answer (the old component isn't asked at all), a toggle may switch a light on even if it's already on. The remote node
+also answers every command it gets through the OD writer with its state, even if nothing changed, so the second press
+works there.
+
+A TPDO goes to everyone listening. A request therefore also reaches other nodes with an `rpdo` entry on the same TPDO,
+which run it as a command again, like the remote node's own TPDO at its boot.
 
 ## `platform: canopen_entities` entities
 `binary_sensor`, `sensor` and `text_sensor` showing a remote state:

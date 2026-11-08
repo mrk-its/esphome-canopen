@@ -617,9 +617,21 @@ async def to_code(config: ConfigType) -> None:
             state["state"],
         )
         cg.add(var.add_remote_state(n, state["size"]))
-    for n, (remote_node_id, tpdo, entries) in enumerate(
-        remote.rpdo_plan(rpdo_sources(config, slots))
-    ):
+    plan = remote.rpdo_plan(rpdo_sources(config, slots))
+    # ask the remote nodes for their state when we start: only those that can answer (0x3001 through the OD writer)
+    no_answer = {
+        node.node_id
+        for node in (
+            _remote_node(config[CONF_REMOTE_NODES], name)
+            for name in config[CONF_REMOTE_NODES]
+        )
+        if node.old_component or not node.od_writer
+    }
+    if requests := remote.tpdo_requests(plan, no_answer):
+        cg.add_define("CANOPEN_ENTITIES_TPDO_REQUESTS", len(requests))
+        for remote_node_id, mask in requests:
+            cg.add(var.add_tpdo_request(remote_node_id, mask))
+    for n, (remote_node_id, tpdo, entries) in enumerate(plan):
         cg.add(
             hub.configure_rpdo(
                 n,
