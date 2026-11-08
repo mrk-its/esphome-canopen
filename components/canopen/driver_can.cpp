@@ -26,9 +26,10 @@ void CANopenComponent::set_canbus(canbus::Canbus *canbus) {
 }
 
 void CANopenComponent::on_frame_(uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
-  if (extended_id)
+  // CANopen (CiA 301) uses classic CAN frames with 11-bit ids
+  if (extended_id || data.size() > 8)
     return;
-  this->receive_((can_id & 0x7FF) | (rtr ? 0x800 : 0), data.data(), data.size() > 8 ? 8 : data.size());
+  this->receive_((can_id & 0x7FF) | (rtr ? 0x800 : 0), data.data(), data.size());
   this->process_();
 }
 
@@ -51,7 +52,6 @@ void CANopenComponent::receive_(uint16_t ident, const uint8_t *data, uint8_t len
 bool CANopenComponent::transmit(uint16_t ident, const uint8_t *data, uint8_t len) {
   if (this->canbus_ == nullptr)
     return false;
-  // the (data, len) overload is in ESPHome dev since after 2026.9 (not in 2026.9.x releases)
   if (this->canbus_->send_data(ident & 0x7FF, false, ident & 0x800, data, len) != canbus::ERROR_OK)
     return false;
   for (CANopenComponent *node = this->next_local_; node != nullptr && node != this; node = node->next_local_)
@@ -61,6 +61,7 @@ bool CANopenComponent::transmit(uint16_t ident, const uint8_t *data, uint8_t len
 
 }  // namespace esphome::canopen
 
+using esphome::canopen::discard_pending_tx;
 using esphome::canopen::send_frame;
 
 extern "C" {
@@ -115,9 +116,10 @@ CO_CANtx_t *CO_CANtxBufferInit(CO_CANmodule_t *CANmodule, uint16_t index, uint16
   if (CANmodule == nullptr || index >= CANmodule->txSize)
     return nullptr;
   CO_CANtx_t *tx = &CANmodule->txArray[index];
+  // the SDO client sets its buffer up again for every request
+  discard_pending_tx(CANmodule, tx);
   tx->ident = (ident & 0x7FF) | (rtr ? 0x800 : 0);
   tx->DLC = noOfBytes;
-  tx->bufferFull = false;
   tx->syncFlag = syncFlag;
   return tx;
 }

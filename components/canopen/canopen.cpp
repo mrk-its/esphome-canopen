@@ -190,6 +190,11 @@ void CANopenComponent::loop() { this->process_(); }
 void CANopenComponent::process_() {
   if (this->co_ == nullptr || this->is_failed())
     return;
+#ifdef USE_CANOPEN_SDO_CLIENT
+  // a hub without node id only works for requests and frames to send
+  if (this->is_client_only() && this->co_->CANmodule->CANtxCount == 0 && this->sdo_idle_())
+    return;
+#endif
   uint32_t now = micros();
   uint32_t dt = now - this->last_us_;
   this->last_us_ = now;

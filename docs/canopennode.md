@@ -605,7 +605,20 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   first cut had 1031; trimmed (2026-11-07) to 901 by leaving out `canopennode_path:`, the SDO client switch
   (`enable_sdo_client()`, the `CANopenData` dataclass, the `USE_CANOPEN_SDO_CLIENT` `#ifdef`s: the client is all PR 1
   runs) and `cancel_sdo()` (with the abort guard, `abort_sdo_()`, `discard_pending_tx()` and `sdo_cancel_test.cpp`).
-  Count with `git diff --numstat upstream/dev -- . ':!tests'`. Keep fixes during review under the limit.
+  Count with `git diff --numstat upstream/dev -- . ':!tests'`. Keep fixes during review under the limit. 940 after the
+  first review's fixes (below).
+- **First review** (`esphbot`, 2026-11-08; fixes on `canopen-full` `376dcbdaa6`, `75cf87553a`, in the cut as one new
+  commit): with TX refused, CANopenNode returns `CO_SDO_RT_transmittBufferFull` and never reports the timeout, so a
+  request and the queue behind it waited until the bus came back (the bot missed this one and misread the late write).
+  A frame unsent at the response timeout now ends the request with `TRANSPORT_ERROR`; a failed request drops its unsent
+  frame, also an abort that the controller refused at that moment. `CO_CANtxBufferInit` keeps `CANtxCount` right
+  (`CO_SDOclient_setup()` re-inits the buffer for every request: no `CO_CONFIG_FLAG_OD_DYNAMIC`). So
+  `discard_pending_tx()` is in the cut after all. Also: `write_sdo()` rejects values that don't fit, rejections are
+  logged, frames over 8 bytes are ignored, an idle client-only hub returns early from `process_()`.
+  `read_sdo_data()` takes the caller's buffer and capacity (no hub buffer, no option); `SDORequest::data` is non-const
+  because of that (clang-tidy flags a `const` field written through a cast), `write_sdo_data()` has the one cast. Not
+  done: `cancel_sdo()`'s abort on `canopen-full` can still block the queue while TX is stuck (`sdo_abort_pending_`); give
+  it the same limit when PR 2 is cut.
 - **Content:** `__init__.py` (library + the two `CO_CONFIG_*` build flags in `add_canopennode_library()`,
   `canbus_id`, `response_timeout`, the two actions), `automation.h`, `canopen.cpp/.h`, `driver_can.cpp`,
   `sdo_client.cpp`, `types.h` (SDO types only); CODEOWNERS, `platformio.ini` CANopenNode line, `defines.h`
@@ -629,7 +642,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   - left for review: the canbus as a constructor parameter instead of `set_canbus()` (esphome's "required invariant"
     rule; `set_canbus()` also registers the frame callback).
 - **esphome conventions** (its AGENTS.md, checked before opening): fixed on `canopen-full` (`bf0f7c20cf`) and folded
-  into the cut: the SDO client's 1 KB read buffer is a member (no heap after `setup()`), the abort guard counts down
+  into the cut: no heap after `setup()` for the SDO client's reads (a member buffer then, the caller's buffer since the
+  first review), the abort guard counts down
   with the client's `dt` instead of `millis()` (the OTA phases use `App.get_loop_component_start_time()`), codegen
   state in a `CANopenData` dataclass under `DOMAIN`, type hints everywhere; `script/build_language_schema.py`
   extracts the whole schema. OTA clang-tidy findings fixed on `canopen-full` (`4676376312`).

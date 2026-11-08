@@ -65,7 +65,8 @@ inline void run(uint8_t own_id) {
       check(r.ok() && r.value == 0xBEEF, "SDO read 0x5000 (default od_read)");
     }, nullptr);
     // partial reads of the generated domain
-    hub->read_sdo_data(0x7F, 0x5001, 0, +[](void *, const SDOReply &r) {
+    static uint8_t domain_buffer[128];
+    hub->read_sdo_data(0x7F, 0x5001, 0, domain_buffer, sizeof(domain_buffer), +[](void *, const SDOReply &r) {
       bool ok = r.ok() && r.len == 100;
       for (size_t i = 0; ok && i < r.len; i++)
         ok = r.data[i] == i;

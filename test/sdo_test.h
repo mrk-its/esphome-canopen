@@ -25,6 +25,8 @@ using namespace esphome::canopen;
 static const char *const TAG = "sdo_test";
 static constexpr uint8_t TEST_NODE = 0x61;
 static constexpr uint8_t ABSENT_NODE = 0x7E;
+// the steps run one at a time, and the callbacks use it before the next request starts
+static uint8_t read_buffer[256];
 
 struct Test {
   CANopenComponent *co{nullptr};
@@ -139,14 +141,14 @@ inline void start(CANopenComponent *co, uint8_t own_node_id) {
                                 }));
   });
   s.push_back([] {
-    test.co->read_sdo_data(TEST_NODE, 0x1008, 0, on_reply, pending([](const SDOReply &r) {
+    test.co->read_sdo_data(TEST_NODE, 0x1008, 0, read_buffer, sizeof(read_buffer), on_reply, pending([](const SDOReply &r) {
                              ESP_LOGI(TAG, "node 0x%02x name: '%.*s'", TEST_NODE, (int) r.len, (const char *) r.data);
                              test.check(r.ok() && r.len > 0, "read_sdo_data 0x1008 (device name)");
                              test.next();
                            }));
   });
   s.push_back([] {
-    test.co->read_sdo_data(TEST_NODE, 0x100A, 0, on_reply, pending([](const SDOReply &r) {
+    test.co->read_sdo_data(TEST_NODE, 0x100A, 0, read_buffer, sizeof(read_buffer), on_reply, pending([](const SDOReply &r) {
                              ESP_LOGI(TAG, "node 0x%02x sw version: '%.*s' (%u bytes)", TEST_NODE, (int) r.len,
                                       (const char *) r.data, (unsigned) r.len);
                              test.check(r.ok() && r.len > 0, "read_sdo_data 0x100A (software version)");
@@ -260,7 +262,7 @@ inline void start(CANopenComponent *co, uint8_t own_node_id) {
   // cancel in flight: start a buffer read, cancel it 1 ms later, then the next read to the node must work at once
   s.push_back([] {
     test.counts[1] = 0;
-    test.co->read_sdo_data(TEST_NODE, 0x1008, 0, count_reply, (void *) 1);
+    test.co->read_sdo_data(TEST_NODE, 0x1008, 0, read_buffer, sizeof(read_buffer), count_reply, (void *) 1);
     test.after(1, [] {
       test.co->cancel_sdo((void *) 1);
       test.co->read_sdo<uint32_t>(TEST_NODE, 0x1018, 1, on_reply, pending([](const SDOReply &r) {
