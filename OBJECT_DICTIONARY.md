@@ -256,6 +256,8 @@ The sender (`send_od_write()`, the `canopen_entities.*` actions) uses the old fo
 | 2..3  | OD index (little endian) |
 | 4..7  | value (little endian), 1..4 bytes, DLC 5..8 |
 
+A successful write to an entity's command object also sends the matching state in its TPDO, even if nothing changed, so a sender with a stale copy of the state corrects it.
+
 DAM-MPDO (CiA 301, destination address mode), sent with `od_writer_mpdo: true`, on the sender's own TPDO 7 COB-ID, `0x500 + sender_node_id` (that TPDO is reserved on the sender, and frames go out only while it is OPERATIONAL). Targets whose YAML is in the old component's format still get the old format, because they ignore this one:
 
 | Byte  | Content |

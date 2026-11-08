@@ -8,6 +8,7 @@
 using esphome::canopen_entities::decode_od_writer_frame;
 using esphome::canopen_entities::encode_dam_mpdo_frame;
 using esphome::canopen_entities::encode_old_od_writer_frame;
+using esphome::canopen_entities::od_writer_state_index;
 using esphome::canopen_entities::OdWriterFrame;
 
 #define CHECK(cond) \
@@ -69,6 +70,19 @@ int main() {
   CHECK(memcmp(out, old_expected, 8) == 0);
   CHECK(decode_od_writer_frame(out, 5, NODE, frame));
   CHECK(!frame.dam && frame.index == 0x2032 && frame.sub == 3 && frame.len == 1 && frame.value[0] == 1);
+
+  // the state object answering a command: commands at 0x2002 + 16 * n, states one below
+  uint16_t state = 0;
+  CHECK(od_writer_state_index(0x2052, state) && state == 0x2051);
+  CHECK(od_writer_state_index(0x2002, state) && state == 0x2001);
+  CHECK(od_writer_state_index(0x2FF2, state) && state == 0x2FF1);
+  state = 0;
+  CHECK(!od_writer_state_index(0x2051, state));  // a state
+  CHECK(!od_writer_state_index(0x2050, state));  // metadata
+  CHECK(!od_writer_state_index(0x1017, state));  // not an entity
+  CHECK(!od_writer_state_index(0x3002, state));  // not an entity, ends in 2 too
+  CHECK(!od_writer_state_index(0x1FF2, state));
+  CHECK(state == 0);
 
   printf("OK\n");
   return 0;

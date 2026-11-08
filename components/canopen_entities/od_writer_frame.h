@@ -36,6 +36,15 @@ inline bool decode_od_writer_frame(const uint8_t *data, uint8_t len, uint8_t nod
   return true;
 }
 
+// If index is an entity's command object (0x2002 + 16 * n), gives its state object (0x2001 + 16 * n), which has the same
+// subs. Anything else written through the OD writer isn't a command.
+inline bool od_writer_state_index(uint16_t index, uint16_t &state_index) {
+  if (index < 0x2000 || index >= 0x3000 || (index & 0xF) != 2)
+    return false;
+  state_index = index - 1;
+  return true;
+}
+
 // The old format: all 8 bytes are filled, the frame is 4 + size bytes long.
 inline void encode_old_od_writer_frame(uint8_t *data, uint8_t target, uint16_t index, uint8_t sub, uint32_t value) {
   data[0] = target;

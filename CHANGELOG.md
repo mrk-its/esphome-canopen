@@ -1,4 +1,5 @@
 # Unreleased
+* `canopen_entities`: a command received through the OD writer always sends the entity's state in its TPDO, even if nothing changed, so a toggle with a stale state works by the second press again (the old component did this).
 * `canopen_entities` accepts node-to-node commands as DAM-MPDO (CiA 301) on `0x500..0x57F`, next to the old OD writer frames
 * `canopen_entities: od_writer_mpdo: true` sends them as DAM-MPDO (default: the old frames); update the target nodes first, firmware without DAM-MPDO ignores these frames
 

@@ -52,7 +52,9 @@ each with at most 8 mapping entries, shared with the `rpdo` entries of `entities
 both a slot and an entity's `rpdo`.
 
 The remote state is only known after the remote node has sent its TPDO, e.g. after a reboot of this node a toggle
-may switch a light on even if it's already on, see [#32](https://github.com/mrk-its/esphome-canopen/issues/32).
+may switch a light on even if it's already on, see [#32](https://github.com/mrk-its/esphome-canopen/issues/32). The
+remote node answers every command it gets through the OD writer with its state, even if nothing changed, so the second
+press works.
 
 ## `platform: canopen_entities` entities
 `binary_sensor`, `sensor` and `text_sensor` showing a remote state:

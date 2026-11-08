@@ -507,6 +507,11 @@ void CANopenEntities::handle_od_writer_frame(const uint8_t *data, uint8_t len) {
              static_cast<unsigned>(value_len), static_cast<int>(ret));
   } else {
     ESP_LOGD(TAG, "OD writer: 0x%04x:%u written", frame.index, frame.sub);
+    // Answer even if nothing changed: a sender with a stale copy of the state (it rebooted, or missed the TPDO) sent
+    // the wrong command, and without a change it would never learn. Not for RPDOs: linked nodes could loop.
+    uint16_t state_index;
+    if (od_writer_state_index(frame.index, state_index))
+      this->hub_->request_tpdo(state_index, frame.sub);
   }
 }
 
