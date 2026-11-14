@@ -163,9 +163,13 @@ void MappedEntity::command_(uint8_t sub, uint32_t value) {
 #ifdef USE_NUMBER
     case ENTITY_TYPE_NUMBER:
     case ENTITY_TYPE_NUMBER_UINT8:
-    case ENTITY_TYPE_NUMBER_UINT16:
-      static_cast<number::Number *>(this->entity_)->publish_state(this->value_from_wire(value));
+    case ENTITY_TYPE_NUMBER_UINT16: {
+      // through a call, so the number's control() runs (e.g. a modbus_controller number writes its register)
+      float number_value = this->value_from_wire(value);
+      if (!std::isnan(number_value))
+        static_cast<number::Number *>(this->entity_)->make_call().set_value(number_value).perform();
       break;
+    }
 #endif
 #ifdef USE_BINARY_SENSOR
     case ENTITY_TYPE_BINARY_SENSOR:
@@ -457,7 +461,8 @@ void MappedEntity::alarm_command_(uint32_t value) {
       alarm->arm_custom_bypass();
       break;
     case 127:
-      alarm->publish_state(alarm_control_panel::ACP_STATE_TRIGGERED);
+      // through a call, like the arm/disarm commands, so the platform's control() runs
+      alarm->make_call().triggered().perform();
       break;
     default:
       break;
