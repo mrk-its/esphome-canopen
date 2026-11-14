@@ -29,6 +29,10 @@ static constexpr uint8_t META_UNIT = 3;
 static constexpr uint8_t META_STATE_CLASS = 4;
 static constexpr uint8_t META_MIN_VALUE = 7;
 static constexpr uint8_t META_MAX_VALUE = 8;
+// numbers: the entity's own limits (traits), for the UI; 7 / 8 are the range of the scaled encoding
+static constexpr uint8_t META_NUMBER_MIN = 9;
+static constexpr uint8_t META_NUMBER_MAX = 10;
+static constexpr uint8_t META_NUMBER_STEP = 11;
 
 uint32_t scale_to_wire(float value, float min_val, float max_val, uint32_t max_int) {
   if (std::isnan(value))
@@ -207,7 +211,7 @@ void MappedEntity::command_(uint8_t sub, uint32_t value) {
 
 void MappedEntity::add_to_od(canopen::ObjectDictionary &od) {
   // metadata: strings only if not empty (can2mqtt skips missing subindices), read by od_read()
-  std::array<RecordSub, 7> meta;
+  std::array<RecordSub, 10> meta;
   size_t n = 0;
   meta[n++] = {0, OD_READ, &this->meta_highest_, 1};
   char str[ENTITY_NAME_BUF_SIZE];
@@ -219,6 +223,24 @@ void MappedEntity::add_to_od(canopen::ObjectDictionary &od) {
     meta[n++] = {META_MIN_VALUE, OD_READ, &this->min_value_, 4};
     meta[n++] = {META_MAX_VALUE, OD_READ, &this->max_value_, 4};
   }
+#ifdef USE_NUMBER
+  switch (this->type_ & 0xFF) {
+    case ENTITY_TYPE_NUMBER:
+    case ENTITY_TYPE_NUMBER_UINT8:
+    case ENTITY_TYPE_NUMBER_UINT16: {
+      // copied here, not in add_number(): the traits are set by then
+      auto &traits = static_cast<number::Number *>(this->entity_)->traits;
+      this->number_limits_ = {traits.get_min_value(), traits.get_max_value(), traits.get_step()};
+      meta[n++] = {META_NUMBER_MIN, OD_READ, &this->number_limits_[0], 4};
+      meta[n++] = {META_NUMBER_MAX, OD_READ, &this->number_limits_[1], 4};
+      meta[n++] = {META_NUMBER_STEP, OD_READ, &this->number_limits_[2], 4};
+      this->meta_highest_ = META_NUMBER_STEP;
+      break;
+    }
+    default:
+      break;
+  }
+#endif
   od.add_record(this->meta_index(), meta.data(), n);
   od.set_object(this->meta_index(), this);
 

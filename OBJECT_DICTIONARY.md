@@ -28,6 +28,9 @@ Additionally Entity Type of each entity is stored at `0x2001`, subindex N.
 |                   | 0x04     | State Class             | String | R      | present only if not empty |
 |                   | 0x07     | min_value               | REAL32 | R      | entity type specific |
 |                   | 0x08     | max_value               | REAL32 | R      | entity type specific |
+|                   | 0x09     | min                     | REAL32 | R      | numbers: the entity's own minimum |
+|                   | 0x0A     | max                     | REAL32 | R      | numbers: the entity's own maximum |
+|                   | 0x0B     | step                    | REAL32 | R      | numbers: the entity's own step |
 |||||||
 | 0x2001 + 0x10 * N |          | Entity #N States        |        |        | Number of states / their types depends on entity type |
 |                   | 0x01     | State #1                |        | R      | |
@@ -130,9 +133,13 @@ EntityTypeCode: 8
 
 | Index             | SubIndex | Object Name             | Type   | Access | Description     |
 |-------------------|----------|-------------------------|--------|:------:|-|
+| 0x2000 + 0x10 * N | 0x09     | Number #N min           | REAL32 | R      | the number's `min_value` (its traits) |
+|                   | 0x0A     | Number #N max           | REAL32 | R      | the number's `max_value` (its traits) |
+|                   | 0x0B     | Number #N step          | REAL32 | R      | the number's `step` (its traits) |
+|||||||
 | 0x2001 + 0x10 * N | 0x01     | Number #N State         | REAL32 | R      | |
 |||||||
-| 0x2002 + 0x10 * N | 0x01     | Number #N Command       | REAL32 | W      | publishes given value as number state |
+| 0x2002 + 0x10 * N | 0x01     | Number #N Command       | REAL32 | W      | sets the number through a call (its `control()` runs); values outside min..max are rejected |
 
 ## Number8 / Number16
 EntityTypeCode: 9 (Number8, `size: 1`), 10 (Number16, `size: 2`)
@@ -141,10 +148,11 @@ EntityTypeCode: 9 (Number8, `size: 1`), 10 (Number16, `size: 2`)
 |-------------------|----------|-------------------------|--------|:------:|-|
 | 0x2000 + 0x10 * N | 0x07     | Number #N min_value     | REAL32 | R      | `min_value` from config, default 0 |
 |                   | 0x08     | Number #N max_value     | REAL32 | R      | `max_value` from config, default 254 / 65534 |
+|                   | 0x09..0x0B | Number #N min, max, step | REAL32 | R    | the number's own limits, as for Number; 0x07 / 0x08 are only the range of the encoding |
 |||||||
 | 0x2001 + 0x10 * N | 0x01     | Number #N State         | UINT8 / UINT16 | R | [scaled](#scaled-values) to `min_value..max_value` |
 |||||||
-| 0x2002 + 0x10 * N | 0x01     | Number #N Command       | UINT8 / UINT16 | W | [scaled](#scaled-values), publishes given value as number state |
+| 0x2002 + 0x10 * N | 0x01     | Number #N Command       | UINT8 / UINT16 | W | [scaled](#scaled-values), then as the Number command |
 
 ## Alarm Control Panel
 

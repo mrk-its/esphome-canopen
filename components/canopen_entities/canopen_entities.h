@@ -143,6 +143,7 @@ class MappedEntity : public canopen::OdObject {
   bool has_min_max_{false};
   float min_value_{0.0f};  // REAL32 in the OD
   float max_value_{0.0f};
+  std::array<float, 3> number_limits_{};  // numbers: traits min, max, step (REAL32 in the OD, subs 9..11)
 };
 
 // A remote state slot (OD 0x4000 + n, sub 1): a state of another node's entity, written by an RPDO from that node's

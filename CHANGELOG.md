@@ -1,4 +1,5 @@
 # Unreleased
+* `canopen_entities`: numbers expose their own min, max and step (metadata subs `0x09..0x0B`, REAL32), for the Home Assistant number limits; `0x07` / `0x08` stay the range of the scaled encoding. can2mqtt reads them from 0.2.13-b7.
 * `canopen_entities`: number and alarm "triggered" commands go through the entity's call (`control()`) instead of publishing the value directly, so e.g. a `modbus_controller` number writes its register. Number values outside min/max are rejected, and a number whose `control()` doesn't publish keeps its state.
 * `canopen_entities`: a node asks the remote nodes it listens to for their TPDOs when it starts and when one of them boots (new object `0x3001`), so its remote states are right from the first press. Remote nodes on older firmware ignore the request.
 * `canopen_entities`: a command received through the OD writer always sends the entity's state in its TPDO, even if nothing changed, so a toggle with a stale state works by the second press again (the old component did this).

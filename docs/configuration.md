@@ -75,6 +75,9 @@ One `canopen_entities:` per firmware.
 * `min_value` (Optional, float, default=0): minimal value for scaled states (`size` 1 or 2).
 * `max_value` (Optional, float, default=254 for `size: 1`, 65534 for `size: 2`): maximal value for scaled states
   (`size` 1 or 2).
+  These only set the encoding. A number's own `min_value` / `max_value` / `step` (in its platform config) are sent
+  separately and are the limits Home Assistant shows. For a number with integer values 0..254 (or 0..65534), the
+  defaults put the value itself on the wire.
 * `caps` (Optional, list, `light` / `cover` only): capabilities of the entity, needed only for platforms whose
   capabilities the component can't derive from the config (the build fails with a hint). Light: `on_off`,
   `brightness`, `color_temperature`; cover: `position`, `tilt`. See [TPDO layout](../OBJECT_DICTIONARY.md#tpdo-layout).
