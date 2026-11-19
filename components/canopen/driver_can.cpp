@@ -33,7 +33,7 @@ void CANopenComponent::on_frame_(const canbus::CanFrame &frame) {
   if (frame.use_extended_id || len > 8)
     return;
   this->receive_((frame.can_id & 0x7FF) | (frame.remote_transmission_request ? 0x800 : 0), frame.data, len);
-  this->process_();
+  this->process_(true);
 }
 
 void CANopenComponent::receive_(uint16_t ident, const uint8_t *data, uint8_t len) {

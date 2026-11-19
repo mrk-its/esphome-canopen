@@ -245,7 +245,8 @@ class CANopenEntities : public Component {
   // adds the OD entries: before the hub's setup()
   void setup() override;
   void dump_config() override;
-  float get_setup_priority() const override { return setup_priority::PROCESSOR + 1.0f; }
+  // before the hub's setup() (HARDWARE - 1), which builds the OD from the entries added in setup()
+  float get_setup_priority() const override { return setup_priority::HARDWARE - 0.5f; }
 
  protected:
   MappedEntity *add_entity_(EntityBase *entity, uint8_t index, uint32_t type);

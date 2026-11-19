@@ -123,6 +123,8 @@ def enable_sdo_client() -> None:
     # optional in CiA 301, a server without it aborts the request, and the client doesn't fall back to segmented.
     cg.add_build_flag("-DCO_CONFIG_SDO_CLI=0x0B")
     cg.add_build_flag("-DCO_CONFIG_FIFO=0x01")
+    # one segment: drained before the next one is requested (sdo_client.cpp)
+    cg.add_build_flag("-DCO_CONFIG_SDO_CLI_BUFFER_SIZE=7")
 
 
 # CANopenNode's minimum server buffer for block transfer (CO_SDOserver.c checks it)

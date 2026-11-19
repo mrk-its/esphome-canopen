@@ -197,9 +197,9 @@ void CANopenComponent::dump_config() {
 #endif
 }
 
-void CANopenComponent::loop() { this->process_(); }
+void CANopenComponent::loop() { this->process_(false); }
 
-void CANopenComponent::process_() {
+void CANopenComponent::process_(bool from_frame) {
   if (this->co_ == nullptr || this->is_failed())
     return;
 #ifdef USE_CANOPEN_SDO_CLIENT
@@ -210,16 +210,27 @@ void CANopenComponent::process_() {
   uint32_t now = micros();
   uint32_t dt = now - this->last_us_;
   this->last_us_ = now;
-  // The SDO client first: a request whose frame still waits at its deadline ends there, before the flush below (or
-  // CO_process()) could send it.
 #ifdef USE_CANOPEN_SDO_CLIENT
-  this->process_sdo_(dt);
-#endif
-  if (this->is_client_only()) {
-    // CO_process() would process the node's objects, which aren't initialised
-    CO_CANmodule_process(this->co_->CANmodule);
-    return;
+  // SDO client first: an unsent frame ends at its deadline, before the flush could send it. Its time runs in loop() (a
+  // received frame may come before a queued reply), or while no reply can be on its way (frame unsent, no request).
+  CO_SDOclient_t *cli = this->co_->SDOclient;
+  const bool unsent = cli->CANtxBuff->bufferFull;
+  if (!from_frame || unsent || !this->sdo_busy_) {
+    this->process_sdo_(now - this->sdo_last_us_);
+    this->sdo_last_us_ = now;
+  } else {
+    this->process_sdo_(0);
   }
+#endif
+  // also done by CO_process(), which would process the node's objects (not initialised in client-only mode)
+  CO_CANmodule_process(this->co_->CANmodule);
+#ifdef USE_CANOPEN_SDO_CLIENT
+  // CANopenNode started the response timeout when it queued the frame: start it again now that the frame is sent
+  if (unsent && !cli->CANtxBuff->bufferFull)
+    cli->timeoutTimer = 0;
+#endif
+  if (this->is_client_only())
+    return;
 #ifdef USE_CANOPEN_NODE
   CO_NMT_reset_cmd_t reset = CO_process(this->co_, false, dt, nullptr);
   if (reset == CO_RESET_APP) {

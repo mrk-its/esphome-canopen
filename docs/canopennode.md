@@ -710,6 +710,34 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   was ahead of the stalled one, so its deadline came after `can_start()`), `can_stop()`, a read of `0x1018:4` from
   dimmer4, `can_start()` from that read's callback, i.e. in the loop of its deadline, before the hub's TX flush:
   TRANSPORT_ERROR, 0 answers on `0x5B7` afterwards, a control read then got 1.
+- **Second Copilot review** (2026-11-20, review 5984666368: 4 new comments, 7 "previously missed" in unchanged code;
+  Copilot resolved 16 of the first round's 17 threads itself, also the two answered without a change; `on_boot` stayed
+  open). Fixes on `canopen-full` `4c59c79c01`, in the cut as `1f3736764b`:
+  - hub setup priority `HARDWARE - 1` (after the CAN bus, before default `on_boot`); the queue stays. On
+    `canopen-full` the setup-order contract in `canopen.h` now says "above `HARDWARE - 1`"; `canopen_entities` (adds
+    its OD entries in `setup()`) moved from `PROCESSOR + 1` to `HARDWARE - 0.5`. Everything else here registers from
+    codegen (OTA, remote logs, `register_node()`);
+  - a reply while the client's own frame is unsent is dropped (`sdo_reply_is_stale_()`): it can't be for that request.
+    A late ack for the same object after the request went out can't be told apart (no transaction id in SDO);
+  - `CO_CONFIG_SDO_CLI_BUFFER_SIZE=7`: the fifo holds one segment, so CANopenNode returns `uploadDataBufferFull` instead
+    of requesting the next segment; `process_sdo_()` drains, checks the capacity, then calls `CO_SDOclientUpload()`
+    again in the same pass (`canopen-full` also for `waitingLocalTransfer`). An oversized read sends initiate, one
+    segment request, abort. The flag reaches CANopenNode's sources on zephyr too (`compile_commands.json` of
+    `stm32l4_loopback.yaml`), it changes `CO_SDOclient_t`;
+  - `process_(bool from_frame)`: on the frame path the client's time doesn't run unless its frame is unsent or no request
+    runs (a received frame may come before a reply queued behind it after a long loop). The cut's `last_us_` is only the
+    SDO clock; `canopen-full` has `sdo_last_us_` (CO_process() keeps `last_us_`). Starting a request from the frame path
+    applies real time too, otherwise the next `loop()` would see the whole idle time;
+  - the response timer restarts when the flush sends a queued frame (`canopen-full` flushes itself before `CO_process()`,
+    which flushes again);
+  - a server abort with `0x05040000` is ABORT; `<cstring>`; `uint8_t` queue counters; `put_le32()`;
+  - not changed (answered): canbus' send-failure warnings while the controller refuses frames.
+  Clang-format: the hook pins v23.1.3 (= `/usr/bin/clang-format`); the venv's `clang-format` is 13 and wraps
+  differently, don't use it. Size 993 after tightening comments (1009 before; the same comment edits on `canopen-full`
+  where the text matched). Tests: `canopen-full` 100 C++ + 43 Python, the cut 36 + 18, mutation-checked; builds and
+  clang-tidy clean on both; here `stm32l4_loopback.yaml`, `stm32l4_canopen.yaml` (canopen_entities, new priority) and
+  `esp8266_mapper.yaml` build. Hardware (nucleo, same test): all cases as before, incl. the stall and the `on_boot`
+  read; the house pass 124 successes, segmented strings (up to 29 bytes) intact with the 7-byte fifo.
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's

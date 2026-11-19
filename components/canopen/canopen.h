@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstring>
 #include <initializer_list>
 #include <vector>
 
@@ -30,11 +31,12 @@ NMTState to_nmt_state(CO_NMT_internalState_t state);
 // - Before the hub's setup(), which builds the object dictionary and initialises CANopenNode: OD entries and
 //   handlers (get_od()), configure_tpdo() / configure_rpdo(), monitor_node(), identity and device information. Two
 //   places run early enough: setters called from codegen (they run in main(), before App.setup()), or the setup()
-//   of a component whose setup priority is above the hub's (setup_priority::PROCESSOR), e.g. PROCESSOR + 1. Calls
-//   made later are logged as errors and ignored.
+//   of a component whose setup priority is above the hub's (setup_priority::HARDWARE - 1, after the CAN bus), e.g.
+//   HARDWARE - 0.5. Calls made later are logged as errors and ignored.
 // The rest is runtime API, e.g. from loop() or automations: add_frame_listener() and the callbacks (any time),
-// send_frame(), SDO client and NMT master requests; write_od(), read_od() and request_tpdo() need the OD, so they fail
-// or do nothing before the hub's setup().
+// send_frame(), SDO client and NMT master requests (made before the hub's setup(), they wait for it); write_od(),
+// read_od() and request_tpdo() need the OD, so they fail or do nothing before the hub's setup(), which runs before
+// most components' setup() (e.g. sensors, DATA) and the default on_boot automations.
 //
 // Client-only mode: without a node id (NO_NODE_ID) the hub is no CANopen node, only an SDO client on the bus (plus
 // raw frames). CANopenNode's node part (NMT, heartbeat, EMCY, SDO server) isn't initialised, so it isn't linked either.
@@ -56,7 +58,8 @@ class CANopenComponent : public Component {
   void setup() override;
   void loop() override;
   void dump_config() override;
-  float get_setup_priority() const override { return setup_priority::PROCESSOR; }
+  // after the CAN bus, before the default on_boot automations (600)
+  float get_setup_priority() const override { return setup_priority::HARDWARE - 1.0f; }
 
   void set_canbus(canbus::Canbus *canbus);
   // Other canopen nodes on the same canbus, as a ring (codegen): a frame one of them sends is also received by the
@@ -203,7 +206,7 @@ class CANopenComponent : public Component {
  protected:
   void on_frame_(const canbus::CanFrame &frame);
   void receive_(uint16_t ident, const uint8_t *data, uint8_t len);
-  void process_();
+  void process_(bool from_frame);
   void setup_client_only_();
   // marks the hub failed and ends the requests queued before setup()
   void fail_setup_(const LogString *reason);
@@ -307,17 +310,18 @@ class CANopenComponent : public Component {
   uint32_t sdo_cli_cob_rx_{0x80000000};
   uint8_t sdo_cli_node_{0};
   std::array<SDORequest, SDO_QUEUE_SIZE> sdo_queue_{};
-  size_t sdo_head_{0};
-  size_t sdo_count_{0};
   SDORequest sdo_active_{};
-  bool sdo_busy_{false};
-  size_t sdo_offset_{0};  // WRITE/WRITE_DATA: bytes handed to the client fifo
+  uint32_t sdo_last_us_{0};  // the SDO client's clock, see process_()
+  size_t sdo_offset_{0};     // WRITE/WRITE_DATA: bytes handed to the client fifo
   // READ/READ_DATA: bytes received (also those beyond the buffer, for the size checks), kept in sdo_rx_value_ (READ)
   // or the caller's buffer (READ_DATA)
   size_t sdo_rx_len_{0};
-  std::array<uint8_t, 4> sdo_rx_value_{};
-  uint8_t sdo_abort_node_{0};       // node of the last cancelled transfer, see ABORT_GUARD_US
   uint32_t sdo_abort_guard_us_{0};  // time left before a request to sdo_abort_node_ may start
+  std::array<uint8_t, 4> sdo_rx_value_{};
+  uint8_t sdo_head_{0};
+  uint8_t sdo_count_{0};
+  uint8_t sdo_abort_node_{0};  // node of the last cancelled transfer, see ABORT_GUARD_US
+  bool sdo_busy_{false};
   bool sdo_abort_pending_{false};
 #endif
 
