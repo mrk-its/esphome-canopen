@@ -702,9 +702,14 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   Size: 985 lines (`git diff --numstat $(git merge-base upstream/dev HEAD) -- . ':!tests'`; 941 before). Fetch
   `upstream dev` first: against a stale `upstream/dev` the count includes the merged `dev`. Tests: `canopen-full`
   95 C++ + 43 Python, the cut 31 C++ + 18 Python; the four build targets on both. clang-tidy clean (esp32-idf-tidy with the tests, esp8266-arduino-tidy on the component; both branches). Build checks here: `stm32l4_loopback.yaml` (fork venv), `esp8266_mapper.yaml` (upstream venv, updated to 2026.12.0-dev: the old one had no `add_frame_callback()`).
-  Hardware test still to do (the nucleo wasn't connected): `on_boot` read at the default priority, a pass over the
-  house nodes, and `can_stop()` around a deadline. The test config no longer needs the compat patch (both use
-  `add_frame_callback()`).
+  Hardware test (nucleo, 2026-11-19; `test/stm32l4_sdo_client.yaml` + `test/sdo_client_test.h`, not committed, hub from
+  a worktree of the cut, no compat patch any more, `tx_buffer_size: 0`): the `on_boot` read at the default priority
+  succeeded (it was REJECTED before); the fixed cases as before (value, size mismatch, `0x06020000`, absent node
+  timeout, queue 16 of 17); a value read of `0x1008` gives SIZE_MISMATCH; the pass over the house nodes 124 successes,
+  no aborts or timeouts. Stall: the node pass paused and the queue drained first (in the first run a node-pass request
+  was ahead of the stalled one, so its deadline came after `can_start()`), `can_stop()`, a read of `0x1018:4` from
+  dimmer4, `can_start()` from that read's callback, i.e. in the loop of its deadline, before the hub's TX flush:
+  TRANSPORT_ERROR, 0 answers on `0x5B7` afterwards, a control read then got 1.
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
