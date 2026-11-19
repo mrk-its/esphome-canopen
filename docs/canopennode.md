@@ -633,9 +633,6 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   - fixed `0x1280` entry (`sdo_cli_record_`, `od_entries_`, `od_` in `canopen.h`) instead of the runtime OD; PR 3
     replaces it;
   - `CO_CONFIG_SDO_CLI=0x03` (no local transfers); PR 3 brings back `0x0B`;
-  - `canbus::add_frame_callback()` (upstream `dev` #22008, 2026-11-04; `add_callback()` is deprecated there).
-    `canopen-full` keeps `add_callback()` until esphomeplatformzephyr has #22008 (its `canbus.h` doesn't, as of
-    `origin/framework-zephyr` `c5dfed5e8`), since the copy here is built with the fork venv;
   - no `canopennode_path:`, no SDO client switch (`enable_sdo_client()`, `CANopenData`, `USE_CANOPEN_SDO_CLIENT`),
     no `cancel_sdo()`: see "Size". `cancel_sdo()` and `sdo_cancel_test.cpp` go to PR 2, the client switch (with
     `sdo_client:`) to PR 3, `canopennode_path:` to whichever PR needs it next;
@@ -671,6 +668,43 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   - Found here, not by the gtests: a read whose last frame overflows the buffer gave `SDO_RESULT_ABORT` with code 0,
     because `CO_SDOclientUpload()` clears it when the transfer is already over. Fixed (`ff116ed538`, in the cut).
   - One pass over the house nodes: all reads succeeded, no aborts or timeouts.
+- **Copilot review** (2026-11-19, review 5966531279, 17 comments; fixes on `canopen-full` `eddd646f1f`, in the cut as
+  `2318307be0`, docs `a73f911ed` / `ef24ebff1`). Before it, someone merged `dev` into the cut from the GitHub UI
+  (`a955eae7c0`): `git pull --ff-only` before working on the cut. Fixed:
+  - one hub per canbus (the cut); on `canopen-full` one hub *without `node_id`* per canbus (node hubs plus one
+    client-only hub on a bus stay valid, as the loopback test uses). Two clients on one bus would share COB-IDs;
+  - `process_()` runs the SDO client before the TX flush (`CO_CANmodule_process()` / `CO_process()`). Otherwise a frame
+    still waiting at the deadline went out in the flush and the caller then got `TIMEOUT`. The abort guard
+    (`canopen-full`) now counts from the flush that sent the abort (a pending abort found sent left `dt` ago);
+  - stale replies: while a request runs, initiate responses / aborts from its server that name another object are kept
+    from CANopenNode's client (`sdo_reply_is_stale_()`, checked in `receive_()` for the client's rx buffer only, so
+    frame listeners and other local hubs still see them). CANopenNode takes any abort without checking the object;
+  - a value read drains the fifo after every segment (before: only when full or at the end) and stops past 4 bytes:
+    `SIZE_MISMATCH`, server aborted with `0x06070012`; `SDO_MAX_VALUE_UPLOAD` removed;
+  - `write_sdo()` masks a sign-extended value to `size`, so the reply's value is zero-extended;
+  - requests before `setup()` (default `on_boot`, priority 600, runs before the hub's 400) are queued instead of
+    rejected; `fail_setup_()` marks the hub failed with a reason and rejects the queue. Not done by raising the hub's
+    priority: `canopen_entities` (`PROCESSOR + 1`) adds OD entries before the hub's setup;
+  - CAN FD frames ignored (`frame.fd`). For that, `canopen-full` moved to `add_frame_callback()` (the fork venv's
+    esphomeplatformzephyr has it now), so that difference from the cut is gone;
+  - `on_success` / `on_value` / `on_error` take one automation (`validate_automation(single=True)`, one `Trigger`
+    each, as `http_request`); shared `SDO_ACTION_SCHEMA` / `_sdo_action_to_code()`; `final` actions;
+    `PROGMEM_STRING_TABLE` result names; reasons for `mark_failed()`; one `ESP_LOGCONFIG`; init log verbose;
+  - tests: `SdoTest` fixture in `fake_canbus.h`; `sdo_client_test.cpp` now also on `canopen-full`; new tests for the
+    deadline flush, stale replies, long value reads, signed raw writes, requests before setup and FD frames
+    (`USE_CANBUS_FD` defined in the unit test build); `canopen_node_test.cpp` gets its synchronous rejections from a
+    failed hub now.
+  Documented, not fixed: a frame the controller has taken can't be recalled (MCP2515 sets TXREQ and returns OK), so a
+  write that failed with `TIMEOUT` / `TRANSPORT_ERROR` may still have been carried out (`types.h`, docs); also
+  "another SDO client on the same node: handle `on_error`" (the can2mqtt collision above). Not changed (answered):
+  lambda results narrowed to the field type (every `TEMPLATABLE_VALUE` does that); ESP32 `tx_enqueue_timeout`
+  blocking (only with a full TWAI queue, i.e. a dead bus; the platform's setting).
+  Size: 985 lines (`git diff --numstat $(git merge-base upstream/dev HEAD) -- . ':!tests'`; 941 before). Fetch
+  `upstream dev` first: against a stale `upstream/dev` the count includes the merged `dev`. Tests: `canopen-full`
+  95 C++ + 43 Python, the cut 31 C++ + 18 Python; the four build targets on both. clang-tidy clean (esp32-idf-tidy with the tests, esp8266-arduino-tidy on the component; both branches). Build checks here: `stm32l4_loopback.yaml` (fork venv), `esp8266_mapper.yaml` (upstream venv, updated to 2026.12.0-dev: the old one had no `add_frame_callback()`).
+  Hardware test still to do (the nucleo wasn't connected): `on_boot` read at the default priority, a pass over the
+  house nodes, and `can_stop()` around a deadline. The test config no longer needs the compat patch (both use
+  `add_frame_callback()`).
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's

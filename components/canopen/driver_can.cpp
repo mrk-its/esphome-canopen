@@ -20,16 +20,19 @@ static bool send_frame(CO_CANmodule_t *mod, CO_CANtx_t *buf) {
 
 void CANopenComponent::set_canbus(canbus::Canbus *canbus) {
   this->canbus_ = canbus;
-  canbus->add_callback([this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
-    this->on_frame_(can_id, extended_id, rtr, data);
-  });
+  canbus->add_frame_callback([this](const canbus::CanFrame &frame) { this->on_frame_(frame); });
 }
 
-void CANopenComponent::on_frame_(uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
+void CANopenComponent::on_frame_(const canbus::CanFrame &frame) {
   // CANopen (CiA 301) uses classic CAN frames with 11-bit ids
-  if (extended_id || data.size() > 8)
+#ifdef USE_CANBUS_FD
+  if (frame.fd)
     return;
-  this->receive_((can_id & 0x7FF) | (rtr ? 0x800 : 0), data.data(), data.size());
+#endif
+  const uint8_t len = frame.payload_length();
+  if (frame.use_extended_id || len > 8)
+    return;
+  this->receive_((frame.can_id & 0x7FF) | (frame.remote_transmission_request ? 0x800 : 0), frame.data, len);
   this->process_();
 }
 
@@ -43,8 +46,13 @@ void CANopenComponent::receive_(uint16_t ident, const uint8_t *data, uint8_t len
   memcpy(msg.data, data, len);
   for (uint16_t i = 0; i < mod->rxSize; i++) {
     CO_CANrx_t *rx = &mod->rxArray[i];
-    if (rx->CANrx_callback != nullptr && ((msg.ident ^ rx->ident) & rx->mask) == 0)
-      rx->CANrx_callback(rx->object, &msg);
+    if (rx->CANrx_callback == nullptr || ((msg.ident ^ rx->ident) & rx->mask) != 0)
+      continue;
+#ifdef USE_CANOPEN_SDO_CLIENT
+    if (rx->object == this->co_->SDOclient && this->sdo_reply_is_stale_(data, len))
+      continue;
+#endif
+    rx->CANrx_callback(rx->object, &msg);
   }
   this->dispatch_frame_(msg);
 }

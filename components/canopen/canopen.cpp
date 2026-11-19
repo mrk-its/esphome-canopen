@@ -62,7 +62,7 @@ void CANopenComponent::setup() {
   this->add_pdo_od_();
 #endif
   if (!od.finalize()) {
-    this->mark_failed(LOG_STR("invalid object dictionary"));
+    this->fail_setup_(LOG_STR("invalid object dictionary"));
     return;
   }
 
@@ -85,18 +85,18 @@ void CANopenComponent::setup() {
   uint32_t heap = 0;
   this->co_ = CO_new(&cfg, &heap);
   if (this->co_ == nullptr) {
-    this->mark_failed(LOG_STR("CO_new failed"));
+    this->fail_setup_(LOG_STR("CO_new failed"));
     return;
   }
   CO_ReturnError_t err = CO_CANinit(this->co_, this, 0);
   if (err != CO_ERROR_NO) {
     ESP_LOGE(TAG, "CO_CANinit failed: %d", err);
-    this->mark_failed();
+    this->fail_setup_(LOG_STR("CO_CANinit failed"));
     return;
   }
 #ifdef USE_CANOPEN_PDO
   if (!this->init_pdo_storage_()) {
-    this->mark_failed();
+    this->fail_setup_(LOG_STR("PDO storage init failed"));
     return;
   }
 #endif
@@ -106,12 +106,12 @@ void CANopenComponent::setup() {
                        false, this->node_id_, &err_info);
   if (err != CO_ERROR_NO) {
     ESP_LOGE(TAG, "CO_CANopenInit failed: %d (OD 0x%04" PRIx32 ")", err, err_info);
-    this->mark_failed();
+    this->fail_setup_(LOG_STR("CO_CANopenInit failed"));
     return;
   }
 #ifdef USE_CANOPEN_PDO
   if (!this->init_pdo_()) {
-    this->mark_failed();
+    this->fail_setup_(LOG_STR("PDO init failed"));
     return;
   }
 #endif
@@ -120,7 +120,7 @@ void CANopenComponent::setup() {
 
   CO_CANsetNormalMode(this->co_->CANmodule);
   this->last_us_ = micros();
-  ESP_LOGI(TAG, "CANopenNode initialized, node 0x%02x, heap %" PRIu32 " B", this->node_id_, heap);
+  ESP_LOGV(TAG, "CANopenNode initialized, node 0x%02x, heap %" PRIu32 " B", this->node_id_, heap);
 #endif  // USE_CANOPEN_NODE
 }
 
@@ -130,53 +130,65 @@ void CANopenComponent::setup_client_only_() {
 #ifdef USE_CANOPEN_SDO_CLIENT
   this->add_sdo_client_od_();
   if (!this->od_.finalize()) {
-    this->mark_failed(LOG_STR("invalid object dictionary"));
+    this->fail_setup_(LOG_STR("invalid object dictionary"));
     return;
   }
   this->config_sdo_client_(this->config_);
   uint32_t heap = 0;
   this->co_ = CO_new(&this->config_, &heap);
   if (this->co_ == nullptr) {
-    this->mark_failed(LOG_STR("CO_new failed"));
+    this->fail_setup_(LOG_STR("CO_new failed"));
     return;
   }
   CO_ReturnError_t err = CO_CANinit(this->co_, this, 0);
   if (err != CO_ERROR_NO) {
     ESP_LOGE(TAG, "CO_CANinit failed: %d", err);
-    this->mark_failed();
+    this->fail_setup_(LOG_STR("CO_CANinit failed"));
     return;
   }
   if (!this->init_sdo_client_()) {
-    this->mark_failed();
+    this->fail_setup_(LOG_STR("SDO client init failed"));
     return;
   }
   this->init_frame_listeners_();
   CO_CANsetNormalMode(this->co_->CANmodule);
   this->last_us_ = micros();
-  ESP_LOGI(TAG, "CANopenNode initialized, SDO client only, heap %" PRIu32 " B", heap);
+  ESP_LOGV(TAG, "CANopenNode initialized, SDO client only, heap %" PRIu32 " B", heap);
 #else
   // codegen enables the SDO client for a hub without node id
-  this->mark_failed(LOG_STR("no node id and no SDO client"));
+  this->fail_setup_(LOG_STR("no node id and no SDO client"));
+#endif
+}
+
+void CANopenComponent::fail_setup_(const LogString *reason) {
+  this->mark_failed(reason);
+#ifdef USE_CANOPEN_SDO_CLIENT
+  this->reject_queued_sdo_();
 #endif
 }
 
 void CANopenComponent::dump_config() {
-  ESP_LOGCONFIG(TAG, "CANopen (CANopenNode):");
   if (this->is_client_only()) {
-    ESP_LOGCONFIG(TAG, "  Mode: SDO client only (no node ID)");
 #ifdef USE_CANOPEN_SDO_CLIENT
-    ESP_LOGCONFIG(TAG, "  SDO client: response timeout %u ms", this->response_timeout_ms_);
+    ESP_LOGCONFIG(TAG,
+                  "CANopen (CANopenNode):\n"
+                  "  Mode: SDO client only (no node ID)\n"
+                  "  SDO client: response timeout %u ms",
+                  this->response_timeout_ms_);
 #endif
     return;
   }
 #ifdef USE_CANOPEN_NODE
-  ESP_LOGCONFIG(TAG, "  Node ID: 0x%02x", this->node_id_);
-  ESP_LOGCONFIG(TAG, "  Heartbeat interval: %u ms", this->hb_producer_ms_);
+  ESP_LOGCONFIG(TAG,
+                "CANopen (CANopenNode):\n"
+                "  Node ID: 0x%02x\n"
+                "  Heartbeat interval: %u ms\n"
+                "  NMT startup: %s",
+                this->node_id_, this->hb_producer_ms_,
+                this->start_operational_ ? LOG_STR_LITERAL("operational") : LOG_STR_LITERAL("pre-operational"));
 #ifdef CANOPEN_SDO_BLOCK_SIZE
   ESP_LOGCONFIG(TAG, "  SDO server: block transfer, download block size %u", CANOPEN_SDO_BLOCK_SIZE);
 #endif
-  ESP_LOGCONFIG(TAG, "  NMT startup: %s",
-                this->start_operational_ ? LOG_STR_LITERAL("operational") : LOG_STR_LITERAL("pre-operational"));
   this->dump_device_info_config_();
 #ifdef USE_CANOPEN_SDO_CLIENT
   ESP_LOGCONFIG(TAG, "  SDO client: response timeout %u ms", this->response_timeout_ms_);
@@ -198,12 +210,14 @@ void CANopenComponent::process_() {
   uint32_t now = micros();
   uint32_t dt = now - this->last_us_;
   this->last_us_ = now;
+  // The SDO client first: a request whose frame still waits at its deadline ends there, before the flush below (or
+  // CO_process()) could send it.
+#ifdef USE_CANOPEN_SDO_CLIENT
+  this->process_sdo_(dt);
+#endif
   if (this->is_client_only()) {
     // CO_process() would process the node's objects, which aren't initialised
     CO_CANmodule_process(this->co_->CANmodule);
-#ifdef USE_CANOPEN_SDO_CLIENT
-    this->process_sdo_(dt);
-#endif
     return;
   }
 #ifdef USE_CANOPEN_NODE
@@ -224,9 +238,6 @@ void CANopenComponent::process_() {
     ESP_LOGI(TAG, "NMT state: %s", LOG_STR_ARG(nmt_state_to_string(state)));
     this->nmt_state_callback_.call(state);
   }
-#ifdef USE_CANOPEN_SDO_CLIENT
-  this->process_sdo_(dt);
-#endif
 #endif  // USE_CANOPEN_NODE
 }
 

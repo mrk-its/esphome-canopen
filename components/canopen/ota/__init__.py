@@ -36,8 +36,10 @@ CANopenOTAComponent = canopen.ns.class_("CANopenOTAComponent", OTAComponent)
 
 
 def _is_zephyr() -> bool:
-    return getattr(CORE, "using_zephyr_rtos", False) or getattr(
-        CORE, "is_zephyr", False
+    """Zephyr builds of the fork: `using_toolchain_zephyr`, or `using_zephyr_rtos` / `is_zephyr` on older branches."""
+    return any(
+        getattr(CORE, name, False)
+        for name in ("using_toolchain_zephyr", "using_zephyr_rtos", "is_zephyr")
     )
 
 

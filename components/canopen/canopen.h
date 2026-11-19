@@ -138,8 +138,8 @@ class CANopenComponent : public Component {
   // --- SDO client (sdo_client.cpp) ---
   // SDO client (one channel, requests run one after another in FIFO order). Every request ends in exactly one
   // callback: accepted ones from loop() / frame processing after the transfer, rejected ones (queue full, invalid
-  // arguments, stack not running) synchronously before the call returns false. Requests to our own node id are
-  // served from our object dictionary, without CAN frames.
+  // arguments, failed hub) synchronously before the call returns false. Requests made before setup() wait in the
+  // queue (e.g. from on_boot). Requests to our own node id are served from our object dictionary, without CAN frames.
 
   // value read; expected_size 1/2/4 checks the width (SIZE_MISMATCH), 0 accepts any width up to 4
   bool read_sdo(uint8_t node_id, uint16_t index, uint8_t sub, uint8_t expected_size, SDOCallback callback,
@@ -201,10 +201,12 @@ class CANopenComponent : public Component {
 #endif
 
  protected:
-  void on_frame_(uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data);
+  void on_frame_(const canbus::CanFrame &frame);
   void receive_(uint16_t ident, const uint8_t *data, uint8_t len);
   void process_();
   void setup_client_only_();
+  // marks the hub failed and ends the requests queued before setup()
+  void fail_setup_(const LogString *reason);
   // The features' parts of setup(), called in this order: add_*_od_() add OD entries (before the OD is finalized),
   // config_*_() fill in their CO_config_t counts and entries, init_*_() run once CANopenNode is initialised.
 
@@ -285,8 +287,6 @@ class CANopenComponent : public Component {
     void *context;
   };
   static constexpr size_t SDO_QUEUE_SIZE = 16;
-  // a value read only counts the bytes (SIZE_MISMATCH above 4); longer objects are aborted
-  static constexpr size_t SDO_MAX_VALUE_UPLOAD = 1024;
   bool sdo_idle_() const {
     return !this->sdo_busy_ && this->sdo_count_ == 0 && !this->sdo_abort_pending_ && this->sdo_abort_guard_us_ == 0;
   }
@@ -295,6 +295,8 @@ class CANopenComponent : public Component {
   // client-only mode; a node's client is initialised by CO_CANopenInit()
   bool init_sdo_client_();
   bool queue_sdo_(SDORequest &&request);
+  void reject_queued_sdo_();
+  bool sdo_reply_is_stale_(const uint8_t *data, uint8_t len) const;
   void process_sdo_(uint32_t dt_us);
   bool start_sdo_();
   void finish_sdo_(SDOResult result, uint32_t abort_code);
