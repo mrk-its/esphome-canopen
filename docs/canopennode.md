@@ -757,7 +757,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   Size of the cut after them: 991 lines outside `tests/` (993 added, 2 removed in canbus).
   Their tests fail clang-tidy (`readability-static-accessed-through-instance`: `this->advance_()` on a static): the
   PR's CI is red on "clang-tidy for ESP32 IDF 3/5 and 5/5" (run 44655413694). Fixed on `canopen-full` (`846650b945`,
-  `advance_()` without `this->`); the cut needs the same change (not pushed: waiting for the user).
+  `advance_()` without `this->`) and on the cut (`99b2327702`, CI green).
   - **On `canopen-full`, differently:** a node still runs `CO_process()` for every received frame: CANopenNode keeps
     one received frame per RPDO (`CO_PDO_receive()`), so processing only in `loop()` would apply only the last of
     several frames of one COB-ID in a canbus pass (events, MPDO). The flush follows bdraco: `CO_CANmodule_process()`
@@ -783,6 +783,14 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     through the node image above (can2mqtt finds the image by a hand-made `node_id: 7f, ver: ..` string), 94,019 B in
     ~35 s, booted as a client-only hub, confirmed by `safe_mode`. Two B1 presses: light off, then on (HA history at
     the same times), no SDO errors. That image has no CAN OTA: back to the node firmware over USB.
+  - The last Copilot review (on `1036a42cff`) listed two "open issues": the two threads of its 2026-11-19 review,
+    fixed in `1f3736764b` and answered but never resolved; resolved 2026-11-20, with a note on the timer one (the
+    reset is in `loop()`, after the flush, not in `CO_CANsend()`). Its summary ("late SDO segments can abort
+    unrelated queued requests") pointed at a gap the threads didn't cover: a segment response (scs 0/1) of a
+    timed-out transfer, arriving after the next request to that node went out, made CANopenNode abort that request
+    (`CO_SDO_AB_CMD`). `sdo_reply_is_stale_()` drops it while the request waits for its initiate response
+    (`canopen-full` `261dee2ea8`, cut `51fdef96f1`; test `SegmentResponseWhileWaitingForTheInitiateOneIsIgnored`,
+    mutation-checked). Cut size: 994 lines outside `tests/` (996 added, 2 removed in canbus).
   - **To discuss with bdraco when PR 3 is cut** (not raised on PR 1: the cut never flushes on the frame path): the
     node's per-frame `CO_process()` without the flush, above. Draft comment:
     > For a node hub I'd like to keep running `CO_process()` for every received frame, not move it into `loop()`.
