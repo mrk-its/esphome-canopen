@@ -4,7 +4,7 @@ from typing import Any
 
 from esphome import automation
 import esphome.codegen as cg
-from esphome.components.canbus import CanbusComponent
+from esphome.components.canbus import CONF_CANBUS_ID, CanbusComponent
 from esphome.components.const import CONF_SERIAL_NUMBER
 import esphome.config_validation as cv
 from esphome.const import (
@@ -29,7 +29,6 @@ DEPENDENCIES = ["canbus"]
 DOMAIN = "canopen"
 MULTI_CONF = True
 
-CONF_CANBUS_ID = "canbus_id"
 # for components that refer to a canopen node (cv.use_id(CANopenComponent))
 CONF_CANOPEN_ID = "canopen_id"
 CONF_NODE_ID = "node_id"
@@ -455,11 +454,11 @@ def add_canopennode_library(path: str | None = None) -> None:
 async def to_code(config: ConfigType) -> None:
     add_canopennode_library(config.get(CONF_CANOPENNODE_PATH))
 
-    var = cg.new_Pvariable(config[CONF_ID], config.get(CONF_NODE_ID, NO_NODE_ID))
-    await cg.register_component(var, config)
-
     canbus = await cg.get_variable(config[CONF_CANBUS_ID])
-    cg.add(var.set_canbus(canbus))
+    var = cg.new_Pvariable(
+        config[CONF_ID], canbus, config.get(CONF_NODE_ID, NO_NODE_ID)
+    )
+    await cg.register_component(var, config)
     # other nodes on this canbus: a ring in config order (each call closes it again)
     local = _get_data().local_nodes.setdefault(str(config[CONF_CANBUS_ID]), [])
     if local:
@@ -579,11 +578,7 @@ async def sdo_write_to_code(
     args: TemplateArgsType,
 ) -> MockObj:
     var = await _sdo_action_to_code(config, action_id, template_arg, args)
-    value = config[CONF_VALUE]
-    if isinstance(value, int):
-        # negative values as two's complement in `size` bytes
-        value &= (1 << (8 * config[CONF_SIZE])) - 1
-    cg.add(var.set_value(await cg.templatable(value, args, cg.uint32)))
+    cg.add(var.set_value(await cg.templatable(config[CONF_VALUE], args, cg.uint32)))
     cg.add(var.set_size(config[CONF_SIZE]))
     if success_conf := config.get(CONF_ON_SUCCESS):
         await automation.build_automation(var.get_success_trigger(), [], success_conf)

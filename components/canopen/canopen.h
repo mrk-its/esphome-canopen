@@ -51,7 +51,7 @@ class CANopenComponent : public Component {
   // CANopenNode's "no own node" value (CO_SDOclient_init()).
   static constexpr uint8_t NO_NODE_ID = 0;
 
-  explicit CANopenComponent(uint8_t node_id) : node_id_(node_id) {}
+  CANopenComponent(canbus::Canbus *canbus, uint8_t node_id) : canbus_(canbus), node_id_(node_id) {}
   // no node id: SDO client only, see above
   bool is_client_only() const { return this->node_id_ == NO_NODE_ID; }
 
@@ -61,7 +61,6 @@ class CANopenComponent : public Component {
   // after the CAN bus, before the default on_boot automations (600)
   float get_setup_priority() const override { return setup_priority::HARDWARE - 1.0f; }
 
-  void set_canbus(canbus::Canbus *canbus);
   // Other canopen nodes on the same canbus, as a ring (codegen): a frame one of them sends is also received by the
   // others, since a CAN controller doesn't receive its own frames. nullptr = no other local node.
   void set_next_local(CANopenComponent *next) { this->next_local_ = next; }
@@ -84,6 +83,9 @@ class CANopenComponent : public Component {
   // buffers, frame listeners, callbacks) and process it in their next loop(), so no node's processing runs inside
   // another's.
   bool transmit(uint16_t ident, const uint8_t *data, uint8_t len);
+  // Used by the CANopenNode driver: while a received frame is processed, queued frames aren't retried (only loop()
+  // does that: on ESP32 a refused frame can block for the controller's enqueue timeout).
+  bool in_frame() const { return this->in_frame_; }
 
   // --- Identity and device information (device_info.cpp) ---
   // Identity (0x1018) and device information (0x1008 device name, 0x1009 hardware version, 0x100A software
@@ -206,14 +208,18 @@ class CANopenComponent : public Component {
  protected:
   void on_frame_(const canbus::CanFrame &frame);
   void receive_(uint16_t ident, const uint8_t *data, uint8_t len);
-  void process_(bool from_frame);
+  // A client-only hub with no request queued or running and no frame waiting to be resent. A node always has work
+  // (heartbeat, PDO timers).
+  bool idle_() const;
+  // CO_process() and our node's own processing: per received frame and in loop()
+  void process_node_();
   void setup_client_only_();
   // marks the hub failed and ends the requests queued before setup()
   void fail_setup_(const LogString *reason);
   // The features' parts of setup(), called in this order: add_*_od_() add OD entries (before the OD is finalized),
   // config_*_() fill in their CO_config_t counts and entries, init_*_() run once CANopenNode is initialised.
 
-  canbus::Canbus *canbus_{nullptr};
+  canbus::Canbus *canbus_;
   CANopenComponent *next_local_{nullptr};
   uint8_t node_id_;
   CO_t *co_{nullptr};
@@ -224,8 +230,9 @@ class CANopenComponent : public Component {
   uint32_t cob_emcy_{0x80};        // 0x1014, CANopenNode adds the node id
   uint16_t hb_producer_ms_{5000};  // 0x1017
 
-  uint32_t last_us_{0};
+  uint32_t last_us_{0};  // the node's clock (CO_process(), PDOs)
   bool start_operational_{true};
+  bool in_frame_{false};
   NMTState nmt_state_{NMTState::NMT_STATE_UNKNOWN};
   LazyCallbackManager<void(NMTState)> nmt_state_callback_;
   uint16_t response_timeout_ms_{500};
@@ -279,47 +286,47 @@ class CANopenComponent : public Component {
   enum class SDOKind : uint8_t { SDO_KIND_READ, SDO_KIND_WRITE, SDO_KIND_READ_DATA, SDO_KIND_WRITE_DATA };
   struct SDORequest {
     uint8_t node_id;
-    uint16_t index;
     uint8_t sub;
     SDOKind kind;
     uint8_t size;  // read: expected size (0 = any); write: value size
-    uint32_t value;
-    uint8_t *data;  // READ_DATA, WRITE_DATA (only read): owned by the caller
-    size_t len;     // READ_DATA: capacity of data
+    uint16_t index;
+    union {
+      uint32_t value;  // WRITE
+      uint8_t *data;   // READ_DATA, WRITE_DATA (only read): owned by the caller
+    };
+    size_t len;  // READ_DATA: capacity of data
     SDOCallback callback;
     void *context;
   };
   static constexpr size_t SDO_QUEUE_SIZE = 16;
   bool sdo_idle_() const {
-    return !this->sdo_busy_ && this->sdo_count_ == 0 && !this->sdo_abort_pending_ && this->sdo_abort_guard_us_ == 0;
+    return !this->sdo_busy_ && this->sdo_queue_.empty() && !this->sdo_abort_pending_ && this->sdo_abort_guard_us_ == 0;
   }
   void add_sdo_client_od_();
   void config_sdo_client_(CO_config_t &cfg);
   // client-only mode; a node's client is initialised by CO_CANopenInit()
   bool init_sdo_client_();
-  bool queue_sdo_(SDORequest &&request);
+  bool queue_sdo_(const SDORequest &request);
   void reject_queued_sdo_();
   bool sdo_reply_is_stale_(const uint8_t *data, uint8_t len) const;
   void process_sdo_(uint32_t dt_us);
+  // runs the upload and drains the client fifo; true when an overlong read ended the request here
+  bool drain_upload_(uint32_t dt_us, CO_SDO_return_t &ret, CO_SDO_abortCode_t &abort);
   bool start_sdo_();
   void finish_sdo_(SDOResult result, uint32_t abort_code);
   void abort_sdo_();
-  // OD 0x1280 (SDO client parameter), set up per request
-  uint8_t sdo_cli_highest_sub_{3};
+  StaticRingBuffer<SDORequest, SDO_QUEUE_SIZE> sdo_queue_;
+  SDORequest sdo_active_{};
+  // WRITE/WRITE_DATA: bytes handed to the client fifo; READ/READ_DATA: bytes received, also those beyond the buffer
+  size_t sdo_len_{0};
+  uint32_t sdo_last_ms_{0};         // loop time the SDO client was last given
+  uint32_t sdo_abort_guard_us_{0};  // time left before a request to sdo_abort_node_ may start
+  // OD 0x1280 (SDO client parameter, with sdo_cli_highest_sub_ and sdo_cli_node_), set up per request
   uint32_t sdo_cli_cob_tx_{0x80000000};
   uint32_t sdo_cli_cob_rx_{0x80000000};
-  uint8_t sdo_cli_node_{0};
-  std::array<SDORequest, SDO_QUEUE_SIZE> sdo_queue_{};
-  SDORequest sdo_active_{};
-  uint32_t sdo_last_us_{0};  // the SDO client's clock, see process_()
-  size_t sdo_offset_{0};     // WRITE/WRITE_DATA: bytes handed to the client fifo
-  // READ/READ_DATA: bytes received (also those beyond the buffer, for the size checks), kept in sdo_rx_value_ (READ)
-  // or the caller's buffer (READ_DATA)
-  size_t sdo_rx_len_{0};
-  uint32_t sdo_abort_guard_us_{0};  // time left before a request to sdo_abort_node_ may start
   std::array<uint8_t, 4> sdo_rx_value_{};
-  uint8_t sdo_head_{0};
-  uint8_t sdo_count_{0};
+  uint8_t sdo_cli_highest_sub_{3};
+  uint8_t sdo_cli_node_{0};
   uint8_t sdo_abort_node_{0};  // node of the last cancelled transfer, see ABORT_GUARD_US
   bool sdo_busy_{false};
   bool sdo_abort_pending_{false};

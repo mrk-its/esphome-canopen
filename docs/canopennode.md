@@ -400,8 +400,8 @@ PR N from here: split PR N's part out of the "PRs 2-6" commit into its own commi
 
 | File | PR | Content |
 |---|---|---|
-| `canopen.cpp` | 1 | setup sequence, 0x1001 / 0x1014 / 0x1017, `CO_new` / `CO_CANopenInit`, `process_()`, own NMT state, `dump_config()` |
-| `driver_can.cpp` | 1 | CANopenNode CAN driver (`CO_CAN*`), `set_canbus()`, `on_frame_()`, `receive_()`, `transmit()` (+ loopback: 2) |
+| `canopen.cpp` | 1 | setup sequence, 0x1001 / 0x1014 / 0x1017, `CO_new` / `CO_CANopenInit`, `loop()` / `process_node_()`, own NMT state, `dump_config()` |
+| `driver_can.cpp` | 1 | CANopenNode CAN driver (`CO_CAN*`), `on_frame_()`, `receive_()`, `transmit()` (+ loopback: 2) |
 | `device_info.cpp` | 1 | 0x1000, 0x1008-0x100A, 0x1018, SDO server 0x1200 |
 | `od.h` / `od.cpp` | 1 | runtime OD (`add_var/array/record/string`, `finalize()`, `find()`); `// --- Handlers ---` blocks: 4 |
 | `types.h` | 1 | `NMTState`; `NodeEvent`, `FrameCallback`, `Emergency`, decoders: 2; `NMTCommand`, SDO types: 3; `PdoMapping`: 5 |
@@ -636,8 +636,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   - no `canopennode_path:`, no SDO client switch (`enable_sdo_client()`, `CANopenData`, `USE_CANOPEN_SDO_CLIENT`),
     no `cancel_sdo()`: see "Size". `cancel_sdo()` and `sdo_cancel_test.cpp` go to PR 2, the client switch (with
     `sdo_client:`) to PR 3, `canopennode_path:` to whichever PR needs it next;
-  - left for review: the canbus as a constructor parameter instead of `set_canbus()` (esphome's "required invariant"
-    rule; `set_canbus()` also registers the frame callback).
+  - the canbus is a constructor parameter since bdraco's commits (below); `canopen-full` takes `(canbus, node_id)`.
 - **esphome conventions** (its AGENTS.md, checked before opening): fixed on `canopen-full` (`bf0f7c20cf`) and folded
   into the cut: no heap after `setup()` for the SDO client's reads (a member buffer then, the caller's buffer since the
   first review), the abort guard counts down
@@ -738,6 +737,52 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   clang-tidy clean on both; here `stm32l4_loopback.yaml`, `stm32l4_canopen.yaml` (canopen_entities, new priority) and
   `esp8266_mapper.yaml` build. Hardware (nucleo, same test): all cases as before, incl. the stall and the `on_boot`
   read; the house pass 124 successes, segmented strings (up to 29 bytes) intact with the 7-byte fifo.
+- **bdraco's commits** (2026-11-20, pushed to the cut on top of `1f3736764b`, last `1036a42cff`; the `dev` merges
+  not counted). Ported to `canopen-full` by hand (the cut's code doesn't fit the node core 1:1):
+  - `aba4d27b73`: the queue is a `StaticRingBuffer`, the request's `value` / `data` share a union, members reordered;
+    an idle hub turns its loop off (`enable_loop()` in `queue_sdo_()` and `CO_CANsend()`); `SDOActionBase` for both
+    actions; `CONF_CANBUS_ID` from canbus; `sdo_write` values not masked in codegen (`write_sdo()` masks); tests:
+    one table for the rejected requests, `SdoTest` for all, YAMLs on `packages:`;
+  - `580d5a6ced`: the canbus is a constructor parameter, the frame callback registered in `setup()`; `drain_upload_()`,
+    one `sdo_len_`, `encode_value_le`; `test.esp32-ard.yaml` dropped;
+  - `ba59c24159`: no `USE_CANBUS_FD` in the shared unit test binary (it broke the canbus tests);
+  - `4c2cce3918`: the SDO client's time comes from the loop clock (`App.get_loop_component_start_time()`, ms) and runs
+    only in `loop()`; a reply received in `on_frame_()` is processed at once and restarts the clock (CANopenNode
+    restarts its response timer for it). Queued frames are flushed only from `loop()` (on ESP32 a refused frame can
+    block for the controller's enqueue timeout). The tests move the loop clock (`advance_()`) instead of sleeping;
+  - `ad1a963910` + `1036a42cff`: `Canbus::rx_capped()` (the last receive pass stopped at `max_frames_per_loop`);
+    while a sent request waits for its reply, the hub holds its time until a pass drains, at most one response
+    timeout past the deadline. Not for an unsent frame (no reply can wait for it);
+  - `26554f9074`: superseded by the loop clock.
+  Size of the cut after them: 991 lines outside `tests/` (993 added, 2 removed in canbus).
+  Their tests fail clang-tidy (`readability-static-accessed-through-instance`: `this->advance_()` on a static): the
+  PR's CI is red on "clang-tidy for ESP32 IDF 3/5 and 5/5" (run 44655413694). Fixed on `canopen-full` (`846650b945`,
+  `advance_()` without `this->`); the cut needs the same change (not pushed: waiting for the user).
+  - **On `canopen-full`, differently:** a node still runs `CO_process()` for every received frame: CANopenNode keeps
+    one received frame per RPDO (`CO_PDO_receive()`), so processing only in `loop()` would apply only the last of
+    several frames of one COB-ID in a canbus pass (events, MPDO). The flush follows bdraco: `CO_CANmodule_process()`
+    does nothing while `in_frame_` (CO_process() calls it), so queued frames are retried only from `loop()`; frames
+    made while handling a received one go out at once only while nothing is queued. A node's loop never idles
+    (heartbeat, PDO timers): `idle_()` is for client-only hubs. Two clocks: `CO_process()` / PDOs keep `micros()`
+    (`last_us_`, inhibit times in 100 us), the SDO client `sdo_last_ms_`. `receive_()` stays (loopback, frame
+    listeners); a reply from another local node gets no clock restart. `cancel_sdo()` turns the ring once (no erase)
+    and enables the loop for the abort guard. `rx_capped()` through a C++20 `requires` helper in `canopen.cpp`, false
+    on a canbus without it: the hub copy in esphome-canopen still builds on ESPHome installs without PR 1 (upstream
+    venv, esphomeplatformzephyr). Remove the helper once PR 1 is in a release. The house nodes load `canbus` from the
+    `~/repos/esphome` checkout (`common_canopen_entities.yaml`), so they have the real `rx_capped()`.
+  - New tests on `canopen-full`: `processing_test.cpp` (a burst of two RPDOs on one COB-ID is applied twice; a node
+    doesn't retry queued frames on a received frame; the client-only loop idles; a node's doesn't), mutation-checked;
+    `advance_loop_clock()` in `fake_canbus.h` for the other fixtures.
+  - **To discuss with bdraco when PR 3 is cut** (not raised on PR 1: the cut never flushes on the frame path): the
+    node's per-frame `CO_process()` without the flush, above. Draft comment:
+    > For a node hub I'd like to keep running `CO_process()` for every received frame, not move it into `loop()`.
+    > CANopenNode keeps a single receive buffer per RPDO (`CO_PDO_receive()` copies into `CANrxData[0]` and sets
+    > `CANrxNew`): if one COB-ID arrives twice in the same canbus pass, only the last copy would be processed. That's
+    > harmless for state PDOs but loses data for event-like ones (commands, press/release, MPDOs where several objects
+    > share one COB-ID). `CO_process()` flushes the TX queue itself, so our `CO_CANmodule_process()` does nothing while
+    > a received frame is processed: queued frames are retried only from `loop()`, as in PR 1, and new frames go out
+    > immediately only while nothing is queued. A stuck TX costs at most one refused send per pass. Does that match
+    > what you had in mind, or would you rather have node hubs process only in `loop()`?
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's

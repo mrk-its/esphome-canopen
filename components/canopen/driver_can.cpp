@@ -5,6 +5,8 @@
 
 #include <cstring>
 
+#include "esphome/core/application.h"
+
 namespace esphome::canopen {
 
 void discard_pending_tx(CO_CANmodule_t *mod, CO_CANtx_t *buf) {
@@ -18,12 +20,9 @@ static bool send_frame(CO_CANmodule_t *mod, CO_CANtx_t *buf) {
   return static_cast<CANopenComponent *>(mod->CANptr)->transmit(buf->ident, buf->data, buf->DLC);
 }
 
-void CANopenComponent::set_canbus(canbus::Canbus *canbus) {
-  this->canbus_ = canbus;
-  canbus->add_frame_callback([this](const canbus::CanFrame &frame) { this->on_frame_(frame); });
-}
-
 void CANopenComponent::on_frame_(const canbus::CanFrame &frame) {
+  if (this->co_ == nullptr || this->is_failed())
+    return;
   // CANopen (CiA 301) uses classic CAN frames with 11-bit ids
 #ifdef USE_CANBUS_FD
   if (frame.fd)
@@ -33,7 +32,21 @@ void CANopenComponent::on_frame_(const canbus::CanFrame &frame) {
   if (frame.use_extended_id || len > 8)
     return;
   this->receive_((frame.can_id & 0x7FF) | (frame.remote_transmission_request ? 0x800 : 0), frame.data, len);
-  this->process_(true);
+  this->in_frame_ = true;
+#ifdef USE_CANOPEN_SDO_CLIENT
+  // A reply for the running request is handled right away; CANopenNode restarts its response timer for it (and may
+  // send the next segment), so the time loop() charges starts again here. A reply from another local node comes by
+  // receive_() and waits for loop().
+  if (CO_FLAG_READ(this->co_->SDOclient->CANrxNew)) {
+    this->process_sdo_(0);
+    this->sdo_last_ms_ = App.get_loop_component_start_time();
+  }
+#endif
+  // A node processes every frame before the next one: CANopenNode keeps one received frame per object (e.g. an
+  // RPDO), so a later frame of a burst would overwrite it.
+  if (!this->is_client_only())
+    this->process_node_();
+  this->in_frame_ = false;
 }
 
 void CANopenComponent::receive_(uint16_t ident, const uint8_t *data, uint8_t len) {
@@ -58,8 +71,6 @@ void CANopenComponent::receive_(uint16_t ident, const uint8_t *data, uint8_t len
 }
 
 bool CANopenComponent::transmit(uint16_t ident, const uint8_t *data, uint8_t len) {
-  if (this->canbus_ == nullptr)
-    return false;
   if (this->canbus_->send_data(ident & 0x7FF, false, ident & 0x800, data, len) != canbus::ERROR_OK)
     return false;
   for (CANopenComponent *node = this->next_local_; node != nullptr && node != this; node = node->next_local_)
@@ -143,9 +154,10 @@ CO_ReturnError_t CO_CANsend(CO_CANmodule_t *CANmodule, CO_CANtx_t *buffer) {
     CANmodule->firstCANtxMessage = false;
     return CO_ERROR_NO;
   }
-  // keep it queued (in order behind the others), CO_CANmodule_process() resends it
+  // keep it queued (in order behind the others), CO_CANmodule_process() resends it from loop()
   buffer->bufferFull = true;
   CANmodule->CANtxCount++;
+  static_cast<esphome::canopen::CANopenComponent *>(CANmodule->CANptr)->enable_loop();
   return CO_ERROR_NO;
 }
 
@@ -153,14 +165,16 @@ void CO_CANclearPendingSyncPDOs(CO_CANmodule_t *CANmodule) {
   for (uint16_t i = 0; i < CANmodule->txSize; i++) {
     CO_CANtx_t *tx = &CANmodule->txArray[i];
     if (tx->bufferFull && tx->syncFlag) {
-      tx->bufferFull = false;
-      CANmodule->CANtxCount--;
+      discard_pending_tx(CANmodule, tx);
       CANmodule->CANerrorStatus |= CO_CAN_ERRTX_PDO_LATE;
     }
   }
 }
 
 void CO_CANmodule_process(CO_CANmodule_t *CANmodule) {
+  // also called by CO_process(); on a received frame the queue waits for loop()
+  if (static_cast<esphome::canopen::CANopenComponent *>(CANmodule->CANptr)->in_frame())
+    return;
   for (uint16_t i = 0; i < CANmodule->txSize && CANmodule->CANtxCount > 0; i++) {
     CO_CANtx_t *tx = &CANmodule->txArray[i];
     if (!tx->bufferFull)

@@ -119,6 +119,7 @@ void CANopenComponent::setup() {
   this->init_frame_listeners_();
 
   CO_CANsetNormalMode(this->co_->CANmodule);
+  this->canbus_->add_frame_callback([this](const canbus::CanFrame &frame) { this->on_frame_(frame); });
   this->last_us_ = micros();
   ESP_LOGV(TAG, "CANopenNode initialized, node 0x%02x, heap %" PRIu32 " B", this->node_id_, heap);
 #endif  // USE_CANOPEN_NODE
@@ -152,7 +153,7 @@ void CANopenComponent::setup_client_only_() {
   }
   this->init_frame_listeners_();
   CO_CANsetNormalMode(this->co_->CANmodule);
-  this->last_us_ = micros();
+  this->canbus_->add_frame_callback([this](const canbus::CanFrame &frame) { this->on_frame_(frame); });
   ESP_LOGV(TAG, "CANopenNode initialized, SDO client only, heap %" PRIu32 " B", heap);
 #else
   // codegen enables the SDO client for a hub without node id
@@ -197,41 +198,64 @@ void CANopenComponent::dump_config() {
 #endif
 }
 
-void CANopenComponent::loop() { this->process_(false); }
+// canbus::Canbus::rx_capped() came with the SDO client (PR 1); an older canbus never reports a capped pass
+template<typename T> static bool rx_capped(const T *canbus) {
+  if constexpr (requires { canbus->rx_capped(); }) {
+    return canbus->rx_capped();
+  } else {
+    return false;
+  }
+}
 
-void CANopenComponent::process_(bool from_frame) {
-  if (this->co_ == nullptr || this->is_failed())
-    return;
+bool CANopenComponent::idle_() const {
 #ifdef USE_CANOPEN_SDO_CLIENT
-  // a hub without node id only works for requests and frames to send
-  if (this->is_client_only() && this->co_->CANmodule->CANtxCount == 0 && this->sdo_idle_())
-    return;
+  return this->is_client_only() && this->co_->CANmodule->CANtxCount == 0 && this->sdo_idle_();
+#else
+  return false;
 #endif
-  uint32_t now = micros();
-  uint32_t dt = now - this->last_us_;
-  this->last_us_ = now;
+}
+
+// A client-only hub needs time only for a running request or an unsent frame: queue_sdo_(), cancel_sdo() and
+// CO_CANsend() enable the loop again.
+void CANopenComponent::loop() {
+  if (this->co_ == nullptr)
+    return;
+  if (this->idle_()) {
+    this->disable_loop();
+    return;
+  }
 #ifdef USE_CANOPEN_SDO_CLIENT
-  // SDO client first: an unsent frame ends at its deadline, before the flush could send it. Its time runs in loop() (a
-  // received frame may come before a queued reply), or while no reply can be on its way (frame unsent, no request).
+  // SDO client first: an unsent frame ends at its deadline, before the flush could send it. Time runs only here,
+  // after the canbus loop delivered its frames: a received frame may come before a queued reply.
   CO_SDOclient_t *cli = this->co_->SDOclient;
   const bool unsent = cli->CANtxBuff->bufferFull;
-  if (!from_frame || unsent || !this->sdo_busy_) {
-    this->process_sdo_(now - this->sdo_last_us_);
-    this->sdo_last_us_ = now;
-  } else {
-    this->process_sdo_(0);
+  const uint32_t now = App.get_loop_component_start_time();
+  const uint32_t elapsed = now - this->sdo_last_ms_;
+  // The reply to a sent frame may still wait in the controller behind a capped canbus pass: the time is charged once it
+  // drained, but held at most one response timeout past the deadline, so a saturated bus still times out.
+  if (!this->sdo_busy_ || unsent || !rx_capped(this->canbus_) ||
+      cli->timeoutTimer / 1000 + elapsed >= 2u * this->response_timeout_ms_) {
+    this->process_sdo_(elapsed * 1000);
+    this->sdo_last_ms_ = now;
   }
 #endif
-  // also done by CO_process(), which would process the node's objects (not initialised in client-only mode)
+  // The only flush of queued frames, also for a node: CO_process() flushes too, but not while a received frame is
+  // processed (in_frame_).
   CO_CANmodule_process(this->co_->CANmodule);
 #ifdef USE_CANOPEN_SDO_CLIENT
   // CANopenNode started the response timeout when it queued the frame: start it again now that the frame is sent
   if (unsent && !cli->CANtxBuff->bufferFull)
     cli->timeoutTimer = 0;
 #endif
-  if (this->is_client_only())
-    return;
+  if (!this->is_client_only())
+    this->process_node_();
+}
+
+void CANopenComponent::process_node_() {
 #ifdef USE_CANOPEN_NODE
+  uint32_t now = micros();
+  uint32_t dt = now - this->last_us_;
+  this->last_us_ = now;
   CO_NMT_reset_cmd_t reset = CO_process(this->co_, false, dt, nullptr);
   if (reset == CO_RESET_APP) {
     ESP_LOGW(TAG, "NMT reset node");
