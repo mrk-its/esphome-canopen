@@ -6,9 +6,9 @@
 # (same board and partition layout as stm32l4_canopen.yaml, which has the hardware tests)
 
 external_components:
-  # the hub from the fork's working tree
+  # the hub from the fork's working tree; canbus too (rx_capped(), from the canopen PR 1), as on the house nodes
   - source: ../../esphome/esphome/components
-    components: [canopen]
+    components: [canopen, canbus]
   - source: ../components
     components: [canopen_entities]
 

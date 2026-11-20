@@ -773,6 +773,10 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   - New tests on `canopen-full`: `processing_test.cpp` (a burst of two RPDOs on one COB-ID is applied twice; a node
     doesn't retry queued frames on a received frame; the client-only loop idles; a node's doesn't), mutation-checked;
     `advance_loop_clock()` in `fake_canbus.h` for the other fixtures.
+  - Hardware (nucleo as node 0x7f, `test/stm32l4_biuro_switch.yaml`, hub and canbus from the `canopen-full`
+    checkout, `sdo_block_size: 60`, 2026-11-20): flashed over USB, operational, can2mqtt reads its version. CAN OTA
+    from can2mqtt: 125,603 B in ~47 s (2.67 KB/s; 2.62 KB/s on 2026-11-02 before the change), no gap over 1 s between
+    the kB log lines, MD5 OK, new image booted and confirmed by `safe_mode`. A B1 press toggled dimmer4 light5.
   - **To discuss with bdraco when PR 3 is cut** (not raised on PR 1: the cut never flushes on the frame path): the
     node's per-frame `CO_process()` without the flush, above. Draft comment:
     > For a node hub I'd like to keep running `CO_process()` for every received frame, not move it into `loop()`.
