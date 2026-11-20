@@ -1,0 +1,197 @@
+# Nucleo as a wall switch on the PR 1 hub only (canopen as SDO client, no node_id, no canopen_entities): B1 toggles
+# dimmer4's light5 ("biuro", node 0x37) by reading its state 0x2051:1 and writing the opposite to its command 0x2052:1
+# (canopen.sdo_read / canopen.sdo_write). The green LED blinks on CAN traffic.
+# The hub comes from a worktree of branch canopen-pr1-sdo-client next to this repo, canbus from canopen-full:
+#   git -C ~/repos/esphome worktree add --detach ~/repos/esphome-pr1 canopen-pr1-sdo-client
+# Build with the esphomeplatformzephyr venv:
+#   ../esphomeplatformzephyr/venv/bin/esphome compile test/stm32l4_biuro_switch_sdo_client.yaml
+# Not a CANopen node, so no CAN OTA from this image. It can be installed over CAN by a node image (e.g.
+# stm32l4_biuro_switch.yaml) through can2mqtt: can2mqtt finds an image's node by the "node_id: .., ver: .." string,
+# which canopen_entities normally generates; here it is logged at boot (set ota_ver to the build time, UTC).
+# (same board and partition layout as stm32l4_biuro_switch.yaml)
+
+substitutions:
+  # dimmer4
+  light_node: "0x37"
+  # the node this image replaces over CAN OTA (stm32l4_biuro_switch.yaml)
+  ota_node: "7f"
+  ota_ver: "20261120.185551"
+
+external_components:
+  # PR 1 hub
+  - source: ../../esphome-pr1/esphome/components
+    components: [canopen]
+  # canbus with rx_capped(): canopen-full's (the same C++ as PR 1's; PR 1's __init__.py needs a newer ESPHome)
+  - source: ../../esphome/esphome/components
+    components: [canbus]
+
+esphome:
+  name: stm32l4-biuro-switch-sdo-client
+  on_boot:
+    - lambda: |-
+        ESP_LOGI("main", "%s", "node_id: ${ota_node}, ver: " ESPHOME_VERSION ".${ota_ver}");
+
+stm32:
+  variant: STM32L4
+  # board: nucleo_l476rg/stm32l476xx
+  board: nucleo_l476rg
+  framework:
+    advanced:
+      runner: openocd
+      bootloader: mcuboot
+  # nucleo_l476rg has no MCUboot layout upstream, so carve the 1 MB flash into
+  # boot (64K) / slot0 / slot1 (464K each), keeping the board's 32K storage at 0xf8000.
+    overlays:
+      app: |
+        /delete-node/ &storage_partition;
+
+        &flash0 {
+            partitions {
+                boot_partition: partition@0 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "mcuboot";
+                    reg = <0x0 DT_SIZE_K(64)>;
+                };
+                slot0_partition: partition@10000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "image-0";
+                    reg = <0x10000 0x74000>;
+                };
+                slot1_partition: partition@84000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "image-1";
+                    reg = <0x84000 0x74000>;
+                };
+                storage_partition: partition@f8000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "storage";
+                    reg = <0xf8000 DT_SIZE_K(32)>;
+                };
+            };
+        };
+
+        / {
+            chosen {
+                zephyr,code-partition = &slot0_partition;
+            };
+        };
+      mcuboot: |
+        /delete-node/ &storage_partition;
+
+        &flash0 {
+            partitions {
+                boot_partition: partition@0 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "mcuboot";
+                    reg = <0x0 DT_SIZE_K(64)>;
+                };
+                slot0_partition: partition@10000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "image-0";
+                    reg = <0x10000 0x74000>;
+                };
+                slot1_partition: partition@84000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "image-1";
+                    reg = <0x84000 0x74000>;
+                };
+                storage_partition: partition@f8000 {
+                    compatible = "zephyr,mapped-partition";
+                    label = "storage";
+                    reg = <0xf8000 DT_SIZE_K(32)>;
+                };
+            };
+        };
+
+        / {
+            chosen {
+                zephyr,code-partition = &boot_partition;
+            };
+        };
+
+logger:
+  logs:
+    canbus: INFO
+    script: INFO
+
+canbus:
+  - platform: zephyr_can
+    id: can_bus
+    can_id: 0
+    bit_rate: 125kbps
+    rx_pin: PA11
+    tx_pin: PA12
+    rx_buffer_size: 64
+    tx_buffer_size: 32
+    # every received frame blinks the LED
+    on_frame:
+      can_id: 0
+      can_id_mask: 0
+      then:
+        - script.execute: frame_blink
+
+script:
+  - id: frame_blink
+    mode: restart
+    then:
+      - output.turn_on: led_output
+      - delay: 20ms
+      - output.turn_off: led_output
+
+canopen:
+  id: sdo_hub
+  canbus_id: can_bus
+  response_timeout: 500ms
+
+# confirms the new MCUboot image after a good boot (1 min, or an orderly reboot); without it the image is rolled
+# back at the next reset
+safe_mode:
+
+globals:
+  - id: light_command
+    type: uint32_t
+    initial_value: "0"
+
+output:
+  - platform: gpio
+    pin: 5  # PA5, LD2
+    id: led_output
+
+binary_sensor:
+  # B1 USER: PC13, low while pressed
+  - platform: gpio
+    id: user_button
+    pin:
+      number: PC13
+      inverted: true
+    filters:
+      - delayed_on_off: 20ms
+    on_press:
+      - logger.log: "B1 pressed: toggle biuro (dimmer4 light5)"
+      - canopen.sdo_read:
+          node_id: ${light_node}
+          index: 0x2051
+          subindex: 1
+          size: 1
+          on_value:
+            - globals.set:
+                id: light_command
+                value: !lambda "return x ? 0 : 1;"
+            - canopen.sdo_write:
+                node_id: ${light_node}
+                index: 0x2052
+                subindex: 1
+                size: 1
+                value: !lambda "return id(light_command);"
+                on_success:
+                  - logger.log:
+                      format: "biuro: command %u sent"
+                      args: ["(unsigned) id(light_command)"]
+                on_error:
+                  - logger.log:
+                      format: "biuro: write failed: %s, abort 0x%08x"
+                      args: ["LOG_STR_ARG(canopen::sdo_result_to_string(result))", "(unsigned) abort_code"]
+          on_error:
+            - logger.log:
+                format: "biuro: state read failed: %s, abort 0x%08x"
+                args: ["LOG_STR_ARG(canopen::sdo_result_to_string(result))", "(unsigned) abort_code"]
