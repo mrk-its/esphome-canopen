@@ -23,7 +23,7 @@ see "Hub for the entity mapper"). **Next:** cut the upstream PRs again from the 
 Where to continue (2026-11-07):
 - **Upstream split:** "Upstream PRs" -> "SDO client only first" (the current split) and its "PR 1 as cut": PR 1 (the
   SDO client, no node) is cut on `canopen-pr1-sdo-client` in `~/repos/esphome` and `~/repos/esphome-docs`, pushed,
-  hardware-tested on the nucleo; both PRs are open as drafts: esphome/esphome#22410 and esphome/esphome.io#8059. "New split" holds the refactor and the cutting steps; the old
+  hardware-tested on the nucleo; both PRs are open, ready for review since 2026-11-09: esphome/esphome#22410 and esphome/esphome.io#8059. "New split" holds the refactor and the cutting steps; the old
   `canopen-pr1-node` (the node core) is superseded.
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
 - **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
@@ -596,7 +596,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   `canopen-pr1-sdo-client` in `~/repos/esphome`, `79f5437814` on `upstream/dev` `a9ba8e9743`, "[canopen] Add CANopen
   SDO client component (on CANopenNode)"; `canopen-pr1-sdo-client` in `~/repos/esphome-docs`, `0bbf9e1bf` on
   `origin/next` (the page cut to PR 1, the index and CAN Bus "See Also" links; `node script/lint.mjs` clean).
-  PRs (drafts, opened 2026-11-07): esphome/esphome#22410 and esphome/esphome.io#8059, both `[canopen] Add CANopen SDO
+  PRs (opened 2026-11-07 as drafts, ready for review since 2026-11-09): esphome/esphome#22410 and esphome/esphome.io#8059, both `[canopen] Add CANopen SDO
   client component`, linked to each other. The esphome PR says it replaces #21522 (kj4dxk's hub); Test Environment:
   the STM32 nucleo, in a sentence (no box ticked).
   Until reviews start, fixes are amended and force-pushed; afterwards only new commits.
