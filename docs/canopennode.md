@@ -776,7 +776,13 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   - Hardware (nucleo as node 0x7f, `test/stm32l4_biuro_switch.yaml`, hub and canbus from the `canopen-full`
     checkout, `sdo_block_size: 60`, 2026-11-20): flashed over USB, operational, can2mqtt reads its version. CAN OTA
     from can2mqtt: 125,603 B in ~47 s (2.67 KB/s; 2.62 KB/s on 2026-11-02 before the change), no gap over 1 s between
-    the kB log lines, MD5 OK, new image booted and confirmed by `safe_mode`. A B1 press toggled dimmer4 light5.
+    the kB log lines, MD5 OK, new image booted and confirmed by `safe_mode`. (A "B1 pressed" line at the start of a
+    serial capture is old output the ST-Link held until the port was opened: the light didn't change then.)
+  - Hardware, PR 1 only (`test/stm32l4_biuro_switch_sdo_client.yaml`: the cut's hub without `node_id`, canbus from
+    `canopen-full`, B1 reads dimmer4 light5's state 0x2051:1 and writes the opposite to 0x2052:1): installed by CAN OTA
+    through the node image above (can2mqtt finds the image by a hand-made `node_id: 7f, ver: ..` string), 94,019 B in
+    ~35 s, booted as a client-only hub, confirmed by `safe_mode`. Two B1 presses: light off, then on (HA history at
+    the same times), no SDO errors. That image has no CAN OTA: back to the node firmware over USB.
   - **To discuss with bdraco when PR 3 is cut** (not raised on PR 1: the cut never flushes on the frame path): the
     node's per-frame `CO_process()` without the flush, above. Draft comment:
     > For a node hub I'd like to keep running `CO_process()` for every received frame, not move it into `loop()`.
