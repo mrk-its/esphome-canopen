@@ -73,6 +73,11 @@ canopen_buttons:
     - binary_sensor: test_binary
       node: dimmer
       entity: light_table
+  # moves a remote cover while held
+  covers:
+    - open: test_binary
+      node: dimmer
+      entity: cover_hall
 
 text_sensor:
   - platform: canopen_entities

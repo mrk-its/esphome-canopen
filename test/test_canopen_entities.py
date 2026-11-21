@@ -531,6 +531,53 @@ def test_invalid_button_lights(tmp_path: Path, button: dict, message: str) -> No
     assert message in output
 
 
+def button_covers(*covers: dict) -> dict:
+    """`canopen_buttons: covers:` entries, plus a second binary sensor `door2` for close buttons."""
+    return {
+        "canopen_buttons": {"covers": list(covers)},
+        "binary_sensor": [{"platform": "template", "id": "door2", "name": "Door 2"}],
+    }
+
+
+@needs_esphome
+def test_codegen_button_covers(tmp_path: Path) -> None:
+    extra = button_covers(
+        {"node": "dimmer", "entity": "cover_hall", "open": "door", "close": "door2"},
+        {"node": "dimmer", "entity": "cover_hall", "close": "door2"},
+    )
+    main_cpp, defines = generate(tmp_path, [], extra, remote_nodes=REMOTE_NODES)
+    mapper = re.search(r"(\w+)->set_layout_hash\(", main_cpp).group(1)
+    assert "#define USE_CANOPEN_BUTTONS_COVERS" in defines
+    assert "USE_CANOPEN_BUTTONS_LIGHTS" not in defines
+    # no remote state needed
+    assert "CANOPEN_ENTITIES_REMOTE_SLOTS" not in defines
+    # cover_hall: entity 5 of node 0x36 (old component: old frame format)
+    assert main_cpp.count(f"->set_remote_target({mapper}, 54, 5, true);") == 2
+    assert main_cpp.count("->set_open_sensor(door);") == 1
+    assert main_cpp.count("->set_close_sensor(door2);") == 2
+
+
+@needs_esphome
+@pytest.mark.parametrize(
+    ("cover", "message"),
+    [
+        pytest.param(
+            {"node": "dimmer", "entity": "light_hall", "open": "door"},
+            "canopen_buttons cover: dimmer 'light_hall' is a light, expected cover",
+            id="not-a-cover",
+        ),
+        pytest.param(
+            {"node": "dimmer", "entity": "cover_hall"},
+            "Must contain at least one of open, close",
+            id="no-buttons",
+        ),
+    ],
+)
+def test_invalid_button_covers(tmp_path: Path, cover: dict, message: str) -> None:
+    output = config_error(tmp_path, [], button_covers(cover), remote_nodes=REMOTE_NODES)
+    assert message in output
+
+
 @needs_esphome
 def test_light_buttons_moved(tmp_path: Path) -> None:
     """The old `canopen_entities: light_buttons:` points to canopen_buttons."""

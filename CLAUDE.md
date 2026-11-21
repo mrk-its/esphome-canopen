@@ -68,7 +68,9 @@ OTA stays until the rest is tested. OTA is PR 8 of the current split (`canopen_o
   objects (`docs/canopen_ota.md`).
 `components/canopen_buttons/`: wall buttons on top of canopen_entities' `RemoteTarget`; `lights:` = `LightButton`
 (`light_button.*`): short press toggles, hold ramps the brightness (was `canopen_entities: light_buttons:` until
-2026-11-21, that key now fails with a pointer). New button kinds (covers...) go here, not into canopen_entities.
+2026-11-21, that key now fails with a pointer); `covers:` = `CoverButton` (`cover_button.*`): open / close buttons,
+the cover moves while held, last press wins, the stop goes out twice. New button kinds go here, not into
+canopen_entities.
 `components/canopen/`: **a generated copy of the hub, never edit it here.** The hub is developed and tested in
 `~/repos/esphome` (branch `canopen-full`, pushed to mrk-its/esphome), from where the upstream PRs are cut.
 `scripts/sync_hub.py` copies `esphome/components/canopen` from a commit (`--ref`, default `canopen-full`) and writes

@@ -140,3 +140,24 @@ transition and the light lags behind the button.
 
 Until 2026-11-21 this was `canopen_entities: light_buttons:` with the same entries; that key now fails validation with
 a pointer here.
+
+### Covers
+`covers` moves a cover of a remote node while a button is held: one button opens, another closes, releasing stops:
+
+```yaml
+canopen_buttons:
+  covers:
+    - open: in1
+      close: in2
+      node: martin-c3
+      entity: cover_hall
+```
+
+* `open` (Optional, ID): binary sensor opening the cover while held
+* `close` (Optional, ID): binary sensor closing the cover while held (at least one of `open`, `close`)
+* `node` (Required, string): name of the node in `remote_nodes`
+* `entity` (Required, string): id of the remote cover (the OD writer on; `tpdo` isn't needed)
+
+The last press wins: pressing the other button while one is held reverses the cover, and releasing one while the
+other is still held moves the other way. When no button is held the cover stops. The stop is sent twice, 50 ms apart:
+commands get no reply, and a lost stop would run the cover to its end. At an end position the cover stops by itself.

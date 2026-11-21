@@ -44,7 +44,7 @@ is developed on), so one `external_components` entry brings both.
 * State broadcast in up to 8 TPDOs, with compact 1- or 2-byte encoding of sensor values
 * [Linking nodes](docs/linking-nodes.md): actions such as `canopen_entities.light.toggle` and remote states as local
   entities, with other nodes referred to by their YAML file and entity ids; wall buttons that toggle and dim a remote
-  light (the `canopen_buttons` component)
+  light, move a remote cover while held (the `canopen_buttons` component)
 * [OTA over CAN](docs/ota.md): firmware updates from Home Assistant through can2mqtt
 * [Remote logs](docs/remote-logs.md): read a node's log in can2mqtt, no serial cable needed
 * From the `canopen` component: heartbeat monitoring of other nodes (`heartbeat_clients`, `on_node_event`), NMT,
