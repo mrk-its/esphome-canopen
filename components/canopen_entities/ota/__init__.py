@@ -33,8 +33,8 @@ CanopenOTAComponent = ns.class_("CanopenOTAComponent", OTAComponent)
 
 
 def _is_zephyr() -> bool:
-    """Zephyr builds of the fork: `using_zephyr_rtos` (framework-zephyr branch), `is_zephyr` (older branches)."""
-    return getattr(CORE, "using_zephyr_rtos", False) or getattr(CORE, "is_zephyr", False)
+    """Zephyr builds of the fork: `using_toolchain_zephyr`, or `using_zephyr_rtos` / `is_zephyr` on older branches."""
+    return any(getattr(CORE, name, False) for name in ("using_toolchain_zephyr", "using_zephyr_rtos", "is_zephyr"))
 
 
 def _mcuboot():
