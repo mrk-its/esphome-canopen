@@ -60,6 +60,8 @@ One `canopen_entities:` per firmware.
   to, by the ESPHome YAML file they are built from (path relative to this config). Their TPDO layout is computed from
   that file, so `rpdo`, `platform: canopen_entities` entities and the `canopen_entities.*` actions can refer to remote
   entities by id. See [Linking nodes](linking-nodes.md).
+* `light_buttons` (Optional, list): buttons toggling a dimmable light of a remote node on a short press and dimming it
+  while held, see [Light buttons](linking-nodes.md#light-buttons).
 * `remote_logs` (Optional): send the node's log output over CAN to can2mqtt, see
   [Remote logging over CAN](remote-logs.md).
 

@@ -98,3 +98,34 @@ the remote entity needs `tpdo`.
 
 The old component's `canopen.entity_cmd` (a raw command to a remote entity) isn't available yet. For other devices
 on the bus, the `canopen` component's actions and lambdas write objects directly (`canopen.sdo_write`, `write_sdo()`).
+
+## Light buttons
+`light_buttons` turns a button (any binary sensor) into a wall dimmer for a light of a remote node: a short press
+toggles the light, holding the button ramps its brightness. Nothing is needed on the remote node beyond the light's
+usual commands (the OD writer, `tpdo` on the light):
+
+```yaml
+canopen_entities:
+  remote_nodes:
+    dimmer3: dimmer3.yaml
+  light_buttons:
+    - binary_sensor: in6
+      node: dimmer3
+      entity: light4
+```
+
+* `binary_sensor` (Required, ID): the button. Its own `on_press` / `on_release` etc. still run.
+* `node` (Required, string): name of the node in `remote_nodes`
+* `entity` (Required, string): id of the remote light (with brightness, and `tpdo`)
+* `hold_time` (Optional, time, default `400ms`): a shorter press toggles the light (sent on release), a longer one
+  dims it
+* `ramp_time` (Optional, time, default `3s`): time to ramp the brightness over the full range
+* `step_interval` (Optional, time, default `100ms`, at least `20ms`): a brightness command is sent this often while
+  dimming
+* `min_brightness` (Optional, percentage, default `2%`): dimming down stops here, it doesn't switch the light off
+
+Direction of a hold: up from `min_brightness` if the light is off (it is switched on), up at the minimum, down at full
+brightness, otherwise the opposite of the previous hold. The light's state and brightness at the start come from
+[remote state slots](#remote-states), during the ramp the button counts on its own. Each step is a separate
+brightness command: the remote light should have `default_transition_length: 0s`, otherwise every step starts a
+transition and the light lags behind the button.

@@ -58,6 +58,9 @@ OTA stays until the rest is tested. OTA is PR 8 of the current split (`canopen_o
   component and until 2026-11-01) -> `RemoteCommandAction` writes.
 - `canopen_entities.cpp/.h`: `CANopenEntities` (the component), `MappedEntity` (one entity, the `OdObject` handler of
   its three records), remote state slots, the OD writer.
+- `light_button.*`: `light_buttons` (`LightButton`): a binary sensor toggling / dimming a remote light (short press,
+  hold), with the light's state and brightness from remote state slots (`resolve_light_buttons()` marks them in nested
+  dicts) and commands through `send_od_write()`; nothing on the remote node.
 - `log_buffer.*` / `remote_logs.*`: remote logs, see "Remote logs".
 - `ota/`: the `ota: - platform: canopen_entities` component, OD `0x3000`, wraps the platform's
   `esphome::ota::make_ota_backend()`; optional zlib (miniz) decompression. Planned to move into the hub on CiA 302-3

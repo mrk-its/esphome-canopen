@@ -13,7 +13,7 @@ from typing import Any
 
 from esphome import automation
 import esphome.codegen as cg
-from esphome.components import canopen
+from esphome.components import binary_sensor, canopen
 from esphome.components.logger import LOG_LEVEL_SEVERITY, request_log_listener
 import esphome.config_validation as cv
 from esphome.const import (
@@ -57,6 +57,12 @@ CONF_TPDO_SIZE = "tpdo_size"
 CONF_MAPPER_ID = "canopen_entities_id"
 CONF_REMOTE_LOGS = "remote_logs"
 CONF_BLOCK_SIZE = "block_size"
+CONF_LIGHT_BUTTONS = "light_buttons"
+CONF_BINARY_SENSOR = "binary_sensor"
+CONF_HOLD_TIME = "hold_time"
+CONF_RAMP_TIME = "ramp_time"
+CONF_STEP_INTERVAL = "step_interval"
+CONF_MIN_BRIGHTNESS = "min_brightness"
 # remote state (node, entity, state) a `platform: canopen_entities` entity or a toggle action reads, set by
 # their validation; collected from the whole validated config by remote_state_slots()
 CONF_REMOTE_STATE = "_canopen_remote_state"
@@ -79,6 +85,7 @@ ns = cg.esphome_ns.namespace("canopen_entities")
 CANopenEntities = ns.class_("CANopenEntities", cg.Component)
 RemoteCommandAction = ns.class_("RemoteCommandAction", automation.Action)
 RemoteLogs = ns.class_("RemoteLogs", cg.Component)
+LightButton = ns.class_("LightButton", cg.Component)
 
 # entity C++ class -> layout domain; order matters only for classes inheriting from each other
 ENTITY_DOMAINS = [
@@ -201,6 +208,47 @@ REMOTE_LOGS_SCHEMA = cv.Schema(
 ).extend(cv.COMPONENT_SCHEMA)
 
 
+def _validate_ramp(config: ConfigType) -> ConfigType:
+    if config[CONF_RAMP_TIME] < config[CONF_STEP_INTERVAL]:
+        raise cv.Invalid(
+            f"'{CONF_RAMP_TIME}' must be at least '{CONF_STEP_INTERVAL}'",
+            path=[CONF_RAMP_TIME],
+        )
+    return config
+
+
+# a button (binary sensor) toggling a remote dimmable light on a short press and dimming it while held (LightButton,
+# light_button.h); the light is resolved by resolve_light_buttons()
+LIGHT_BUTTON_SCHEMA = cv.All(
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.declare_id(LightButton),
+            cv.Required(CONF_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+            cv.Required(CONF_NODE): cv.string,
+            cv.Required(CONF_ENTITY): cv.string,
+            # a shorter press toggles
+            cv.Optional(
+                CONF_HOLD_TIME, default="400ms"
+            ): cv.positive_time_period_milliseconds,
+            # brightness 0 -> 100 % while held
+            cv.Optional(
+                CONF_RAMP_TIME, default="3s"
+            ): cv.positive_time_period_milliseconds,
+            # a brightness command every step_interval while ramping
+            cv.Optional(CONF_STEP_INTERVAL, default="100ms"): cv.All(
+                cv.positive_time_period_milliseconds,
+                cv.Range(min=cv.TimePeriod(milliseconds=20)),
+            ),
+            # dimming stops here (it doesn't switch the light off); an off light starts here
+            cv.Optional(CONF_MIN_BRIGHTNESS, default="2%"): cv.All(
+                cv.percentage, cv.Range(min=0.004, max=0.99)
+            ),
+        }
+    ).extend(cv.COMPONENT_SCHEMA),
+    _validate_ramp,
+)
+
+
 # what canopen_entities needs from the hub beyond its first upstream PR: own PDOs (PR 5), SDO block transfer (PR 6),
 # the node check (require_node_id(), with the SDO-client-only mode)
 HUB_REQUIRED = ("enable_pdo", "enable_sdo_block", "CONF_SDO_BLOCK_SIZE", "require_node_id")
@@ -261,11 +309,16 @@ CONFIG_SCHEMA = cv.All(
                 {cv.string: cv.file_}
             ),
             cv.Optional(CONF_REMOTE_LOGS): REMOTE_LOGS_SCHEMA,
+            # buttons dimming lights of remote nodes (docs/linking-nodes.md)
+            cv.Optional(CONF_LIGHT_BUTTONS, default=[]): cv.ensure_list(
+                LIGHT_BUTTON_SCHEMA
+            ),
         }
     ).extend(cv.COMPONENT_SCHEMA),
     validate_unique_indices,
     validate_od_writer_tpdo,
     lambda config: resolve_remote_rpdo(config),  # noqa: PLW0108 (defined below)
+    lambda config: resolve_light_buttons(config),  # noqa: PLW0108 (defined below)
 )
 
 
@@ -317,6 +370,50 @@ def resolve_remote_rpdo(config: ConfigType) -> ConfigType:
                     "tpdo_size": node.tpdo_size(state["tpdo"]),
                 },
             }
+    return config
+
+
+def resolve_light_buttons(config: ConfigType) -> ConfigType:
+    """Resolve the remote lights of `light_buttons`: a light with brightness, its state and brightness in TPDOs (read
+    from remote state slots, each marked with CONF_REMOTE_STATE in a nested dict), the OD writer on."""
+    for pos, button in enumerate(config[CONF_LIGHT_BUTTONS]):
+        path = [CONF_LIGHT_BUTTONS, pos]
+        try:
+            node = _remote_node(config[CONF_REMOTE_NODES], button[CONF_NODE])
+            entity = node.entity(button[CONF_ENTITY])
+            domain = node.domain(index=entity["index"])
+            states = node.state_names(index=entity["index"])
+            label = f"{button[CONF_NODE]} '{entity['id']}'"
+            if domain != layout.DOMAIN_LIGHT or "brightness" not in states:
+                kind = "light without brightness" if domain == layout.DOMAIN_LIGHT else domain
+                raise cv.Invalid(
+                    f"{label} is a {kind}, a light button needs a dimmable light "
+                    "(canopen_entities.light.toggle switches it)"
+                )
+            if not node.od_writer:
+                raise cv.Invalid(f"{button[CONF_NODE]} has the OD writer off ({node.path})")
+            for state in (CONF_STATE, "brightness"):
+                node.state(index=entity["index"], state=state)
+        except remote.RemoteError as err:
+            raise cv.Invalid(str(err), path=path) from err
+        except cv.Invalid as err:
+            raise cv.Invalid(str(err), path=path) from err
+        config[CONF_LIGHT_BUTTONS][pos] = {
+            **button,
+            CONF_ENTITY: str(entity["id"]),
+            "_target": {
+                "node_id": node.node_id,
+                CONF_INDEX: entity["index"],
+                "brightness_cmd": states.index("brightness"),
+                "old_format": node.old_component,
+            },
+            "_state_slot": {
+                CONF_REMOTE_STATE: [button[CONF_NODE], str(entity["id"]), CONF_STATE]
+            },
+            "_brightness_slot": {
+                CONF_REMOTE_STATE: [button[CONF_NODE], str(entity["id"]), "brightness"]
+            },
+        }
     return config
 
 
@@ -640,8 +737,45 @@ async def to_code(config: ConfigType) -> None:
             )
         )
 
+    for button in config[CONF_LIGHT_BUTTONS]:
+        await light_button_to_code(button, var)
+
     if (remote_logs := config.get(CONF_REMOTE_LOGS)) is not None:
         await remote_logs_to_code(remote_logs, hub, config[canopen.CONF_CANOPEN_ID])
+
+
+async def light_button_to_code(config: ConfigType, mapper: MockObj) -> None:
+    cg.add_define("USE_CANOPEN_ENTITIES_LIGHT_BUTTONS")
+    var = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(var, config)
+    cg.add(var.set_parent(mapper))
+    cg.add(var.set_binary_sensor(await cg.get_variable(config[CONF_BINARY_SENSOR])))
+    target = config["_target"]
+    cg.add(
+        var.set_target(
+            target["node_id"],
+            target[CONF_INDEX],
+            target["brightness_cmd"],
+            target["old_format"],
+        )
+    )
+    cg.add(
+        var.set_slots(
+            remote_state_slot(CORE.config, config["_state_slot"][CONF_REMOTE_STATE]),
+            remote_state_slot(
+                CORE.config, config["_brightness_slot"][CONF_REMOTE_STATE]
+            ),
+        )
+    )
+    interval = config[CONF_STEP_INTERVAL].total_milliseconds
+    cg.add(
+        var.set_timing(
+            config[CONF_HOLD_TIME].total_milliseconds,
+            interval,
+            interval / config[CONF_RAMP_TIME].total_milliseconds,
+            config[CONF_MIN_BRIGHTNESS],
+        )
+    )
 
 
 def enable_sdo_block(canopen_id: Any) -> None:

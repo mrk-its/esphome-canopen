@@ -66,6 +66,11 @@ canopen_entities:
       index: 3
       tpdo: 0
       rpdo: {node: dimmer, entity: relay}
+  # a button dimming a remote light (short press toggles)
+  light_buttons:
+    - binary_sensor: test_binary
+      node: dimmer
+      entity: light_table
 
 text_sensor:
   - platform: canopen_entities

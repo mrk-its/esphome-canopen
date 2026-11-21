@@ -476,6 +476,58 @@ def test_invalid_remote(tmp_path, entities, extra, message):
     assert message in config_error(tmp_path, entities, extra, remote_nodes=REMOTE_NODES)
 
 
+def light_buttons(*buttons: dict) -> list[dict]:
+    """`light_buttons` entries on the binary sensor `door` (BASE)."""
+    return [{"binary_sensor": "door", **b} for b in buttons]
+
+
+@needs_esphome
+def test_codegen_light_buttons(tmp_path: Path) -> None:
+    buttons = light_buttons(
+        {"node": "dimmer", "entity": "light_hall"},
+        {"node": "dimmer", "entity": "light_table", "hold_time": "1s", "ramp_time": "5s", "step_interval": "50ms",
+         "min_brightness": "10%"},
+    )
+    main_cpp, defines = generate(tmp_path, [], remote_nodes=REMOTE_NODES, light_buttons=buttons)
+    mapper = re.search(r"(\w+)->set_layout_hash\(", main_cpp).group(1)
+    assert "#define USE_CANOPEN_ENTITIES_LIGHT_BUTTONS" in defines
+    # slots sorted by (node, entity, state): hall brightness, hall state, table brightness, table state
+    assert "#define CANOPEN_ENTITIES_REMOTE_SLOTS 4" in defines
+    assert main_cpp.count(f"->set_parent({mapper});") == 2
+    assert main_cpp.count("->set_binary_sensor(door);") == 2
+    # node 0x36 on the old component: the old frame format; brightness is command 1
+    assert "->set_target(54, 1, 1, true);" in main_cpp and "->set_slots(1, 0);" in main_cpp
+    assert "->set_target(54, 2, 1, true);" in main_cpp and "->set_slots(3, 2);" in main_cpp
+    # step = step_interval / ramp_time
+    assert re.search(r"->set_timing\(400, 100, 0\.0333+\d*f, 0\.02f\);", main_cpp)
+    assert re.search(r"->set_timing\(1000, 50, 0\.01f, 0\.1f\);", main_cpp)
+
+
+@needs_esphome
+@pytest.mark.parametrize(
+    ("button", "message"),
+    [
+        pytest.param({"node": "nowhere", "entity": "light_hall"}, "Unknown node 'nowhere'", id="unknown-node"),
+        pytest.param(
+            {"node": "dimmer", "entity": "relay"},
+            "dimmer 'relay' is a switch, a light button needs a dimmable light",
+            id="not-a-light",
+        ),
+        pytest.param(
+            {"node": "dimmer2", "entity": "light_hall"}, "dimmer2 has the OD writer off", id="od-writer-off"
+        ),
+        pytest.param(
+            {"node": "dimmer", "entity": "light_hall", "ramp_time": "50ms"},
+            "'ramp_time' must be at least 'step_interval'",
+            id="ramp-time",
+        ),
+    ],
+)
+def test_invalid_light_buttons(tmp_path: Path, button: dict, message: str) -> None:
+    output = config_error(tmp_path, [], remote_nodes=REMOTE_NODES, light_buttons=light_buttons(button))
+    assert message in output
+
+
 @needs_esphome
 def test_codegen_remote_logs(tmp_path: Path) -> None:
     remote_logs = {"level": "DEBUG", "timeout": "never", "block_size": 8, "buffer_size": 1024}
