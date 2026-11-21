@@ -41,6 +41,10 @@ NMTState to_nmt_state(CO_NMT_internalState_t state) {
 }
 
 void CANopenComponent::setup() {
+  if (this->canbus_->is_failed()) {
+    this->fail_setup_(LOG_STR("CAN bus failed"));
+    return;
+  }
   if (this->is_client_only()) {
     this->setup_client_only_();
     return;

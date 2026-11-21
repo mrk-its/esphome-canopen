@@ -791,6 +791,16 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     (`CO_SDO_AB_CMD`). `sdo_reply_is_stale_()` drops it while the request waits for its initiate response
     (`canopen-full` `261dee2ea8`, cut `51fdef96f1`; test `SegmentResponseWhileWaitingForTheInitiateOneIsIgnored`,
     mutation-checked). Cut size: 994 lines outside `tests/` (996 added, 2 removed in canbus).
+  - Copilot review of 2026-11-21 (on `e725be04af`, the user's note in `types.h` on late responses for the same object),
+    8 findings. Fixed (`canopen-full` `e83eb75e7e`, cut `3c5694c5b3`, docs `75b0e628a` on the PR branch and on docs
+    `canopen-full`): a failed CAN bus fails the hub in `setup()` (requests made before it are rejected, not timed out;
+    test `FailedBusFailsTheHub`, mutation-checked); `read_sdo<T>()` static_asserts a 1/2/4-byte `T` (`sizeof(T)` was
+    narrowed to `uint8_t`); the dead `is_failed()` guard in `on_frame_()` removed; the callback contract names
+    `setup()` as the other source of REJECTED; type annotations in the test codegen override. Declined with replies:
+    canbus's warning per refused retry (canbus's, bounded by the response timeout), runtime tests of the action
+    triggers (codegen test + SDO client gtests), stale segment replies for another object (dropped while waiting for
+    the initiate response since `51fdef96f1`; a server answers in order). Cut size: 999 lines outside `tests/` (1001
+    added, 2 removed in canbus).
   - **To discuss with bdraco when PR 3 is cut** (not raised on PR 1: the cut never flushes on the frame path): the
     node's per-frame `CO_process()` without the flush, above. Draft comment:
     > For a node hub I'd like to keep running `CO_process()` for every received frame, not move it into `loop()`.

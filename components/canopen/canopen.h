@@ -144,13 +144,15 @@ class CANopenComponent : public Component {
   // SDO client (one channel, requests run one after another in FIFO order). Every request ends in exactly one
   // callback: accepted ones from loop() / frame processing after the transfer, rejected ones (queue full, invalid
   // arguments, failed hub) synchronously before the call returns false. Requests made before setup() wait in the
-  // queue (e.g. from on_boot). Requests to our own node id are served from our object dictionary, without CAN frames.
+  // queue (e.g. from on_boot); a failed setup() rejects them. Requests to our own node id are served from our object
+  // dictionary, without CAN frames.
 
   // value read; expected_size 1/2/4 checks the width (SIZE_MISMATCH), 0 accepts any width up to 4
   bool read_sdo(uint8_t node_id, uint16_t index, uint8_t sub, uint8_t expected_size, SDOCallback callback,
                 void *context);
   template<typename T>
   bool read_sdo(uint8_t node_id, uint16_t index, uint8_t sub, SDOCallback callback, void *context) {
+    static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4, "SDO values are 1, 2 or 4 bytes");
     return this->read_sdo(node_id, index, sub, sizeof(T), callback, context);
   }
   // value write of size 1/2/4 bytes (little endian)
