@@ -1,6 +1,6 @@
 #include "light_button.h"
 
-#ifdef USE_CANOPEN_ENTITIES_LIGHT_BUTTONS
+#ifdef USE_CANOPEN_BUTTONS_LIGHTS
 
 #include <algorithm>
 #include <cinttypes>
@@ -8,9 +8,9 @@
 
 #include "esphome/core/log.h"
 
-namespace esphome::canopen_entities {
+namespace esphome::canopen_buttons {
 
-static const char *const TAG = "canopen_entities.light_button";
+static const char *const TAG = "canopen_buttons.light";
 
 static constexpr uint32_t HOLD_TIMEOUT_ID = 0;
 static constexpr uint32_t STEP_INTERVAL_ID = 1;
@@ -26,8 +26,8 @@ void LightButton::dump_config() {
                 "Light button:\n"
                 "  Remote light: node 0x%02X entity %u\n"
                 "  Hold time: %" PRIu32 " ms, step %.1f%% every %" PRIu32 " ms, min brightness %.0f%%",
-                this->node_id_, this->entity_index_, this->hold_time_, this->step_ * 100.0f, this->step_interval_,
-                this->min_brightness_ * 100.0f);
+                this->target_node_id_, this->target_index_, this->hold_time_, this->step_ * 100.0f,
+                this->step_interval_, this->min_brightness_ * 100.0f);
 }
 
 void LightButton::on_state_(bool pressed) {
@@ -43,15 +43,15 @@ void LightButton::on_state_(bool pressed) {
   this->cancel_interval(STEP_INTERVAL_ID);
   if (!this->ramping_) {
     // a short press: toggle
-    bool on = this->parent_->get_remote_state(this->state_slot_) != 0;
-    this->send_(0, on ? 0 : 1);
+    bool on = this->remote_state_(this->state_slot_) != 0;
+    this->send_command_(0, on ? 0 : 1);
   }
   this->ramping_ = false;
 }
 
 void LightButton::start_ramp_() {
-  bool on = this->parent_->get_remote_state(this->state_slot_) != 0;
-  float level = percentage_from_wire(this->parent_->get_remote_state(this->brightness_slot_));
+  bool on = this->remote_state_(this->state_slot_) != 0;
+  float level = canopen_entities::percentage_from_wire(this->remote_state_(this->brightness_slot_));
   if (!on || std::isnan(level)) {
     level = this->min_brightness_;
     this->up_ = true;
@@ -64,12 +64,12 @@ void LightButton::start_ramp_() {
   }
   this->level_ = std::clamp(level, this->min_brightness_, 1.0f);
   this->ramping_ = true;
-  ESP_LOGD(TAG, "Dimming node 0x%02X entity %u %s from %.0f%%", this->node_id_, this->entity_index_,
+  ESP_LOGD(TAG, "Dimming node 0x%02X entity %u %s from %.0f%%", this->target_node_id_, this->target_index_,
            this->up_ ? "up" : "down", this->level_ * 100.0f);
   // brightness alone doesn't switch an ESPHome light on
-  this->send_(this->brightness_cmd_, percentage_to_wire(this->level_));
+  this->send_command_(this->brightness_cmd_, canopen_entities::percentage_to_wire(this->level_));
   if (!on)
-    this->send_(0, 1);
+    this->send_command_(0, 1);
   this->set_interval(STEP_INTERVAL_ID, this->step_interval_, [this]() { this->ramp_step_(); });
 }
 
@@ -81,13 +81,9 @@ void LightButton::ramp_step_() {
     return;
   }
   this->level_ = level;
-  this->send_(this->brightness_cmd_, percentage_to_wire(level));
+  this->send_command_(this->brightness_cmd_, canopen_entities::percentage_to_wire(level));
 }
 
-void LightButton::send_(uint8_t cmd, uint32_t raw) {
-  this->parent_->send_od_write(this->node_id_, 0x2002 + 0x10 * this->entity_index_, cmd + 1, raw, 1, this->old_format_);
-}
+}  // namespace esphome::canopen_buttons
 
-}  // namespace esphome::canopen_entities
-
-#endif  // USE_CANOPEN_ENTITIES_LIGHT_BUTTONS
+#endif  // USE_CANOPEN_BUTTONS_LIGHTS

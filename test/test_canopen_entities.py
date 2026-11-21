@@ -40,7 +40,7 @@ external_components:
   - source: {{type: local, path: {HUB}}}
     components: [canopen]
   - source: {{type: local, path: {REPO / "components"}}}
-    components: [canopen_entities]
+    components: [canopen_entities, canopen_buttons]
 esphome:
   name: mapper-test
 esp8266:
@@ -476,28 +476,29 @@ def test_invalid_remote(tmp_path, entities, extra, message):
     assert message in config_error(tmp_path, entities, extra, remote_nodes=REMOTE_NODES)
 
 
-def light_buttons(*buttons: dict) -> list[dict]:
-    """`light_buttons` entries on the binary sensor `door` (BASE)."""
-    return [{"binary_sensor": "door", **b} for b in buttons]
+def button_lights(*buttons: dict) -> dict:
+    """`canopen_buttons: lights:` entries on the binary sensor `door` (BASE), as write_config() extra."""
+    return {"canopen_buttons": {"lights": [{"binary_sensor": "door", **b} for b in buttons]}}
 
 
 @needs_esphome
-def test_codegen_light_buttons(tmp_path: Path) -> None:
-    buttons = light_buttons(
+def test_codegen_button_lights(tmp_path: Path) -> None:
+    extra = button_lights(
         {"node": "dimmer", "entity": "light_hall"},
         {"node": "dimmer", "entity": "light_table", "hold_time": "1s", "ramp_time": "5s", "step_interval": "50ms",
          "min_brightness": "10%"},
     )
-    main_cpp, defines = generate(tmp_path, [], remote_nodes=REMOTE_NODES, light_buttons=buttons)
+    main_cpp, defines = generate(tmp_path, [], extra, remote_nodes=REMOTE_NODES)
     mapper = re.search(r"(\w+)->set_layout_hash\(", main_cpp).group(1)
-    assert "#define USE_CANOPEN_ENTITIES_LIGHT_BUTTONS" in defines
+    assert "#define USE_CANOPEN_BUTTONS_LIGHTS" in defines
     # slots sorted by (node, entity, state): hall brightness, hall state, table brightness, table state
     assert "#define CANOPEN_ENTITIES_REMOTE_SLOTS 4" in defines
-    assert main_cpp.count(f"->set_parent({mapper});") == 2
     assert main_cpp.count("->set_binary_sensor(door);") == 2
     # node 0x36 on the old component: the old frame format; brightness is command 1
-    assert "->set_target(54, 1, 1, true);" in main_cpp and "->set_slots(1, 0);" in main_cpp
-    assert "->set_target(54, 2, 1, true);" in main_cpp and "->set_slots(3, 2);" in main_cpp
+    assert f"->set_remote_target({mapper}, 54, 1, true);" in main_cpp
+    assert f"->set_remote_target({mapper}, 54, 2, true);" in main_cpp
+    assert main_cpp.count("->set_brightness_cmd(1);") == 2
+    assert "->set_slots(1, 0);" in main_cpp and "->set_slots(3, 2);" in main_cpp
     # step = step_interval / ramp_time
     assert re.search(r"->set_timing\(400, 100, 0\.0333+\d*f, 0\.02f\);", main_cpp)
     assert re.search(r"->set_timing\(1000, 50, 0\.01f, 0\.1f\);", main_cpp)
@@ -510,11 +511,13 @@ def test_codegen_light_buttons(tmp_path: Path) -> None:
         pytest.param({"node": "nowhere", "entity": "light_hall"}, "Unknown node 'nowhere'", id="unknown-node"),
         pytest.param(
             {"node": "dimmer", "entity": "relay"},
-            "dimmer 'relay' is a switch, a light button needs a dimmable light",
+            "canopen_buttons light: dimmer 'relay' is a switch, expected light",
             id="not-a-light",
         ),
         pytest.param(
-            {"node": "dimmer2", "entity": "light_hall"}, "dimmer2 has the OD writer off", id="od-writer-off"
+            {"node": "dimmer2", "entity": "light_hall"},
+            "canopen_buttons light: dimmer2 has the OD writer off",
+            id="od-writer-off",
         ),
         pytest.param(
             {"node": "dimmer", "entity": "light_hall", "ramp_time": "50ms"},
@@ -523,9 +526,19 @@ def test_codegen_light_buttons(tmp_path: Path) -> None:
         ),
     ],
 )
-def test_invalid_light_buttons(tmp_path: Path, button: dict, message: str) -> None:
-    output = config_error(tmp_path, [], remote_nodes=REMOTE_NODES, light_buttons=light_buttons(button))
+def test_invalid_button_lights(tmp_path: Path, button: dict, message: str) -> None:
+    output = config_error(tmp_path, [], button_lights(button), remote_nodes=REMOTE_NODES)
     assert message in output
+
+
+@needs_esphome
+def test_light_buttons_moved(tmp_path: Path) -> None:
+    """The old `canopen_entities: light_buttons:` points to canopen_buttons."""
+    output = config_error(
+        tmp_path, [], remote_nodes=REMOTE_NODES,
+        light_buttons=[{"binary_sensor": "door", "node": "dimmer", "entity": "light_hall"}],
+    )
+    assert "'light_buttons' moved to the canopen_buttons component" in output
 
 
 @needs_esphome

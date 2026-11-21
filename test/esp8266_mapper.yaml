@@ -4,7 +4,7 @@
 external_components:
   # the hub (a copy, scripts/sync_hub.py) and canopen_entities
   - source: ../components
-    components: [canopen, canopen_entities]
+    components: [canopen, canopen_entities, canopen_buttons]
 
 esphome:
   name: esp8266-mapper
@@ -66,8 +66,10 @@ canopen_entities:
       index: 3
       tpdo: 0
       rpdo: {node: dimmer, entity: relay}
-  # a button dimming a remote light (short press toggles)
-  light_buttons:
+
+# a button dimming a remote light (short press toggles)
+canopen_buttons:
+  lights:
     - binary_sensor: test_binary
       node: dimmer
       entity: light_table

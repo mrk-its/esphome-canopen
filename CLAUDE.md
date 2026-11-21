@@ -58,13 +58,17 @@ OTA stays until the rest is tested. OTA is PR 8 of the current split (`canopen_o
   component and until 2026-11-01) -> `RemoteCommandAction` writes.
 - `canopen_entities.cpp/.h`: `CANopenEntities` (the component), `MappedEntity` (one entity, the `OdObject` handler of
   its three records), remote state slots, the OD writer.
-- `light_button.*`: `light_buttons` (`LightButton`): a binary sensor toggling / dimming a remote light (short press,
-  hold), with the light's state and brightness from remote state slots (`resolve_light_buttons()` marks them in nested
-  dicts) and commands through `send_od_write()`; nothing on the remote node.
+- `RemoteTarget` (Python in `__init__.py`, C++ in `canopen_entities.h`): the interface for components on top of
+  canopen_entities that control remote entities (the actions, `canopen_buttons`): resolve / check a remote entity
+  (`require_domain()`, `require_od_writer()`, `cmd()`), request remote state slots (`state_marker()`, slot number via
+  `remote_state_slot()`), send commands (`send_command_()`) and read slots (`remote_state_()`). Keep it stable.
 - `log_buffer.*` / `remote_logs.*`: remote logs, see "Remote logs".
 - `ota/`: the `ota: - platform: canopen_entities` component, OD `0x3000`, wraps the platform's
   `esphome::ota::make_ota_backend()`; optional zlib (miniz) decompression. Planned to move into the hub on CiA 302-3
   objects (`docs/canopen_ota.md`).
+`components/canopen_buttons/`: wall buttons on top of canopen_entities' `RemoteTarget`; `lights:` = `LightButton`
+(`light_button.*`): short press toggles, hold ramps the brightness (was `canopen_entities: light_buttons:` until
+2026-11-21, that key now fails with a pointer). New button kinds (covers...) go here, not into canopen_entities.
 `components/canopen/`: **a generated copy of the hub, never edit it here.** The hub is developed and tested in
 `~/repos/esphome` (branch `canopen-full`, pushed to mrk-its/esphome), from where the upstream PRs are cut.
 `scripts/sync_hub.py` copies `esphome/components/canopen` from a commit (`--ref`, default `canopen-full`) and writes

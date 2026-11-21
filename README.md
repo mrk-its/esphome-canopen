@@ -44,7 +44,7 @@ is developed on), so one `external_components` entry brings both.
 * State broadcast in up to 8 TPDOs, with compact 1- or 2-byte encoding of sensor values
 * [Linking nodes](docs/linking-nodes.md): actions such as `canopen_entities.light.toggle` and remote states as local
   entities, with other nodes referred to by their YAML file and entity ids; wall buttons that toggle and dim a remote
-  light (`light_buttons`)
+  light (the `canopen_buttons` component)
 * [OTA over CAN](docs/ota.md): firmware updates from Home Assistant through can2mqtt
 * [Remote logs](docs/remote-logs.md): read a node's log in can2mqtt, no serial cable needed
 * From the `canopen` component: heartbeat monitoring of other nodes (`heartbeat_clients`, `on_node_event`), NMT,
@@ -154,7 +154,7 @@ A few rules:
 | | |
 |---|---|
 | [Configuration](docs/configuration.md) | all `canopen_entities:` options, entity / TPDO / RPDO schemas, the `canopen:` options that matter here |
-| [Linking nodes](docs/linking-nodes.md) | `remote_nodes`, `canopen_entities.*` actions, `platform: canopen_entities` remote-state entities, `light_buttons` |
+| [Linking nodes](docs/linking-nodes.md) | `remote_nodes`, `canopen_entities.*` actions, `platform: canopen_entities` remote-state entities, `canopen_buttons` |
 | [OTA over CAN](docs/ota.md) | firmware updates through can2mqtt, Zephyr / MCUboot |
 | [Remote logs](docs/remote-logs.md) | node logs over CAN (`remote_logs:`) |
 | [Migrating from the old component](docs/migration.md) | old `canopen:` options and where they went |

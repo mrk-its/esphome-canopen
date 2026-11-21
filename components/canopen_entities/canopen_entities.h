@@ -294,6 +294,37 @@ class CANopenEntities : public Component {
   uint32_t layout_hash_{0};
 };
 
+// An entity of a remote node (remote_nodes) that a local component controls, for components on top of
+// canopen_entities (canopen_buttons; the Python side is RemoteTarget in __init__.py): commands go out through the OD
+// writer, states are read from remote state slots (slot numbers from codegen).
+class RemoteTarget {
+ public:
+  void set_remote_target(CANopenEntities *mapper, uint8_t node_id, uint8_t entity_index, bool old_format) {
+    this->mapper_ = mapper;
+    this->target_node_id_ = node_id;
+    this->target_index_ = entity_index;
+    this->target_old_format_ = old_format;
+  }
+  uint8_t target_node_id() const { return this->target_node_id_; }
+  uint8_t target_index() const { return this->target_index_; }
+
+ protected:
+  // command `cmd` (0-based: the index of the state it sets) of the remote entity, size bytes
+  bool send_command_(uint8_t cmd, uint32_t raw, uint8_t size = 1) const {
+    return this->mapper_->send_od_write(this->target_node_id_, 0x2002 + 0x10 * this->target_index_, cmd + 1, raw, size,
+                                        this->target_old_format_);
+  }
+#ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
+  // raw value of remote state slot n (0 until the remote node's TPDO arrives)
+  uint32_t remote_state_(uint8_t slot) const { return this->mapper_->get_remote_state(slot); }
+#endif
+
+  CANopenEntities *mapper_{nullptr};
+  uint8_t target_node_id_{0};
+  uint8_t target_index_{0};
+  bool target_old_format_{false};
+};
+
 // how RemoteCommandAction encodes a command value (ENC_* in __init__.py)
 enum RemoteCmdEncoding : uint8_t {
   REMOTE_CMD_RAW = 0,

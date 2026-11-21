@@ -99,16 +99,23 @@ the remote entity needs `tpdo`.
 The old component's `canopen.entity_cmd` (a raw command to a remote entity) isn't available yet. For other devices
 on the bus, the `canopen` component's actions and lambdas write objects directly (`canopen.sdo_write`, `write_sdo()`).
 
-## Light buttons
-`light_buttons` turns a button (any binary sensor) into a wall dimmer for a light of a remote node: a short press
-toggles the light, holding the button ramps its brightness. Nothing is needed on the remote node beyond the light's
-usual commands (the OD writer, `tpdo` on the light):
+## Wall buttons (`canopen_buttons`)
+The `canopen_buttons` component (in this repository, next to `canopen_entities`, which it needs) turns buttons into
+wall controls for entities of remote nodes. Nothing is needed on the remote node beyond the entity's usual commands
+(the OD writer, `tpdo` on the entity). With a `components:` filter on the `external_components` entry, add
+`canopen_buttons` to it.
+
+### Lights
+`lights` turns a button (any binary sensor) into a wall dimmer for a light of a remote node: a short press toggles the
+light, holding the button ramps its brightness:
 
 ```yaml
 canopen_entities:
   remote_nodes:
     dimmer3: dimmer3.yaml
-  light_buttons:
+
+canopen_buttons:
+  lights:
     - binary_sensor: in6
       node: dimmer3
       entity: light4
@@ -116,7 +123,8 @@ canopen_entities:
 
 * `binary_sensor` (Required, ID): the button. Its own `on_press` / `on_release` etc. still run.
 * `node` (Required, string): name of the node in `remote_nodes`
-* `entity` (Required, string): id of the remote light (with brightness, and `tpdo`)
+* `entity` (Required, string): id of the remote light (with brightness, and `tpdo`). A light without brightness
+  fails validation: use `canopen_entities.light.toggle` for it.
 * `hold_time` (Optional, time, default `400ms`): a shorter press toggles the light (sent on release), a longer one
   dims it
 * `ramp_time` (Optional, time, default `3s`): time to ramp the brightness over the full range
@@ -129,3 +137,6 @@ brightness, otherwise the opposite of the previous hold. The light's state and b
 [remote state slots](#remote-states), during the ramp the button counts on its own. Each step is a separate
 brightness command: the remote light should have `default_transition_length: 0s`, otherwise every step starts a
 transition and the light lags behind the button.
+
+Until 2026-11-21 this was `canopen_entities: light_buttons:` with the same entries; that key now fails validation with
+a pointer here.
