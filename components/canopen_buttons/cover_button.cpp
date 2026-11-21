@@ -13,10 +13,10 @@ static constexpr uint32_t STOP_REPEAT_TIMEOUT_ID = 0;
 static constexpr uint32_t STOP_REPEAT_DELAY = 50;
 
 void CoverButton::setup() {
-  if (this->open_sensor_ != nullptr)
-    this->open_sensor_->add_on_state_callback([this](bool state) { this->on_button_(OPEN, state); });
-  if (this->close_sensor_ != nullptr)
-    this->close_sensor_->add_on_state_callback([this](bool state) { this->on_button_(CLOSE, state); });
+  if (this->open_button_ != nullptr)
+    this->open_button_->add_on_state_callback([this](bool state) { this->on_button_(OPEN, state); });
+  if (this->close_button_ != nullptr)
+    this->close_button_->add_on_state_callback([this](bool state) { this->on_button_(CLOSE, state); });
 }
 
 void CoverButton::dump_config() {
@@ -24,8 +24,8 @@ void CoverButton::dump_config() {
                 "Cover button:\n"
                 "  Remote cover: node 0x%02X entity %u\n"
                 "  Open button: %s, close button: %s",
-                this->target_node_id_, this->target_index_, YESNO(this->open_sensor_ != nullptr),
-                YESNO(this->close_sensor_ != nullptr));
+                this->target_node_id_, this->target_index_, YESNO(this->open_button_ != nullptr),
+                YESNO(this->close_button_ != nullptr));
 }
 
 void CoverButton::on_button_(Direction direction, bool pressed) {

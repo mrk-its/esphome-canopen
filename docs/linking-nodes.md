@@ -116,12 +116,12 @@ canopen_entities:
 
 canopen_buttons:
   lights:
-    - binary_sensor: in6
+    - button: in6
       node: dimmer3
       entity: light4
 ```
 
-* `binary_sensor` (Required, ID): the button. Its own `on_press` / `on_release` etc. still run.
+* `button` (Required, ID): the button, any binary sensor. Its own `on_press` / `on_release` etc. still run.
 * `node` (Required, string): name of the node in `remote_nodes`
 * `entity` (Required, string): id of the remote light (with brightness, and `tpdo`). A light without brightness
   fails validation: use `canopen_entities.light.toggle` for it.
@@ -138,8 +138,8 @@ brightness, otherwise the opposite of the previous hold. The light's state and b
 brightness command: the remote light should have `default_transition_length: 0s`, otherwise every step starts a
 transition and the light lags behind the button.
 
-Until 2026-11-21 this was `canopen_entities: light_buttons:` with the same entries; that key now fails validation with
-a pointer here.
+Until 2026-11-21 this was `canopen_entities: light_buttons:`, with `binary_sensor:` instead of `button:`; that key
+now fails validation with a pointer here.
 
 ### Covers
 `covers` moves a cover of a remote node while a button is held: one button opens, another closes, releasing stops:
@@ -147,14 +147,15 @@ a pointer here.
 ```yaml
 canopen_buttons:
   covers:
-    - open: in1
-      close: in2
+    - open_button: in1
+      close_button: in2
       node: martin-c3
       entity: cover_hall
 ```
 
-* `open` (Optional, ID): binary sensor opening the cover while held
-* `close` (Optional, ID): binary sensor closing the cover while held (at least one of `open`, `close`)
+* `open_button` (Optional, ID): binary sensor opening the cover while held
+* `close_button` (Optional, ID): binary sensor closing the cover while held (at least one of `open_button`,
+  `close_button`)
 * `node` (Required, string): name of the node in `remote_nodes`
 * `entity` (Required, string): id of the remote cover (the OD writer on; `tpdo` isn't needed)
 

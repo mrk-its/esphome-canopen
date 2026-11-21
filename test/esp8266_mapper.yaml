@@ -70,12 +70,12 @@ canopen_entities:
 # a button dimming a remote light (short press toggles)
 canopen_buttons:
   lights:
-    - binary_sensor: test_binary
+    - button: test_binary
       node: dimmer
       entity: light_table
   # moves a remote cover while held
   covers:
-    - open: test_binary
+    - open_button: test_binary
       node: dimmer
       entity: cover_hall
 

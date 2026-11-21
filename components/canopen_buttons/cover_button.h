@@ -10,15 +10,16 @@
 
 namespace esphome::canopen_buttons {
 
-// `canopen_buttons: covers:` (docs/linking-nodes.md): open / close buttons (either may be missing) moving a cover of
-// another node while held, through the OD writer (Cover Command: 0 stop, 1 open, 2 close). A press sends its
+// `canopen_buttons: covers:` (docs/linking-nodes.md): `open_button` / `close_button` (either may be missing) moving a
+// cover of another node while held, through the OD writer (Cover Command: 0 stop, 1 open, 2 close). A press sends its
 // direction; the last press wins. A release moves the other way if that button is still held, otherwise it stops: the
 // stop goes out twice (STOP_REPEAT_DELAY apart), since OD writer frames get no reply and a lost stop would run the
 // cover to its end.
 class CoverButton : public Component, public canopen_entities::RemoteTarget {
  public:
-  void set_open_sensor(binary_sensor::BinarySensor *sensor) { this->open_sensor_ = sensor; }
-  void set_close_sensor(binary_sensor::BinarySensor *sensor) { this->close_sensor_ = sensor; }
+  // the buttons: any binary sensors
+  void set_open_button(binary_sensor::BinarySensor *button) { this->open_button_ = button; }
+  void set_close_button(binary_sensor::BinarySensor *button) { this->close_button_ = button; }
 
   void setup() override;
   void dump_config() override;
@@ -30,8 +31,8 @@ class CoverButton : public Component, public canopen_entities::RemoteTarget {
   void on_button_(Direction direction, bool pressed);
   void move_(Direction direction);
 
-  binary_sensor::BinarySensor *open_sensor_{nullptr};
-  binary_sensor::BinarySensor *close_sensor_{nullptr};
+  binary_sensor::BinarySensor *open_button_{nullptr};
+  binary_sensor::BinarySensor *close_button_{nullptr};
   bool open_held_{false};
   bool close_held_{false};
 };

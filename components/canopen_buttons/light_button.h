@@ -18,7 +18,8 @@ namespace esphome::canopen_buttons {
 // The remote light should have default_transition_length: 0s, or each step starts a transition.
 class LightButton : public Component, public canopen_entities::RemoteTarget {
  public:
-  void set_binary_sensor(binary_sensor::BinarySensor *sensor) { this->sensor_ = sensor; }
+  // the button: any binary sensor
+  void set_button(binary_sensor::BinarySensor *button) { this->button_ = button; }
   // command index (sub - 1) of the light's brightness
   void set_brightness_cmd(uint8_t cmd) { this->brightness_cmd_ = cmd; }
   // remote state slots holding the light's state and brightness
@@ -42,7 +43,7 @@ class LightButton : public Component, public canopen_entities::RemoteTarget {
   void start_ramp_();
   void ramp_step_();
 
-  binary_sensor::BinarySensor *sensor_{nullptr};
+  binary_sensor::BinarySensor *button_{nullptr};
   uint8_t brightness_cmd_{1};
   uint8_t state_slot_{0};
   uint8_t brightness_slot_{0};

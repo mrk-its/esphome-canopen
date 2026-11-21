@@ -478,7 +478,7 @@ def test_invalid_remote(tmp_path, entities, extra, message):
 
 def button_lights(*buttons: dict) -> dict:
     """`canopen_buttons: lights:` entries on the binary sensor `door` (BASE), as write_config() extra."""
-    return {"canopen_buttons": {"lights": [{"binary_sensor": "door", **b} for b in buttons]}}
+    return {"canopen_buttons": {"lights": [{"button": "door", **b} for b in buttons]}}
 
 
 @needs_esphome
@@ -493,7 +493,7 @@ def test_codegen_button_lights(tmp_path: Path) -> None:
     assert "#define USE_CANOPEN_BUTTONS_LIGHTS" in defines
     # slots sorted by (node, entity, state): hall brightness, hall state, table brightness, table state
     assert "#define CANOPEN_ENTITIES_REMOTE_SLOTS 4" in defines
-    assert main_cpp.count("->set_binary_sensor(door);") == 2
+    assert main_cpp.count("->set_button(door);") == 2
     # node 0x36 on the old component: the old frame format; brightness is command 1
     assert f"->set_remote_target({mapper}, 54, 1, true);" in main_cpp
     assert f"->set_remote_target({mapper}, 54, 2, true);" in main_cpp
@@ -532,7 +532,7 @@ def test_invalid_button_lights(tmp_path: Path, button: dict, message: str) -> No
 
 
 def button_covers(*covers: dict) -> dict:
-    """`canopen_buttons: covers:` entries, plus a second binary sensor `door2` for close buttons."""
+    """`canopen_buttons: covers:` entries, plus a second binary sensor `door2` for close_button."""
     return {
         "canopen_buttons": {"covers": list(covers)},
         "binary_sensor": [{"platform": "template", "id": "door2", "name": "Door 2"}],
@@ -542,8 +542,8 @@ def button_covers(*covers: dict) -> dict:
 @needs_esphome
 def test_codegen_button_covers(tmp_path: Path) -> None:
     extra = button_covers(
-        {"node": "dimmer", "entity": "cover_hall", "open": "door", "close": "door2"},
-        {"node": "dimmer", "entity": "cover_hall", "close": "door2"},
+        {"node": "dimmer", "entity": "cover_hall", "open_button": "door", "close_button": "door2"},
+        {"node": "dimmer", "entity": "cover_hall", "close_button": "door2"},
     )
     main_cpp, defines = generate(tmp_path, [], extra, remote_nodes=REMOTE_NODES)
     mapper = re.search(r"(\w+)->set_layout_hash\(", main_cpp).group(1)
@@ -553,8 +553,8 @@ def test_codegen_button_covers(tmp_path: Path) -> None:
     assert "CANOPEN_ENTITIES_REMOTE_SLOTS" not in defines
     # cover_hall: entity 5 of node 0x36 (old component: old frame format)
     assert main_cpp.count(f"->set_remote_target({mapper}, 54, 5, true);") == 2
-    assert main_cpp.count("->set_open_sensor(door);") == 1
-    assert main_cpp.count("->set_close_sensor(door2);") == 2
+    assert main_cpp.count("->set_open_button(door);") == 1
+    assert main_cpp.count("->set_close_button(door2);") == 2
 
 
 @needs_esphome
@@ -562,13 +562,13 @@ def test_codegen_button_covers(tmp_path: Path) -> None:
     ("cover", "message"),
     [
         pytest.param(
-            {"node": "dimmer", "entity": "light_hall", "open": "door"},
+            {"node": "dimmer", "entity": "light_hall", "open_button": "door"},
             "canopen_buttons cover: dimmer 'light_hall' is a light, expected cover",
             id="not-a-cover",
         ),
         pytest.param(
             {"node": "dimmer", "entity": "cover_hall"},
-            "Must contain at least one of open, close",
+            "Must contain at least one of open_button, close_button",
             id="no-buttons",
         ),
     ],

@@ -159,7 +159,7 @@ output:
 # B1: a short press toggles the light, holding it dims
 canopen_buttons:
   lights:
-    - binary_sensor: user_button
+    - button: user_button
       node: dimmer4
       entity: light5  # biuro
 
