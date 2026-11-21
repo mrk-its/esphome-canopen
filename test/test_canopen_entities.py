@@ -543,7 +543,8 @@ def button_covers(*covers: dict) -> dict:
 def test_codegen_button_covers(tmp_path: Path) -> None:
     extra = button_covers(
         {"node": "dimmer", "entity": "cover_hall", "open_button": "door", "close_button": "door2"},
-        {"node": "dimmer", "entity": "cover_hall", "close_button": "door2"},
+        {"node": "dimmer", "entity": "cover_hall", "close_button": "door2", "double_click_time": "0ms"},
+        {"node": "dimmer", "entity": "cover_hall", "open_button": "door", "double_click_time": "600ms"},
     )
     main_cpp, defines = generate(tmp_path, [], extra, remote_nodes=REMOTE_NODES)
     mapper = re.search(r"(\w+)->set_layout_hash\(", main_cpp).group(1)
@@ -552,9 +553,11 @@ def test_codegen_button_covers(tmp_path: Path) -> None:
     # no remote state needed
     assert "CANOPEN_ENTITIES_REMOTE_SLOTS" not in defines
     # cover_hall: entity 5 of node 0x36 (old component: old frame format)
-    assert main_cpp.count(f"->set_remote_target({mapper}, 54, 5, true);") == 2
-    assert main_cpp.count("->set_open_button(door);") == 1
+    assert main_cpp.count(f"->set_remote_target({mapper}, 54, 5, true);") == 3
+    assert main_cpp.count("->set_open_button(door);") == 2
     assert main_cpp.count("->set_close_button(door2);") == 2
+    # double-click: default 400 ms, 0 = off
+    assert re.findall(r"->set_double_click_time\((\d+)\);", main_cpp) == ["400", "0", "600"]
 
 
 @needs_esphome

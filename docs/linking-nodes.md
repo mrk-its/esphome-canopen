@@ -158,7 +158,14 @@ canopen_buttons:
   `close_button`)
 * `node` (Required, string): name of the node in `remote_nodes`
 * `entity` (Required, string): id of the remote cover (the OD writer on; `tpdo` isn't needed)
+* `double_click_time` (Optional, time, default `400ms`): a double-click moves the cover all the way; `0ms` turns it
+  off
 
 The last press wins: pressing the other button while one is held reverses the cover, and releasing one while the
 other is still held moves the other way. When no button is held the cover stops. The stop is sent twice, 50 ms apart:
 commands get no reply, and a lost stop would run the cover to its end. At an end position the cover stops by itself.
+
+A double-click (the same button twice; the first press and the gap before the second each at most
+`double_click_time`) moves the cover all the way: the second release doesn't stop it. The first click of the pair
+still moves the cover a little and stops it. Any later press of either button takes over again, so a tap stops the
+cover and holding the other button reverses it.

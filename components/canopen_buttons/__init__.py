@@ -27,6 +27,7 @@ CONF_BRIGHTNESS = "brightness"
 CONF_COVERS = "covers"
 CONF_OPEN_BUTTON = "open_button"
 CONF_CLOSE_BUTTON = "close_button"
+CONF_DOUBLE_CLICK_TIME = "double_click_time"
 
 ns = cg.esphome_ns.namespace("canopen_buttons")
 LightButton = ns.class_("LightButton", cg.Component)
@@ -129,6 +130,10 @@ COVER_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(CoverButton),
             cv.Optional(CONF_OPEN_BUTTON): cv.use_id(binary_sensor.BinarySensor),
             cv.Optional(CONF_CLOSE_BUTTON): cv.use_id(binary_sensor.BinarySensor),
+            # a double-click moves the cover all the way (0ms: off)
+            cv.Optional(
+                CONF_DOUBLE_CLICK_TIME, default="400ms"
+            ): cv.positive_time_period_milliseconds,
             cv.Required(canopen_entities.CONF_NODE): cv.string,
             cv.Required(canopen_entities.CONF_ENTITY): cv.string,
         }
@@ -199,3 +204,6 @@ async def to_code(config: ConfigType) -> None:
             cg.add(
                 var.set_close_button(await cg.get_variable(cover[CONF_CLOSE_BUTTON]))
             )
+        cg.add(
+            var.set_double_click_time(cover[CONF_DOUBLE_CLICK_TIME].total_milliseconds)
+        )
