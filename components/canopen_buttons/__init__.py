@@ -18,15 +18,15 @@ CODEOWNERS = ["@mrk-its"]
 DEPENDENCIES = ["canopen_entities"]
 
 CONF_LIGHTS = "lights"
-CONF_BINARY_SENSOR = "binary_sensor"
+CONF_BUTTON = "button"
 CONF_HOLD_TIME = "hold_time"
 CONF_RAMP_TIME = "ramp_time"
 CONF_STEP_INTERVAL = "step_interval"
 CONF_MIN_BRIGHTNESS = "min_brightness"
 CONF_BRIGHTNESS = "brightness"
 CONF_COVERS = "covers"
-CONF_OPEN = "open"
-CONF_CLOSE = "close"
+CONF_OPEN_BUTTON = "open_button"
+CONF_CLOSE_BUTTON = "close_button"
 
 ns = cg.esphome_ns.namespace("canopen_buttons")
 LightButton = ns.class_("LightButton", cg.Component)
@@ -76,7 +76,7 @@ LIGHT_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(LightButton),
-            cv.Required(CONF_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+            cv.Required(CONF_BUTTON): cv.use_id(binary_sensor.BinarySensor),
             cv.Required(canopen_entities.CONF_NODE): cv.string,
             cv.Required(canopen_entities.CONF_ENTITY): cv.string,
             cv.Optional(
@@ -127,13 +127,13 @@ COVER_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(CoverButton),
-            cv.Optional(CONF_OPEN): cv.use_id(binary_sensor.BinarySensor),
-            cv.Optional(CONF_CLOSE): cv.use_id(binary_sensor.BinarySensor),
+            cv.Optional(CONF_OPEN_BUTTON): cv.use_id(binary_sensor.BinarySensor),
+            cv.Optional(CONF_CLOSE_BUTTON): cv.use_id(binary_sensor.BinarySensor),
             cv.Required(canopen_entities.CONF_NODE): cv.string,
             cv.Required(canopen_entities.CONF_ENTITY): cv.string,
         }
     ).extend(cv.COMPONENT_SCHEMA),
-    cv.has_at_least_one_key(CONF_OPEN, CONF_CLOSE),
+    cv.has_at_least_one_key(CONF_OPEN_BUTTON, CONF_CLOSE_BUTTON),
     _resolve_cover,
 )
 
@@ -168,7 +168,7 @@ async def to_code(config: ConfigType) -> None:
             )
         )
         cg.add(var.set_brightness_cmd(target["brightness_cmd"]))
-        cg.add(var.set_binary_sensor(await cg.get_variable(light[CONF_BINARY_SENSOR])))
+        cg.add(var.set_button(await cg.get_variable(light[CONF_BUTTON])))
         cg.add(
             var.set_slots(_slot(light["_state_slot"]), _slot(light["_brightness_slot"]))
         )
@@ -193,7 +193,9 @@ async def to_code(config: ConfigType) -> None:
                 mapper, target["node_id"], target["index"], target["old_format"]
             )
         )
-        if CONF_OPEN in cover:
-            cg.add(var.set_open_sensor(await cg.get_variable(cover[CONF_OPEN])))
-        if CONF_CLOSE in cover:
-            cg.add(var.set_close_sensor(await cg.get_variable(cover[CONF_CLOSE])))
+        if CONF_OPEN_BUTTON in cover:
+            cg.add(var.set_open_button(await cg.get_variable(cover[CONF_OPEN_BUTTON])))
+        if CONF_CLOSE_BUTTON in cover:
+            cg.add(
+                var.set_close_button(await cg.get_variable(cover[CONF_CLOSE_BUTTON]))
+            )

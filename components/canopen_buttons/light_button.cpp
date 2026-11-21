@@ -18,7 +18,7 @@ static constexpr uint32_t STEP_INTERVAL_ID = 1;
 static constexpr float LIMIT_TOLERANCE = 0.01f;
 
 void LightButton::setup() {
-  this->sensor_->add_on_state_callback([this](bool state) { this->on_state_(state); });
+  this->button_->add_on_state_callback([this](bool state) { this->on_state_(state); });
 }
 
 void LightButton::dump_config() {

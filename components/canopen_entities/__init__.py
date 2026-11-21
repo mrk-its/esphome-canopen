@@ -265,7 +265,8 @@ CONFIG_SCHEMA = cv.All(
             # moved to the canopen_buttons component (2026-11-21)
             cv.Optional(CONF_LIGHT_BUTTONS): cv.invalid(
                 "'light_buttons' moved to the canopen_buttons component: "
-                "'canopen_buttons: lights:' takes the same entries (docs/linking-nodes.md)"
+                "'canopen_buttons: lights:' takes the same entries, with 'button:' instead of "
+                "'binary_sensor:' (docs/linking-nodes.md)"
             ),
         }
     ).extend(cv.COMPONENT_SCHEMA),
