@@ -3,14 +3,20 @@
 The remote YAML is not validated: only the pre-validation passes ESPHome runs
 (packages, substitutions, !extend / !remove) are applied, then its node id and
 exposed entities and the configs of those entities are read raw. That is enough
-for layout.py to compute the remote node's TPDO layout. Two formats: a node on
+for layout.py to compute the remote node's TPDO layout. The passes run in a child
+process (remote_loader.py): they keep state in ESPHome globals (secrets, package
+sources, merge warnings) that would mix the remote node into the local run. Two formats: a node on
 the canopen hub (`canopen: node_id` + `canopen_entities: entities`) and a
 node on the old canopen-stack component (`canopen: node_id, entities`).
 
 Also the RPDO plan of a node (rpdo_plan()): ESPHome-free, for the tests.
 """
 
+import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 from . import layout
 
@@ -27,29 +33,39 @@ ENTITY_DOMAINS = {
 
 _cache = {}
 
+# the child loading a remote node's YAML, and how long it may take (remote git packages may be fetched)
+LOADER = Path(__file__).with_name("remote_loader.py")
+LOADER_TIMEOUT = 120
+
 
 class RemoteError(Exception):
     pass
 
 
 def load_remote_config(path):
-    """Load a node's YAML and apply ESPHome's pre-validation passes (see
-    esphome.config.validate_config(), steps 0..1.2)."""
-    # ESPHome internals, imported lazily: only configs with remote_nodes need them
-    from esphome import yaml_util
-    from esphome.components.packages import do_packages_pass, merge_packages
-    from esphome.components.substitutions import do_substitution_pass
-    from esphome.config import resolve_extend_remove
+    """The parts of a node's YAML canopen_entities reads (`canopen:`, `canopen_entities:`, the entity domains),
+    after ESPHome's pre-validation passes, loaded by remote_loader.py in a child process."""
+    from esphome.core import CORE  # lazily: only configs with remote_nodes need it
 
-    # clear_secrets=False: don't drop secrets already loaded for the local config
-    config = yaml_util.load_yaml(Path(path), clear_secrets=False)
-    if "packages" in config:
-        config = do_packages_pass(config)
-    config = do_substitution_pass(config)
-    if "packages" in config:
-        config = merge_packages(config)
-    resolve_extend_remove(config)
-    return config
+    keys = ["canopen", MAPPER_KEY, *sorted(ENTITY_DOMAINS)]
+    local_config = str(CORE.config_path) if CORE.config_path else ""
+    # -P: the loader's directory (this component) isn't put on sys.path; PYTHONPATH: the child imports the same
+    # ESPHome as this process (venv, editable install, or a checkout on PYTHONPATH)
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(p for p in sys.path if p)}
+    try:
+        result = subprocess.run(
+            [sys.executable, "-P", str(LOADER), str(path), local_config, *keys],
+            capture_output=True,
+            text=True,
+            timeout=LOADER_TIMEOUT,
+            env=env,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as err:
+        raise RemoteError(f"loading took more than {LOADER_TIMEOUT} s") from err
+    if result.returncode != 0:
+        raise RemoteError(result.stderr.strip() or f"loader exited with {result.returncode}")
+    return json.loads(result.stdout)
 
 
 def _declares_nested_id(value, entity_id):

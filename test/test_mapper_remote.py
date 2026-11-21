@@ -129,3 +129,42 @@ def test_rpdo_plan_raw_errors(old_node: remote.RemoteNode) -> None:
         remote.rpdo_plan([_raw(0x36, 3, 0, tpdo_size=8, entity_index=1, cmd=0), _source(old_node, "relay", slot=0)])
     with pytest.raises(remote.PlanError, match="offset 7 .* is outside the 6 B TPDO 3"):
         remote.rpdo_plan([_source(old_node, "relay", slot=0), dict(_raw(0x36, 3, 7, entity_index=1, cmd=0), label="node 0x36 TPDO 3 offset 7 (x)")])
+
+
+def _write_secret_node(tmp_path):
+    """A remote node using a !secret, a local package and a substitution."""
+    (tmp_path / "secrets.yaml").write_text("relay_name: Remote Relay\n")
+    (tmp_path / "entities.yaml").write_text(
+        "canopen_entities:\n  entities:\n    - {index: 1, id: relay, tpdo: 0}\n"
+    )
+    (tmp_path / "node.yaml").write_text(
+        "substitutions:\n  node_id: '0x42'\n"
+        "packages:\n  entities: !include entities.yaml\n"
+        "esphome:\n  name: secret-node\n"
+        "canopen:\n  node_id: ${node_id}\n"
+        "switch:\n  - {platform: template, id: relay, name: !secret relay_name}\n"
+    )
+    return tmp_path / "node.yaml"
+
+
+def test_remote_loader_isolated(tmp_path):
+    """The remote YAML is loaded in a child process: the local run's ESPHome state stays as it was."""
+    from esphome import yaml_util
+    from esphome.core import CORE
+
+    path = _write_secret_node(tmp_path)
+    before = (yaml_util.registered_secret_names(), yaml_util.registered_secret_values(), dict(CORE.data))
+    node = remote.get_remote_node("secret_node", path)
+    after = (yaml_util.registered_secret_names(), yaml_util.registered_secret_values(), dict(CORE.data))
+    assert after == before
+    # the passes ran in the child: substitution, package merge, the secret resolved
+    assert node.node_id == 0x42
+    assert [e["id"] for e in node.entities] == ["relay"]
+    assert remote.load_remote_config(path)["switch"][0]["name"] == "Remote Relay"
+
+
+def test_remote_loader_error(tmp_path):
+    path = tmp_path / "broken.yaml"
+    path.write_text("canopen: [unclosed\n")
+    with pytest.raises(remote.RemoteError, match=r"can't load node 'broken'.*"):
+        remote.get_remote_node("broken", path)

@@ -51,6 +51,9 @@ OTA stays until the rest is tested. OTA is PR 8 of the current split (`canopen_o
   validation; both formats: `canopen_entities:` and the old component's `canopen: entities:`) to resolve
   `rpdo: {node, entity}`, `platform: canopen_entities` entities and the `canopen_entities.<domain>.<action>` actions.
   Raw YAML values may be strings after substitution: coerce (`_normalize_node_config`, `layout.flag`).
+  The passes run in a child process, `remote_loader.py` (`sys.executable -P`, the parent's `sys.path` as
+  `PYTHONPATH`, JSON on stdout): in-process they leak into the local run's ESPHome globals (secret sets, packages'
+  remote sources for `store_yaml`, merge warnings). Keep the loader self-contained (no package imports).
 - Remote state slots: remote states read by `platform: canopen_entities` entities (`binary_sensor.py`, `sensor.py`,
   `text_sensor.py`, C++ in `remote_entities.*`) and toggle actions are collected from the full validated config
   (`remote_state_slots()`, entries marked with `CONF_REMOTE_STATE`), OD `0x4000+n:1`, filled by RPDO.
