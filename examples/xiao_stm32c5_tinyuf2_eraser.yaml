@@ -1,0 +1,39 @@
+# Replace the TinyUF2 bootloader of a Seeed XIAO STM32C5 with MCUboot.
+# 1. Flash this (it runs from TinyUF2, at 0x8000), with the board in TinyUF2's UF2 mode:
+#      ../esphomeplatformzephyr/venv/bin/esphome run examples/xiao_stm32c5_tinyuf2_eraser.yaml --device /dev/ttyACM0
+# 2. Hold the BOOT button for 5 s: xiao_tinyuf2_eraser.erase sets BOOT_SEL to the BOOT0 pin, removes the flash write
+#    protection and erases TinyUF2. The log says when it is done; the app keeps running.
+# 3. Hold BOOT and press RESET (STM32 ROM DFU bootloader), then upload a build with
+#    `framework: advanced: bootloader: mcuboot` with `esphome upload ... --device /dev/ttyACM0`.
+
+external_components:
+  - source: ../components
+    components: [xiao_tinyuf2_eraser]
+
+esphome:
+  name: xiao-tinyuf2-eraser
+
+stm32:
+  variant: STM32C5
+  board: xiao_stm32c5
+
+logger:
+  level: DEBUG
+
+xiao_tinyuf2_eraser:
+
+binary_sensor:
+  - platform: gpio
+    id: boot_button
+    # BOOT drives PH2/BOOT0 high (that is how BOOT + RESET enters the ROM bootloader), although the board
+    # devicetree declares it active-low with a pull-up.
+    pin:
+      number: PH2
+      mode:
+        input: true
+        pulldown: true
+    on_click:
+      min_length: 5s
+      max_length: 30s
+      then:
+        - xiao_tinyuf2_eraser.erase
