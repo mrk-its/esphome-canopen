@@ -2,9 +2,9 @@
 
 #include "esphome/core/component.h"
 
-namespace esphome::tinyuf2_eraser {
+namespace esphome::xiao_tinyuf2_eraser {
 
-class TinyUf2Eraser : public Component {
+class XiaoTinyUf2Eraser : public Component {
  public:
   void dump_config() override;
   // Sets BOOT_SEL to the BOOT0 pin, removes the flash write protection and erases TinyUF2 (0x0-0x8000).
@@ -12,4 +12,4 @@ class TinyUf2Eraser : public Component {
   void erase();
 };
 
-}  // namespace esphome::tinyuf2_eraser
+}  // namespace esphome::xiao_tinyuf2_eraser

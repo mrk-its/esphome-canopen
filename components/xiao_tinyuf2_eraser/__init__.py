@@ -1,6 +1,6 @@
 """Erases the TinyUF2 bootloader of a Seeed XIAO STM32C5, so MCUboot can be written in its place.
 
-The `tinyuf2_eraser.erase` action sets BOOT_SEL to the BOOT0 pin, removes the flash write protection TinyUF2 puts on
+The `xiao_tinyuf2_eraser.erase` action sets BOOT_SEL to the BOOT0 pin, removes the flash write protection TinyUF2 puts on
 its own pages at every boot, and erases 0x0-0x8000. It never resets: TinyUF2 is gone, so the board then waits for
 BOOT + RESET to enter the STM32 ROM DFU bootloader, which writes MCUboot and the app (`bootloader: mcuboot`).
 """
@@ -13,12 +13,12 @@ from esphome.const import CONF_ID
 from esphome.core import CORE
 from esphome.types import ConfigType
 
-DOMAIN = "tinyuf2_eraser"
+DOMAIN = "xiao_tinyuf2_eraser"
 
-tinyuf2_eraser_ns = cg.esphome_ns.namespace("tinyuf2_eraser")
-TinyUf2Eraser = tinyuf2_eraser_ns.class_("TinyUf2Eraser", cg.Component)
+xiao_tinyuf2_eraser_ns = cg.esphome_ns.namespace("xiao_tinyuf2_eraser")
+XiaoTinyUf2Eraser = xiao_tinyuf2_eraser_ns.class_("XiaoTinyUf2Eraser", cg.Component)
 
-CONFIG_SCHEMA = cv.Schema({cv.GenerateID(): cv.declare_id(TinyUf2Eraser)}).extend(
+CONFIG_SCHEMA = cv.Schema({cv.GenerateID(): cv.declare_id(XiaoTinyUf2Eraser)}).extend(
     cv.COMPONENT_SCHEMA
 )
 
@@ -51,7 +51,7 @@ async def to_code(config: ConfigType) -> None:
 
 
 automation.register_apply_action(
-    "tinyuf2_eraser.erase",
-    automation.maybe_simple_id({cv.GenerateID(): cv.use_id(TinyUf2Eraser)}),
+    "xiao_tinyuf2_eraser.erase",
+    automation.maybe_simple_id({cv.GenerateID(): cv.use_id(XiaoTinyUf2Eraser)}),
     automation.ApplyCall("erase()"),
 )

@@ -1,4 +1,4 @@
-#include "tinyuf2_eraser.h"
+#include "xiao_tinyuf2_eraser.h"
 
 #include <algorithm>
 
@@ -10,9 +10,9 @@
 
 #include "stm32c5xx_ll_flash.h"
 
-namespace esphome::tinyuf2_eraser {
+namespace esphome::xiao_tinyuf2_eraser {
 
-ESPHOME_LOG_TAG(TAG, "tinyuf2_eraser");
+ESPHOME_LOG_TAG(TAG, "xiao_tinyuf2_eraser");
 
 static constexpr uintptr_t FLASH_START = 0x08000000;
 static constexpr size_t TINYUF2_SIZE = 0x8000;
@@ -74,7 +74,7 @@ static bool program_option_bytes() {
   return true;
 }
 
-void TinyUf2Eraser::dump_config() {
+void XiaoTinyUf2Eraser::dump_config() {
   ESP_LOGCONFIG(TAG,
                 "TinyUF2 eraser:\n"
                 "  TinyUF2 present: %s\n"
@@ -83,7 +83,7 @@ void TinyUf2Eraser::dump_config() {
                 YESNO(tinyuf2_present()), YESNO(boot_sel_is_pin()), FLASH->WRP1R_CUR, FLASH->WRP2R_CUR);
 }
 
-void TinyUf2Eraser::erase() {
+void XiaoTinyUf2Eraser::erase() {
   if (reinterpret_cast<uintptr_t>(__rom_region_start) < FLASH_START + TINYUF2_SIZE) {
     ESP_LOGE(TAG, "The app starts at %p, inside the TinyUF2 area; not erasing", __rom_region_start);
     return;
@@ -107,4 +107,4 @@ void TinyUf2Eraser::erase() {
   ESP_LOGW(TAG, "TinyUF2 erased. Hold BOOT and press RESET, then upload a 'bootloader: mcuboot' build over DFU");
 }
 
-}  // namespace esphome::tinyuf2_eraser
+}  // namespace esphome::xiao_tinyuf2_eraser
