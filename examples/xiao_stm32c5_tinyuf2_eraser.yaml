@@ -1,10 +1,10 @@
-# Replace the TinyUF2 bootloader of a Seeed XIAO STM32C5 with MCUboot.
+# It clears builtin TinyUF2 bootloader of a Seeed XIAO STM32C5 
+# and enabled BOOT_SEL, enabling DFU flashing via builtin STM32 bootloader
 # 1. Flash this (it runs from TinyUF2, at 0x8000), with the board in TinyUF2's UF2 mode:
-#      ../esphomeplatformzephyr/venv/bin/esphome run examples/xiao_stm32c5_tinyuf2_eraser.yaml --device /dev/ttyACM0
+#      esphome run examples/xiao_stm32c5_tinyuf2_eraser.yaml --device /dev/ttyACM0
 # 2. Hold the BOOT button for 5 s: xiao_tinyuf2_eraser.erase sets BOOT_SEL to the BOOT0 pin, removes the flash write
 #    protection and erases TinyUF2. The log says when it is done; the app keeps running.
-# 3. Hold BOOT and press RESET (STM32 ROM DFU bootloader), then upload a build with
-#    `framework: advanced: bootloader: mcuboot` with `esphome upload ... --device /dev/ttyACM0`.
+# 3. Hold BOOT and press RESET (STM32 ROM DFU bootloader) - the baord should be in DFU mode
 
 external_components:
   - source: ../components
