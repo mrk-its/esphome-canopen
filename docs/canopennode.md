@@ -28,8 +28,8 @@ Where to continue (2026-11-24):
   `canopen-full` (`534c38bb71`). Then `canopen-full` was rebuilt on `upstream/dev` (`206bb68485`) as one commit,
   `a055ba97aa` "[canopen] PRs 2-8 on top of PR 1 (to be split)": `canopen-full`'s files for the 59 paths it changes
   (the two PR 1 test configs it renamed deleted), dev's for the rest; 109 C++ + 40 Python tests pass. The old history
-  is `canopen-full-backup2` (pushed). `git diff upstream/dev canopen-full` is now exactly PRs 2-8. Next: cut PR 2
-  (split its part out of that commit, see "Cutting the branches"). `~/repos/esphome-docs` `canopen-full` is not
+  is `canopen-full-backup2` (pushed). `git diff upstream/dev canopen-full` is now exactly PRs 2-8. PR 2 is cut on
+  `canopen-pr2-frames` (`20f842f1b3`, pushed; "PR 2 as cut"); next: its docs and the upstream PR. `~/repos/esphome-docs` `canopen-full` is not
   rebuilt yet: wait until #8059 is merged. "New split" holds the refactor and the cutting steps; the old
   `canopen-pr1-node` (the node core) is superseded.
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
@@ -855,10 +855,38 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   HEAD) -- . ':!tests'`). Tests on the cut: 42 C++.
   Docs (esphome.io#8059, `de283cd69` on 2026-11-24): the 64 KiB limit and late answers by direction; the failed-setup
   rejection was already in `75b0e628a`.
-  **To do:** port the round to `canopen-full` (library from the registries also in codegen with `canopennode_path:`,
-  the apply actions next to `cancel_sdo()` and the node core's own actions, the 64 KiB checks, the direction check in
-  `sdo_reply_is_stale_()`, the start log), re-sync the hub copy here (`scripts/sync_hub.py`), then the house nodes
-  build from the registry package.
+  Ported to `canopen-full` (`534c38bb71`, 2026-11-24), the hub copy here re-synced.
+- **Merged** 2026-11-24 as `206bb68485` on `dev` (squash, identical to the cut's tip).
+
+#### PR 2 as cut (2026-11-24)
+- **Branch** `canopen-pr2-frames` in `~/repos/esphome`, `20f842f1b3` on `upstream/dev` `206bb68485` (PR 1 merged),
+  one commit "[canopen] Add raw frames, heartbeat / EMCY triggers and SDO cancel", pushed to mrk-its. No upstream PR
+  yet, no docs yet (esphome.io#8059 is still open: the docs branch would stack on `canopen-pr1-sdo-client`).
+- **Built by adding** PR 2's parts to the merged PR 1 tree (not by deleting from `canopen-full`, whose PR 1 parts
+  differ: runtime OD, client switch):
+  - `frames.cpp` as on `canopen-full`;
+  - `types.h`: `NMTState`, `nmt_state_to_string()` (in `canopen.cpp`), `FrameCallback`, `Emergency`,
+    `decode_heartbeat()` / `decode_emcy()`;
+  - `canopen.h`: `add_frame_listener()`, `send_frame()`, the heartbeat / EMCY callbacks, `cancel_sdo()` and the
+    abort state;
+  - `driver_can.cpp`: `dispatch_frame_()` after CANopenNode's receive callbacks;
+  - `canopen.cpp`: the `init_frame_listeners_()` hook, the abort guard in `idle_()`;
+  - `__init__.py`: `on_heartbeat` / `on_emcy` (`CALLBACK_AUTOMATIONS`);
+  - `sdo_client.cpp`: `cancel_sdo()`, `abort_sdo_()`, `process_sdo_abort_()`.
+  No `USE_CANOPEN_SDO_CLIENT` (PR 3), no `defines.h` lines.
+- **Abort limit** (the open point from PR 1's first review): a cancel's abort the bus refuses holds the client's TX
+  buffer, so no request could start until the bus came back. It now gets one response timeout to leave
+  (`sdo_abort_guard_us_` counts that down while `sdo_abort_pending_`), then it is dropped with a warning and no guard
+  follows; once it has left, the 50 ms guard runs as before. Same change on `canopen-full` (`066e724f17`, with the
+  tests below; 118 C++ tests).
+- **Tests:** `frames_test.cpp` (the decoders + `FramesTest`: listeners before / after setup, RTR / extended frames
+  skipped, heartbeat / EMCY callbacks, a listener on an SDO reply, `send_frame()`), `sdo_cancel_test.cpp` (adapted to
+  the client-only hub: no `send_nmt()`; plus the abort limit: dropped after the response timeout, no guard after a
+  dropped abort; both fail without the limit), `common.yaml` (triggers, `cancel_sdo()`, `send_frame()`,
+  `add_frame_listener()`), `test_canopen.py` (the two callbacks in the codegen). 65 C++ + 11 Python tests; builds
+  esp8266-ard, esp32-idf, rp2040-ard (no warnings); clang-tidy esp32-idf-tidy (with the tests), esp8266-arduino-tidy,
+  bk72xx-tidy, nrf52-tidy clean. Tidy: static test helpers without the trailing `_` (`advance_clock()`).
+- **Size:** 262 lines outside `tests/` (+266 / -4), 366 in `tests/`.
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's

@@ -195,16 +195,28 @@ CO_SDO_return_t CANopenComponent::start_sdo_() {
   return CO_SDO_RT_wrongArguments;
 }
 
-void CANopenComponent::process_sdo_(uint32_t dt_us) {
-  // The guard runs down from when the queued abort has left, even if no request is waiting yet. It leaves in the
-  // flush after this function (loop()), so a pending abort found sent now left dt_us ago.
+void CANopenComponent::process_sdo_abort_(uint32_t dt_us) {
   if (this->sdo_abort_pending_) {
-    this->sdo_abort_guard_us_ = ABORT_GUARD_US;
-    this->sdo_abort_pending_ = this->co_->SDOclient->CANtxBuff->bufferFull;
+    CO_SDOclient_t *cli = this->co_->SDOclient;
+    if (!cli->CANtxBuff->bufferFull) {
+      // it left in the flush after the last call (loop()), so dt_us ago
+      this->sdo_abort_pending_ = false;
+      this->sdo_abort_guard_us_ = ABORT_GUARD_US;
+    } else if (this->sdo_abort_guard_us_ <= dt_us) {
+      // The bus refused it for a whole response timeout: drop it, so it doesn't hold up the queue. The server ends
+      // the transfer at its own timeout.
+      discard_pending_tx(cli->CANdevTx, cli->CANtxBuff);
+      this->sdo_abort_pending_ = false;
+      ESP_LOGW(TAG, "node 0x%02x: abort of a cancelled transfer not sent", this->sdo_abort_node_);
+    }
   }
-  if (!this->sdo_abort_pending_)
-    this->sdo_abort_guard_us_ = this->sdo_abort_guard_us_ > dt_us ? this->sdo_abort_guard_us_ - dt_us : 0;
+  this->sdo_abort_guard_us_ = this->sdo_abort_guard_us_ > dt_us ? this->sdo_abort_guard_us_ - dt_us : 0;
+}
+
+void CANopenComponent::process_sdo_(uint32_t dt_us) {
+  this->process_sdo_abort_(dt_us);
   if (!this->sdo_busy_) {
+    // a pending abort holds the client's TX buffer
     if (this->sdo_queue_.empty() || this->sdo_abort_pending_)
       return;
     if (this->sdo_queue_.front().node_id == this->sdo_abort_node_) {
@@ -342,8 +354,8 @@ void CANopenComponent::abort_sdo_() {
   ESP_LOGD(TAG, "node 0x%02x, 0x%04x:%u: cancelled", r.node_id, r.index, r.sub);
   CO_SDOclientClose(cli);
   this->sdo_abort_node_ = r.node_id;
-  this->sdo_abort_guard_us_ = ABORT_GUARD_US;
   this->sdo_abort_pending_ = cli->CANtxBuff->bufferFull;
+  this->sdo_abort_guard_us_ = this->sdo_abort_pending_ ? this->response_timeout_ms_ * 1000u : ABORT_GUARD_US;
   this->sdo_active_ = SDORequest{};
   this->sdo_busy_ = false;
 }

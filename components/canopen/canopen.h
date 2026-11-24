@@ -317,12 +317,16 @@ class CANopenComponent : public Component {
   CO_SDO_return_t start_sdo_();
   void finish_sdo_(SDOResult result, uint32_t abort_code);
   void abort_sdo_();
+  // ends an abort the bus refused for a response timeout, then runs down the guard after it (ABORT_GUARD_US)
+  void process_sdo_abort_(uint32_t dt_us);
   StaticRingBuffer<SDORequest, SDO_QUEUE_SIZE> sdo_queue_;
   SDORequest sdo_active_{};
   // bytes handed to the fifo (writes) or received, including those past the buffer (reads)
   size_t sdo_len_{0};
-  uint32_t sdo_last_ms_{0};         // loop time the SDO client was last given
-  uint32_t sdo_abort_guard_us_{0};  // time left before a request to sdo_abort_node_ may start
+  uint32_t sdo_last_ms_{0};  // loop time the SDO client was last given
+  // after a cancel: while the abort waits to be sent, the time left to send it; once sent, the time left before a
+  // request to sdo_abort_node_ may start
+  uint32_t sdo_abort_guard_us_{0};
   // OD 0x1280 (SDO client parameter, with sdo_cli_highest_sub_ and sdo_cli_node_), set up per request
   uint32_t sdo_cli_cob_tx_{0x80000000};
   uint32_t sdo_cli_cob_rx_{0x80000000};
