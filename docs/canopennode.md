@@ -887,6 +887,14 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   esp8266-ard, esp32-idf, rp2040-ard (no warnings); clang-tidy esp32-idf-tidy (with the tests), esp8266-arduino-tidy,
   bk72xx-tidy, nrf52-tidy clean. Tidy: static test helpers without the trailing `_` (`advance_clock()`).
 - **Size:** 262 lines outside `tests/` (+266 / -4), 366 in `tests/`.
+- **Upstream:** esphome/esphome#23266 (2026-11-24). Copilot review (2026-11-25), 8 comments, 7 fixed in
+  `7ec3825f97` (`canopen-full` `7c2f938315`): `Emergency` by value in the automation (a `std::tuple` can't hold a
+  reference), `send_frame()` rejects IDs above `0x7FF`, a filter with `can_id & mask` above `0x7FF` isn't added,
+  dispatch by index on copies (a callback may add listeners; `NOLINT(modernize-loop-convert)`), the abort guard holds
+  every node (one guard for any number of cancels), the abort's timers run from the cancel (`abort_sdo_()` resets the
+  time base), `abort_sdo_()` ends the request before it sends or logs. Pushed back: the guard starts when the driver
+  takes the abort, not when it's on the bus (`canbus` has no transmit completion; comment added). 8 new tests (73 C++
+  in the cut, 126 on `canopen-full`), each failing without its fix. Docs updated (esphome-docs `67a1f177e`).
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
