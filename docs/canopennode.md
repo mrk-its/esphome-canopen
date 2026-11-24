@@ -29,7 +29,7 @@ Where to continue (2026-11-24):
   `a055ba97aa` "[canopen] PRs 2-8 on top of PR 1 (to be split)": `canopen-full`'s files for the 59 paths it changes
   (the two PR 1 test configs it renamed deleted), dev's for the rest; 109 C++ + 40 Python tests pass. The old history
   is `canopen-full-backup2` (pushed). `git diff upstream/dev canopen-full` is now exactly PRs 2-8. PR 2 is cut on
-  `canopen-pr2-frames` (`20f842f1b3`, pushed; "PR 2 as cut"); next: its docs and the upstream PR. `~/repos/esphome-docs` `canopen-full` is not
+  `canopen-pr2-frames` (`20f842f1b3`, pushed; "PR 2 as cut"), upstream PR esphome/esphome#23266 (2026-11-24); its docs are on esphome-docs branch `canopen-pr2-frames` (`7ffc63d68`, on top of the PR 1 docs), docs PR not opened yet. `~/repos/esphome-docs` `canopen-full` is not
   rebuilt yet: wait until #8059 is merged. "New split" holds the refactor and the cutting steps; the old
   `canopen-pr1-node` (the node core) is superseded.
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
