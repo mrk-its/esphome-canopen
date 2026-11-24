@@ -1,9 +1,11 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from esphome import automation
 import esphome.codegen as cg
+from esphome.components import esp32
 from esphome.components.canbus import CONF_CANBUS_ID, CanbusComponent
 from esphome.components.const import CONF_SERIAL_NUMBER
 import esphome.config_validation as cv
@@ -51,9 +53,8 @@ CONF_DEVICE_NAME = "device_name"
 CONF_HARDWARE_VERSION = "hardware_version"
 CONF_SOFTWARE_VERSION = "software_version"
 
-# CANopenNode upstream + library.json + SDO server block size option + the ESPHome target header CO_driver_target.h
-# (branch esphome), pinned to a commit
-CANOPENNODE_SOURCE = "https://github.com/esphome-libs/CANopenNode.git#eef8ab960b854c06f30d2f72df2288a2f2bb0d97"
+# https://github.com/esphome-libs/CANopenNode: upstream plus ESPHome's CO_driver_target.h
+CANOPENNODE_VERSION = "4.1.0-esphome.2"
 
 ns = cg.esphome_ns.namespace("canopen")
 CANopenComponent = ns.class_("CANopenComponent", cg.Component)
@@ -64,8 +65,6 @@ NodeEvent = ns.enum("NodeEvent", is_class=True)
 Emergency = ns.struct("Emergency")
 SDOResult = ns.enum("SDOResult", is_class=True)
 NMTCommand = ns.enum("NMTCommand", is_class=True)
-SDOWriteAction = ns.class_("SDOWriteAction", automation.Action)
-SDOReadAction = ns.class_("SDOReadAction", automation.Action)
 
 # a hub without node_id (CANopenComponent::NO_NODE_ID): SDO client only, no CANopen node
 NO_NODE_ID = 0
@@ -376,7 +375,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_DEVICE_NAME): cv.string,
             cv.Optional(CONF_HARDWARE_VERSION): cv.string,
             cv.Optional(CONF_SOFTWARE_VERSION): cv.string,
-            # local CANopenNode checkout instead of CANOPENNODE_SOURCE (development)
+            # local CANopenNode checkout instead of the registry package (development)
             cv.Optional(CONF_CANOPENNODE_PATH): absolute_path,
         }
     ).extend(cv.COMPONENT_SCHEMA),
@@ -445,10 +444,14 @@ def add_canopennode_library(path: str | None = None) -> None:
 
     Its target header (CO_driver_target.h) is in the library itself, so no include path is needed.
     """
-    if path is not None:
+    if CORE.is_esp32:
+        esp32.add_idf_component(
+            name="esphome/canopennode", ref=CANOPENNODE_VERSION, path=path
+        )
+    elif path is not None:
         cg.add_library("CANopenNode", None, f"file://{path}")
     else:
-        cg.add_library("CANopenNode", None, CANOPENNODE_SOURCE)
+        cg.add_library("esphome/CANopenNode", CANOPENNODE_VERSION)
 
 
 async def to_code(config: ConfigType) -> None:
@@ -523,10 +526,25 @@ SDO_ACTION_SCHEMA = cv.Schema(
         cv.Required(CONF_NODE_ID): cv.templatable(cv.int_range(min=1, max=127)),
         cv.Required(CONF_INDEX): cv.templatable(cv.hex_uint16_t),
         cv.Optional(CONF_SUBINDEX, default=0): cv.templatable(cv.hex_uint8_t),
-        # single: an action's trigger runs one automation
         cv.Optional(CONF_ON_ERROR): automation.validate_automation(single=True),
     }
 )
+
+
+_ADDRESS = (
+    (CONF_NODE_ID, cg.uint8),
+    (CONF_INDEX, cg.uint16),
+    (CONF_SUBINDEX, cg.uint8),
+)
+
+
+async def _automation_fn(
+    config: ConfigType, key: str, fn_args: TemplateArgsType
+) -> MockObj:
+    """The static function running the automation under ``key``, or nullptr."""
+    if (conf := config.get(key)) is None:
+        return cg.nullptr
+    return await automation.build_trigger_callback(fn_args, conf, params=fn_args)
 
 
 async def _sdo_action_to_code(
@@ -534,24 +552,35 @@ async def _sdo_action_to_code(
     action_id: ID,
     template_arg: cg.TemplateArguments,
     args: TemplateArgsType,
+    *,
+    request: Callable[[MockObj], MockObj],
+    keys: tuple[tuple[str, MockObj], ...],
+    reply: MockObj,
+    on_ok: str,
+    on_ok_args: TemplateArgsType,
 ) -> MockObj:
-    """What canopen.sdo_read and canopen.sdo_write share: the hub, the object address and on_error."""
+    """``request(parent)(<keys>, size, reply<on_ok, on_error>, nullptr)``."""
     enable_sdo_client()
-    var = cg.new_Pvariable(action_id, template_arg)
-    await cg.register_parented(var, config[CONF_ID])
-    for key, setter, type_ in (
-        (CONF_NODE_ID, var.set_node_id, cg.uint8),
-        (CONF_INDEX, var.set_index, cg.uint16),
-        (CONF_SUBINDEX, var.set_subindex, cg.uint8),
-    ):
-        cg.add(setter(await cg.templatable(config[key], args, type_)))
-    if error_conf := config.get(CONF_ON_ERROR):
-        await automation.build_automation(
-            var.get_error_trigger(),
-            [(SDOResult, "result"), (cg.uint32, "abort_code")],
-            error_conf,
-        )
-    return var
+    values = [
+        await automation.call_user_lambda(value, args, type_)
+        if cg.is_template(value := config[key])
+        else cg.safe_exp(value)
+        for key, type_ in keys
+    ]
+    ok_fn = await _automation_fn(config, on_ok, on_ok_args)
+    error_fn = await _automation_fn(
+        config, CONF_ON_ERROR, [(SDOResult, "result"), (cg.uint32, "abort_code")]
+    )
+    callback = cg.nullptr
+    if ok_fn is not cg.nullptr or error_fn is not cg.nullptr:
+        callback = reply.template(ok_fn, error_fn)
+    hub = automation.parent_ref(await cg.get_variable(config[CONF_ID]))
+    statement = cg.statement(
+        request(hub)(*values, config[CONF_SIZE], callback, cg.nullptr)
+    )
+    return automation.apply_statements_action(
+        action_id, template_arg, args, [str(statement)]
+    )
 
 
 SDO_WRITE_SCHEMA = cv.All(
@@ -569,7 +598,7 @@ SDO_WRITE_SCHEMA = cv.All(
 
 
 @automation.register_action(
-    "canopen.sdo_write", SDOWriteAction, SDO_WRITE_SCHEMA, synchronous=True
+    "canopen.sdo_write", automation.ApplyAction, SDO_WRITE_SCHEMA, synchronous=True
 )
 async def sdo_write_to_code(
     config: ConfigType,
@@ -577,12 +606,17 @@ async def sdo_write_to_code(
     template_arg: cg.TemplateArguments,
     args: TemplateArgsType,
 ) -> MockObj:
-    var = await _sdo_action_to_code(config, action_id, template_arg, args)
-    cg.add(var.set_value(await cg.templatable(config[CONF_VALUE], args, cg.uint32)))
-    cg.add(var.set_size(config[CONF_SIZE]))
-    if success_conf := config.get(CONF_ON_SUCCESS):
-        await automation.build_automation(var.get_success_trigger(), [], success_conf)
-    return var
+    return await _sdo_action_to_code(
+        config,
+        action_id,
+        template_arg,
+        args,
+        request=lambda hub: hub.write_sdo,
+        keys=(*_ADDRESS, (CONF_VALUE, cg.uint32)),
+        reply=ns.sdo_write_reply,
+        on_ok=CONF_ON_SUCCESS,
+        on_ok_args=[],
+    )
 
 
 NMT_SCHEMA = cv.Schema(
@@ -625,7 +659,7 @@ async def nmt_to_code(
 
 SDO_READ_SCHEMA = SDO_ACTION_SCHEMA.extend(
     {
-        # 1/2/4: the value must have this width; 0: any width up to 4 bytes
+        # 0 accepts any width up to 4 bytes
         cv.Optional(CONF_SIZE, default=0): cv.one_of(0, 1, 2, 4, int=True),
         cv.Optional(CONF_ON_VALUE): automation.validate_automation(single=True),
     }
@@ -633,7 +667,7 @@ SDO_READ_SCHEMA = SDO_ACTION_SCHEMA.extend(
 
 
 @automation.register_action(
-    "canopen.sdo_read", SDOReadAction, SDO_READ_SCHEMA, synchronous=True
+    "canopen.sdo_read", automation.ApplyAction, SDO_READ_SCHEMA, synchronous=True
 )
 async def sdo_read_to_code(
     config: ConfigType,
@@ -641,10 +675,14 @@ async def sdo_read_to_code(
     template_arg: cg.TemplateArguments,
     args: TemplateArgsType,
 ) -> MockObj:
-    var = await _sdo_action_to_code(config, action_id, template_arg, args)
-    cg.add(var.set_size(config[CONF_SIZE]))
-    if value_conf := config.get(CONF_ON_VALUE):
-        await automation.build_automation(
-            var.get_value_trigger(), [(cg.uint32, "x")], value_conf
-        )
-    return var
+    return await _sdo_action_to_code(
+        config,
+        action_id,
+        template_arg,
+        args,
+        request=lambda hub: hub.read_sdo,
+        keys=_ADDRESS,
+        reply=ns.sdo_read_reply,
+        on_ok=CONF_ON_VALUE,
+        on_ok_args=[(cg.uint32, "x")],
+    )

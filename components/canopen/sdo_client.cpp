@@ -1,4 +1,3 @@
-// SDO client on CANopenNode's CO_SDOclient: one channel, a FIFO request queue, one callback per request.
 #include "canopen.h"
 
 #ifdef USE_CANOPEN_SDO_CLIENT
@@ -36,10 +35,12 @@ void CANopenComponent::config_sdo_client_(CO_config_t &cfg) {
   cfg.ENTRY_H1280 = this->od_.find(0x1280);
 }
 
+// Client-only hub; a node's client is set up by CO_CANopenInit(). Without our own node id there are no local
+// transfers, so the client needs no OD.
 bool CANopenComponent::init_sdo_client_() {
   uint32_t err_info = 0;
   CO_ReturnError_t err =
-      CO_SDOclient_init(this->co_->SDOclient, this->od_.od(), this->od_.find(0x1280), NO_NODE_ID, this->co_->CANmodule,
+      CO_SDOclient_init(this->co_->SDOclient, nullptr, this->od_.find(0x1280), NO_NODE_ID, this->co_->CANmodule,
                         this->co_->RX_IDX_SDO_CLI, this->co_->CANmodule, this->co_->TX_IDX_SDO_CLI, &err_info);
   if (err != CO_ERROR_NO) {
     ESP_LOGE(TAG, "CO_SDOclient_init failed: %d (OD 0x%04" PRIx32 ")", err, err_info);
@@ -54,7 +55,7 @@ static void reject(uint8_t node_id, uint16_t index, uint8_t sub, SDOCallback cal
     callback(context, SDOReply{SDOResult::SDO_RESULT_REJECTED, 0, 0, 0, nullptr, 0});
 }
 
-// unsigned or sign-extended, the range validate_sdo_value() checks for constants
+// unsigned or sign-extended, as validate_sdo_value() allows
 static bool value_fits(uint32_t value, uint8_t size) {
   if (size == 4)
     return true;
@@ -69,7 +70,7 @@ bool CANopenComponent::read_sdo(uint8_t node_id, uint16_t index, uint8_t sub, ui
     return false;
   }
   return this->queue_sdo_(
-      SDORequest{node_id, sub, SDOKind::SDO_KIND_READ, expected_size, index, {}, 0, callback, context});
+      SDORequest{node_id, sub, SDOKind::SDO_KIND_READ, expected_size, index, 0, {}, callback, context});
 }
 
 bool CANopenComponent::write_sdo(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size,
@@ -81,7 +82,7 @@ bool CANopenComponent::write_sdo(uint8_t node_id, uint16_t index, uint8_t sub, u
   if (size < 4)
     value &= (1u << (8 * size)) - 1;  // sign-extended: the reply's value is zero-extended
   return this->queue_sdo_(
-      SDORequest{node_id, sub, SDOKind::SDO_KIND_WRITE, size, index, {value}, 0, callback, context});
+      SDORequest{node_id, sub, SDOKind::SDO_KIND_WRITE, size, index, 0, {value}, callback, context});
 }
 
 bool CANopenComponent::read_sdo_data(uint8_t node_id, uint16_t index, uint8_t sub, uint8_t *data, size_t capacity,
@@ -90,24 +91,27 @@ bool CANopenComponent::read_sdo_data(uint8_t node_id, uint16_t index, uint8_t su
     reject(node_id, index, sub, callback, context);
     return false;
   }
-  SDORequest request{node_id, sub, SDOKind::SDO_KIND_READ_DATA, 0, index, {}, capacity, callback, context};
+  // a longer reply aborts anyway, so the buffer's first 64 KiB are enough
+  const auto cap = static_cast<uint16_t>(std::min<size_t>(capacity, UINT16_MAX));
+  SDORequest request{node_id, sub, SDOKind::SDO_KIND_READ_DATA, 0, index, cap, {}, callback, context};
   request.data = data;
   return this->queue_sdo_(request);
 }
 
 bool CANopenComponent::write_sdo_data(uint8_t node_id, uint16_t index, uint8_t sub, const uint8_t *data, size_t len,
                                       SDOCallback callback, void *context) {
-  if (data == nullptr || len == 0) {
+  if (data == nullptr || len == 0 || len > UINT16_MAX) {
     reject(node_id, index, sub, callback, context);
     return false;
   }
-  SDORequest request{node_id, sub, SDOKind::SDO_KIND_WRITE_DATA, 0, index, {}, len, callback, context};
+  const auto size = static_cast<uint16_t>(len);
+  SDORequest request{node_id, sub, SDOKind::SDO_KIND_WRITE_DATA, 0, index, size, {}, callback, context};
   request.data = const_cast<uint8_t *>(data);  // a WRITE_DATA request only reads it
   return this->queue_sdo_(request);
 }
 
 bool CANopenComponent::queue_sdo_(const SDORequest &request) {
-  // before setup() the request waits in the queue: loop() starts it once CANopenNode runs
+  // before setup() the request waits in the queue
   if (this->is_failed() || request.node_id == 0 || request.node_id > 127 || !this->sdo_queue_.push(request)) {
     reject(request.node_id, request.index, request.sub, request.callback, request.context);
     return false;
@@ -124,8 +128,8 @@ void CANopenComponent::reject_queued_sdo_() {
   }
 }
 
-// A late reply to an ended request (e.g. timed out) names its object; CANopenNode takes any abort and aborts on an
-// initiate response for another object, failing the current request. Segment responses name no object and pass.
+// A late reply to an ended request would fail the current one: CANopenNode takes any abort and aborts on an
+// initiate response for another object.
 bool CANopenComponent::sdo_reply_is_stale_(const uint8_t *data, uint8_t len) const {
   if (!this->sdo_busy_ || len < 4)
     return false;
@@ -134,10 +138,14 @@ bool CANopenComponent::sdo_reply_is_stale_(const uint8_t *data, uint8_t len) con
   if (cli->CANtxBuff->bufferFull)
     return true;
   const uint8_t scs = data[0] >> 5;  // 0/1: segment responses, 2/3: initiate upload/download responses, 4: abort
-  if (scs < 2)                       // late, of a timed-out transfer, while the request waits for its initiate response
+  if (scs < 2)                       // late while waiting for the initiate response
     return cli->state == CO_SDO_ST_UPLOAD_INITIATE_RSP || cli->state == CO_SDO_ST_DOWNLOAD_INITIATE_RSP;
   if (scs > 4)
     return false;
+  // an initiate response for the other direction, e.g. a late write ack while a read of the object waits
+  if ((scs == 2 && cli->state == CO_SDO_ST_DOWNLOAD_INITIATE_RSP) ||
+      (scs == 3 && cli->state == CO_SDO_ST_UPLOAD_INITIATE_RSP))
+    return true;
   return encode_uint16(data[2], data[1]) != this->sdo_active_.index || data[3] != this->sdo_active_.sub;
 }
 
@@ -155,36 +163,36 @@ void CANopenComponent::cancel_sdo(void *context) {
   }
 }
 
-bool CANopenComponent::start_sdo_() {
+CO_SDO_return_t CANopenComponent::start_sdo_() {
   CO_SDOclient_t *cli = this->co_->SDOclient;
   SDORequest &r = this->sdo_active_;
   uint8_t node = r.node_id;
-  if (CO_SDOclient_setup(cli, 0x600 + node, 0x580 + node, node) != CO_SDO_RT_ok_communicationEnd)
-    return false;
+  CO_SDO_return_t ret = CO_SDOclient_setup(cli, 0x600 + node, 0x580 + node, node);
+  if (ret != CO_SDO_RT_ok_communicationEnd)
+    return ret;
   this->sdo_len_ = 0;
   this->sdo_rx_value_.fill(0);  // finish_sdo_() decodes all 4 bytes
   switch (r.kind) {
     case SDOKind::SDO_KIND_READ:
     case SDOKind::SDO_KIND_READ_DATA:
-      return CO_SDOclientUploadInitiate(cli, r.index, r.sub, this->response_timeout_ms_, false) ==
-             CO_SDO_RT_ok_communicationEnd;
+      return CO_SDOclientUploadInitiate(cli, r.index, r.sub, this->response_timeout_ms_, false);
     case SDOKind::SDO_KIND_WRITE: {
       uint8_t buf[4];
       put_le32(buf, r.value);
-      if (CO_SDOclientDownloadInitiate(cli, r.index, r.sub, r.size, this->response_timeout_ms_, false) !=
-          CO_SDO_RT_ok_communicationEnd)
-        return false;
+      ret = CO_SDOclientDownloadInitiate(cli, r.index, r.sub, r.size, this->response_timeout_ms_, false);
+      if (ret != CO_SDO_RT_ok_communicationEnd)
+        return ret;
       this->sdo_len_ = CO_SDOclientDownloadBufWrite(cli, buf, r.size);
-      return this->sdo_len_ == r.size;
+      return this->sdo_len_ == r.size ? CO_SDO_RT_ok_communicationEnd : CO_SDO_RT_wrongArguments;
     }
     case SDOKind::SDO_KIND_WRITE_DATA:
-      if (CO_SDOclientDownloadInitiate(cli, r.index, r.sub, r.len, this->response_timeout_ms_, false) !=
-          CO_SDO_RT_ok_communicationEnd)
-        return false;
+      ret = CO_SDOclientDownloadInitiate(cli, r.index, r.sub, r.len, this->response_timeout_ms_, false);
+      if (ret != CO_SDO_RT_ok_communicationEnd)
+        return ret;
       this->sdo_len_ = CO_SDOclientDownloadBufWrite(cli, r.data, r.len);
-      return true;
+      return ret;
   }
-  return false;
+  return CO_SDO_RT_wrongArguments;
 }
 
 void CANopenComponent::process_sdo_(uint32_t dt_us) {
@@ -207,7 +215,10 @@ void CANopenComponent::process_sdo_(uint32_t dt_us) {
     this->sdo_active_ = this->sdo_queue_.front();
     this->sdo_queue_.pop();
     this->sdo_busy_ = true;
-    if (!this->start_sdo_()) {
+    CO_SDO_return_t started = this->start_sdo_();
+    if (started != CO_SDO_RT_ok_communicationEnd) {
+      ESP_LOGD(TAG, "node 0x%02x, 0x%04x:%u: not started (CANopenNode %d)", this->sdo_active_.node_id,
+               this->sdo_active_.index, this->sdo_active_.sub, static_cast<int>(started));
       this->finish_sdo_(SDOResult::SDO_RESULT_TRANSPORT_ERROR, 0);
       return;
     }
@@ -232,7 +243,7 @@ void CANopenComponent::process_sdo_(uint32_t dt_us) {
   if (ret == CO_SDO_RT_ok_communicationEnd) {
     this->finish_sdo_(SDOResult::SDO_RESULT_SUCCESS, 0);
   } else if (ret == CO_SDO_RT_transmittBufferFull && cli->timeoutTimer >= cli->SDOtimeoutTime_us) {
-    // CANopenNode doesn't time out while its frame waits to be sent: the queue would wait as long as the bus is stuck
+    // CANopenNode doesn't time out while its frame waits to be sent
     this->finish_sdo_(SDOResult::SDO_RESULT_TRANSPORT_ERROR, 0);
   } else if (ret < 0) {
     // a server may abort with the timeout code too
@@ -252,8 +263,7 @@ bool CANopenComponent::drain_upload_(uint32_t dt_us, CO_SDO_return_t &ret, CO_SD
   const bool value_read = r.kind == SDOKind::SDO_KIND_READ;
   uint8_t *dst = value_read ? this->sdo_rx_value_.data() : r.data;
   const size_t cap = value_read ? this->sdo_rx_value_.size() : r.len;
-  // The fifo holds one segment (CO_CONFIG_SDO_CLI_BUFFER_SIZE 7), drained before the next is requested: a read past
-  // its capacity (a value: 4 bytes) ends without asking the server for more.
+  // The fifo holds one segment, so a read past capacity ends before the next segment is requested.
   ret = CO_SDOclientUpload(cli, dt_us, false, &abort, nullptr, nullptr, nullptr);
   while (ret >= 0) {
     uint8_t buf[8];
@@ -266,7 +276,7 @@ bool CANopenComponent::drain_upload_(uint32_t dt_us, CO_SDO_return_t &ret, CO_SD
     if (this->sdo_len_ > cap) {
       abort = value_read ? CO_SDO_AB_DATA_LONG : CO_SDO_AB_OUT_OF_MEM;
       CO_SDOclientUpload(cli, 0, true, &abort, nullptr, nullptr, nullptr);
-      // not abort: it comes back empty when the last frame ended the transfer, with nothing left to abort
+      // not abort: it is empty when the last frame already ended the transfer
       if (value_read) {
         this->finish_sdo_(SDOResult::SDO_RESULT_SIZE_MISMATCH, 0);
       } else {
@@ -284,7 +294,7 @@ bool CANopenComponent::drain_upload_(uint32_t dt_us, CO_SDO_return_t &ret, CO_SD
 void CANopenComponent::finish_sdo_(SDOResult result, uint32_t abort_code) {
   CO_SDOclient_t *cli = this->co_->SDOclient;
   CO_SDOclientClose(cli);
-  // failed: drop the frame unless the controller took it (then it can't be recalled, see types.h)
+  // drop an unsent frame; one the controller took can't be recalled (see types.h)
   if (result != SDOResult::SDO_RESULT_SUCCESS)
     discard_pending_tx(cli->CANdevTx, cli->CANtxBuff);
   SDORequest r = this->sdo_active_;

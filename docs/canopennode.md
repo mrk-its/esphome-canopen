@@ -20,12 +20,18 @@ see "Hub for the entity mapper"). **Next:** cut the upstream PRs again from the 
   services use a stack-neutral API, but there is no runtime choice of backend.
 
 ## Current state (handoff)
-Where to continue (2026-11-07):
-- **Upstream split:** "Upstream PRs" -> "SDO client only first" (the current split) and its "PR 1 as cut": PR 1 (the
-  SDO client, no node) is cut on `canopen-pr1-sdo-client` in `~/repos/esphome` and `~/repos/esphome-docs`, pushed,
-  hardware-tested on the nucleo; both PRs are open, ready for review since 2026-11-09: esphome/esphome#22410 and esphome/esphome.io#8059. "New split" holds the refactor and the cutting steps; the old
-  `canopen-pr1-node` (the node core) is superseded. bdraco's second round of commits on the cut (2026-11-23, "PR 1 as
-  cut") is **not on `canopen-full` yet**: port it before cutting PR 2.
+Where to continue (2026-11-24):
+- **Upstream split:** "Upstream PRs" -> "SDO client only first" (the current split) and its "PR 1 as cut". PR 1 (the
+  SDO client, no node; `canopen-pr1-sdo-client`) is **merged upstream**: esphome/esphome#22410, squash `206bb68485`
+  on `dev` (2026-11-24), identical to the cut's tip. The docs PR esphome/esphome.io#8059 is still open (preview:
+  https://deploy-preview-8059--esphome.netlify.app/components/canopen/). bdraco's 2026-11-23 round is ported to
+  `canopen-full` (`534c38bb71`). Then `canopen-full` was rebuilt on `upstream/dev` (`206bb68485`) as one commit,
+  `a055ba97aa` "[canopen] PRs 2-8 on top of PR 1 (to be split)": `canopen-full`'s files for the 59 paths it changes
+  (the two PR 1 test configs it renamed deleted), dev's for the rest; 109 C++ + 40 Python tests pass. The old history
+  is `canopen-full-backup2` (pushed). `git diff upstream/dev canopen-full` is now exactly PRs 2-8. Next: cut PR 2
+  (split its part out of that commit, see "Cutting the branches"). `~/repos/esphome-docs` `canopen-full` is not
+  rebuilt yet: wait until #8059 is merged. "New split" holds the refactor and the cutting steps; the old
+  `canopen-pr1-node` (the node core) is superseded.
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
 - **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
   `components_next`); the old component (`components/canopen`, canopen-stack) and `components_next/canopen` (a stale

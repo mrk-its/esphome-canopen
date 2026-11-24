@@ -21,7 +21,7 @@ static bool send_frame(CO_CANmodule_t *mod, CO_CANtx_t *buf) {
 }
 
 void CANopenComponent::on_frame_(const canbus::CanFrame &frame) {
-  // CANopen (CiA 301) uses classic CAN frames with 11-bit ids
+  // CANopen uses classic CAN with 11-bit ids
 #ifdef USE_CANBUS_FD
   if (frame.fd)
     return;
@@ -83,7 +83,7 @@ using esphome::canopen::send_frame;
 
 extern "C" {
 
-// CANopenNode's C driver API (301/CO_driver.h) fixes these names and signatures
+// names and signatures fixed by CO_driver.h
 // NOLINTBEGIN(readability-identifier-naming,readability-non-const-parameter)
 
 void CO_CANsetConfigurationMode(void *CANptr) {}
@@ -92,8 +92,6 @@ void CO_CANsetNormalMode(CO_CANmodule_t *CANmodule) { CANmodule->CANnormal = tru
 
 CO_ReturnError_t CO_CANmodule_init(CO_CANmodule_t *CANmodule, void *CANptr, CO_CANrx_t rxArray[], uint16_t rxSize,
                                    CO_CANtx_t txArray[], uint16_t txSize, uint16_t CANbitRate) {
-  if (CANmodule == nullptr || CANptr == nullptr || rxArray == nullptr || txArray == nullptr)
-    return CO_ERROR_ILLEGAL_ARGUMENT;
   CANmodule->CANptr = CANptr;
   CANmodule->rxArray = rxArray;
   CANmodule->rxSize = rxSize;
@@ -118,7 +116,7 @@ void CO_CANmodule_disable(CO_CANmodule_t *CANmodule) {
 
 CO_ReturnError_t CO_CANrxBufferInit(CO_CANmodule_t *CANmodule, uint16_t index, uint16_t ident, uint16_t mask,
                                     bool_t rtr, void *object, void (*CANrx_callback)(void *object, void *message)) {
-  if (CANmodule == nullptr || object == nullptr || CANrx_callback == nullptr || index >= CANmodule->rxSize)
+  if (index >= CANmodule->rxSize)
     return CO_ERROR_ILLEGAL_ARGUMENT;
   CO_CANrx_t *rx = &CANmodule->rxArray[index];
   rx->object = object;
@@ -130,7 +128,7 @@ CO_ReturnError_t CO_CANrxBufferInit(CO_CANmodule_t *CANmodule, uint16_t index, u
 
 CO_CANtx_t *CO_CANtxBufferInit(CO_CANmodule_t *CANmodule, uint16_t index, uint16_t ident, bool_t rtr, uint8_t noOfBytes,
                                bool_t syncFlag) {
-  if (CANmodule == nullptr || index >= CANmodule->txSize)
+  if (index >= CANmodule->txSize)
     return nullptr;
   CO_CANtx_t *tx = &CANmodule->txArray[index];
   // the SDO client sets its buffer up again for every request
@@ -143,7 +141,6 @@ CO_CANtx_t *CO_CANtxBufferInit(CO_CANmodule_t *CANmodule, uint16_t index, uint16
 
 CO_ReturnError_t CO_CANsend(CO_CANmodule_t *CANmodule, CO_CANtx_t *buffer) {
   if (buffer->bufferFull) {
-    // previous frame of this buffer is still waiting
     if (!CANmodule->firstCANtxMessage)
       CANmodule->CANerrorStatus |= CO_CAN_ERRTX_OVERFLOW;
     return CO_ERROR_TX_OVERFLOW;
@@ -152,7 +149,7 @@ CO_ReturnError_t CO_CANsend(CO_CANmodule_t *CANmodule, CO_CANtx_t *buffer) {
     CANmodule->firstCANtxMessage = false;
     return CO_ERROR_NO;
   }
-  // keep it queued (in order behind the others), CO_CANmodule_process() resends it from loop()
+  // queued behind the others; CO_CANmodule_process() resends it from loop()
   buffer->bufferFull = true;
   CANmodule->CANtxCount++;
   static_cast<esphome::canopen::CANopenComponent *>(CANmodule->CANptr)->enable_loop();

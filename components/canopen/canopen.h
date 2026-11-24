@@ -58,7 +58,7 @@ class CANopenComponent : public Component {
   void setup() override;
   void loop() override;
   void dump_config() override;
-  // after the CAN bus, before the default on_boot automations (600)
+  // after canbus, before on_boot (600)
   float get_setup_priority() const override { return setup_priority::HARDWARE - 1.0f; }
 
   // Other canopen nodes on the same canbus, as a ring (codegen): a frame one of them sends is also received by the
@@ -147,7 +147,7 @@ class CANopenComponent : public Component {
   // queue (e.g. from on_boot); a failed setup() rejects them. Requests to our own node id are served from our object
   // dictionary, without CAN frames.
 
-  // value read; expected_size 1/2/4 checks the width (SIZE_MISMATCH), 0 accepts any width up to 4
+  // expected_size 1/2/4 must match the reply's width, 0 accepts any up to 4
   bool read_sdo(uint8_t node_id, uint16_t index, uint8_t sub, uint8_t expected_size, SDOCallback callback,
                 void *context);
   template<typename T>
@@ -155,7 +155,7 @@ class CANopenComponent : public Component {
     static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4, "SDO values are 1, 2 or 4 bytes");
     return this->read_sdo(node_id, index, sub, sizeof(T), callback, context);
   }
-  // value write of size 1/2/4 bytes (little endian)
+  // size: 1, 2 or 4 bytes
   bool write_sdo(uint8_t node_id, uint16_t index, uint8_t sub, uint32_t value, uint8_t size,
                  SDOCallback callback = nullptr, void *context = nullptr);
   template<typename T>
@@ -292,11 +292,11 @@ class CANopenComponent : public Component {
     SDOKind kind;
     uint8_t size;  // read: expected size (0 = any); write: value size
     uint16_t index;
+    uint16_t len;  // data length (READ_DATA: capacity)
     union {
       uint32_t value;  // WRITE
-      uint8_t *data;   // READ_DATA, WRITE_DATA (only read): owned by the caller
+      uint8_t *data;   // *_DATA, owned by the caller
     };
-    size_t len;  // READ_DATA: capacity of data
     SDOCallback callback;
     void *context;
   };
@@ -312,14 +312,14 @@ class CANopenComponent : public Component {
   void reject_queued_sdo_();
   bool sdo_reply_is_stale_(const uint8_t *data, uint8_t len) const;
   void process_sdo_(uint32_t dt_us);
-  // runs the upload and drains the client fifo; true when an overlong read ended the request here
+  // true when an overlong read ended the request
   bool drain_upload_(uint32_t dt_us, CO_SDO_return_t &ret, CO_SDO_abortCode_t &abort);
-  bool start_sdo_();
+  CO_SDO_return_t start_sdo_();
   void finish_sdo_(SDOResult result, uint32_t abort_code);
   void abort_sdo_();
   StaticRingBuffer<SDORequest, SDO_QUEUE_SIZE> sdo_queue_;
   SDORequest sdo_active_{};
-  // WRITE/WRITE_DATA: bytes handed to the client fifo; READ/READ_DATA: bytes received, also those beyond the buffer
+  // bytes handed to the fifo (writes) or received, including those past the buffer (reads)
   size_t sdo_len_{0};
   uint32_t sdo_last_ms_{0};         // loop time the SDO client was last given
   uint32_t sdo_abort_guard_us_{0};  // time left before a request to sdo_abort_node_ may start

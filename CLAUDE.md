@@ -24,11 +24,11 @@ steps in `docs/canopennode.md`, "Upstream PRs" -> "SDO client only first" (the c
 refactor and the cutting steps); per-PR line counts with `scripts/pr_split_lines.py`.
 Current split (2026-11-05, "SDO client only first", 8 PRs): PR 1 = the hub without `node_id` (the SDO client,
 `sdo_read` / `sdo_write`), PR 2 raw frames + heartbeat / EMCY triggers, PR 3 the node core (`USE_CANOPEN_NODE`) +
-loopback. PR 1 is cut (2026-11-07) on `canopen-pr1-sdo-client` in `~/repos/esphome` and `~/repos/esphome-docs`
-(pushed, hardware-tested; PRs esphome/esphome#22410 and esphome/esphome.io#8059, ready for review since 2026-11-09); its differences from
-`canopen-full` and the test results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then
-into the cut; reviewers' commits on the cut (bdraco's of 2026-11-23: registry CANopenNode, apply actions, 64 KiB
-limit) are ported back, still to do for that round. Before work in `~/repos/esphome` or `~/repos/esphome-docs`, read their AGENTS.md / CLAUDE.md
+loopback. PR 1 (esphome/esphome#22410, cut on `canopen-pr1-sdo-client`) is **merged upstream** (2026-11-24,
+squash `206bb68485`); its docs PR esphome/esphome.io#8059 is still open. `canopen-full` in `~/repos/esphome` is rebuilt
+on `upstream/dev` as one commit "PRs 2-8 on top of PR 1 (to be split)" (`a055ba97aa`; the old history, with
+bdraco's review commits ported, is `canopen-full-backup2`); PR 2 is cut from it next. The cut's history and test
+results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then into the open PR's cut. Before work in `~/repos/esphome` or `~/repos/esphome-docs`, read their AGENTS.md / CLAUDE.md
 (conventions, `node script/lint.mjs` for the docs).
 OTA in the hub on CiA 302-3 program download objects (`0x1F50`/`0x1F51`/`0x1F56`/`0x1F57`) instead of the mapper's `0x3000`:
 `docs/canopen_ota.md`. Implemented on `canopen-full` and in can2mqtt `dev`, tested over CAN on the nucleo only; the mapper's
