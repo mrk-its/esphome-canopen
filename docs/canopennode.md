@@ -24,7 +24,8 @@ Where to continue (2026-11-07):
 - **Upstream split:** "Upstream PRs" -> "SDO client only first" (the current split) and its "PR 1 as cut": PR 1 (the
   SDO client, no node) is cut on `canopen-pr1-sdo-client` in `~/repos/esphome` and `~/repos/esphome-docs`, pushed,
   hardware-tested on the nucleo; both PRs are open, ready for review since 2026-11-09: esphome/esphome#22410 and esphome/esphome.io#8059. "New split" holds the refactor and the cutting steps; the old
-  `canopen-pr1-node` (the node core) is superseded.
+  `canopen-pr1-node` (the node core) is superseded. bdraco's second round of commits on the cut (2026-11-23, "PR 1 as
+  cut") is **not on `canopen-full` yet**: port it before cutting PR 2.
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
 - **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
   `components_next`); the old component (`components/canopen`, canopen-stack) and `components_next/canopen` (a stale
@@ -630,8 +631,15 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   tests/components/canopen`, after committing. The first push failed it on `sdo_client_test.cpp`: fixture members
   need the trailing `_` too (`bus_`, `hub_`, `requests_()`; gtest's `SetUp()` / `TEST_F` are accepted).
 - **Differences from `canopen-full`, kept in the cut** (later cuts and the rebase after the merge must know them):
-  - fixed `0x1280` entry (`sdo_cli_record_`, `od_entries_`, `od_` in `canopen.h`) instead of the runtime OD; PR 3
-    replaces it;
+  - fixed `0x1280` entry (`sdo_cli_record_`, `sdo_cli_entry_` in `canopen.h`; no `OD_t`: `CO_SDOclient_init()` gets
+    `nullptr`, since `8256c1ed26`) instead of the runtime OD; PR 3 replaces it;
+  - CANopenNode from the registries (since `7e4ac679d0`): `esphome/CANopenNode@4.1.0-esphome.2`, on ESP32 as the IDF
+    component `esphome/canopennode`; `canopen-full` still pins the git commit (`CANOPENNODE_SOURCE`, `platformio.ini`
+    `lib_deps_base`). Until ported, a CANopenNode bump means a new registry release for the cut;
+  - the actions are `automation.ApplyAction`s (`apply_statements_action`) calling `write_sdo()` / `read_sdo()` with a
+    reply function from the header templates `sdo_write_reply<ON_SUCCESS, ON_ERROR>` / `sdo_read_reply<ON_VALUE,
+    ON_ERROR>` (automations built with `build_trigger_callback`, `nullptr` when not configured); `canopen-full` still
+    has the `SDOWriteAction` / `SDOReadAction` classes (since `5cd20a9dc8`..`5f2c254e14`);
   - `CO_CONFIG_SDO_CLI=0x03` (no local transfers); PR 3 brings back `0x0B`;
   - no `canopennode_path:`, no SDO client switch (`enable_sdo_client()`, `CANopenData`, `USE_CANOPEN_SDO_CLIENT`),
     no `cancel_sdo()`: see "Size". `cancel_sdo()` and `sdo_cancel_test.cpp` go to PR 2, the client switch (with
@@ -768,7 +776,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     listeners); a reply from another local node gets no clock restart. `cancel_sdo()` turns the ring once (no erase)
     and enables the loop for the abort guard. `rx_capped()` through a C++20 `requires` helper in `canopen.cpp`, false
     on a canbus without it: the hub copy in esphome-canopen still builds on ESPHome installs without PR 1 (upstream
-    venv, esphomeplatformzephyr). Remove the helper once PR 1 is in a release. The house nodes load `canbus` from the
+    venv, esphomeplatformzephyr). Remove the helper once `rx_capped()` (split out as esphome/esphome#23247, merged
+    into `dev` 2026-11-24) is in a release. The house nodes load `canbus` from the
     `~/repos/esphome` checkout (`common_canopen_entities.yaml`), so they have the real `rx_capped()`.
   - New tests on `canopen-full`: `processing_test.cpp` (a burst of two RPDOs on one COB-ID is applied twice; a node
     doesn't retry queued frames on a received frame; the client-only loop idles; a node's doesn't), mutation-checked;
@@ -811,6 +820,39 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     > a received frame is processed: queued frames are retried only from `loop()`, as in PR 1, and new frames go out
     > immediately only while nothing is queued. A stuck TX costs at most one refused send per pass. Does that match
     > what you had in mind, or would you rather have node hubs process only in `loop()`?
+
+- **bdraco's second round** (2026-11-23/24, J. Nick Koston, 14 commits on the cut `7e4ac679d0`..`4acf244406`, after
+  the user's dev merge `974feb0b6e` the head; **not ported to `canopen-full` yet**). Driven by a Copilot review of
+  2026-11-24 (two findings, both fixed by him) and esphbot reviews:
+  - `7e4ac679d0`: CANopenNode `4.1.0-esphome.2` from the registries (PlatformIO `esphome/CANopenNode`, IDF component
+    `esphome/canopennode` on ESP32), the git pin dropped from `platformio.ini` (`[common:idf-component-libs]` now);
+  - `8dba7ba846`, `6baffdfcaf`: `SDORequest` packed (`len` is `uint16_t`, next to `index`), driver checks that
+    `CO_new()` makes unneeded dropped, one-line tests trimmed;
+  - `06714d7b02` (Copilot): `write_sdo_data()` rejects more than 65535 bytes, `read_sdo_data()` clamps the capacity to
+    65535 (`size_t` was narrowed to `uint16_t`: 65,537 bytes went out as 1, a 65,536-byte buffer became 0);
+  - `e24ea6ce21` (Copilot): `sdo_reply_is_stale_()` drops an initiate response for the other direction (a late write
+    ack while a read of the same object waits, and the reverse). Late aborts still match by object only;
+  - `5cd20a9dc8`, `60aea80f2d`, `0a428b7866`, `8dc2548009`, `5f2c254e14`: the actions as `apply_statements_action`
+    with the reply templates in `automation.h` (see the differences above); YAML schema and the automation variables
+    unchanged; `common.yaml` gets an `on_error` on `sdo_write`;
+  - `8256c1ed26`: no `OD_t`, `CO_SDOclient_init()` gets `nullptr` and the single `0x1280` entry;
+  - `9537139499`: `start_sdo_()` returns the `CO_SDO_return_t`, a request that doesn't start logs it at DEBUG
+    (`not started (CANopenNode %d)`) before `TRANSPORT_ERROR`; reply tests without the address compare;
+    `4acf244406`: reply test state out of globals (clang-tidy).
+  bdraco's hardware runs (PR comments, 2026-11-24): an ESP32-C3 client (ESP-IDF) against a `canopen-full` node 0x20
+  (ESP32-C3) on a 250 kbit/s bus, a Pico 2 W + MCP2515 as second client (PlatformIO library path), retested at
+  `6baffdfcaf`, `06714d7b02`, `5cd20a9dc8` (late responses provoked with slowed objects) and `8256c1ed26`: PASS. Also
+  randybb (2026-11-23): two XIAO STM32C5 (esphomeplatformzephyr, `zephyr_can`, 125 kbit/s), PR client against a
+  `canopen_entities` server. esphbot's summary (2026-11-24): ready to merge, only the canbus split left; the split is
+  esphome/esphome#23247 (`rx_capped()`, merged 2026-11-24, merged into the cut with `dev`), so the cut no longer
+  touches canbus. Size: 971 lines outside `tests/` (all added; `git diff --numstat $(git merge-base upstream/dev
+  HEAD) -- . ':!tests'`). Tests on the cut: 42 C++.
+  Docs (esphome.io#8059, `de283cd69` on 2026-11-24): the 64 KiB limit and late answers by direction; the failed-setup
+  rejection was already in `75b0e628a`.
+  **To do:** port the round to `canopen-full` (library from the registries also in codegen with `canopennode_path:`,
+  the apply actions next to `cancel_sdo()` and the node core's own actions, the 64 KiB checks, the direction check in
+  `sdo_reply_is_stale_()`, the start log), re-sync the hub copy here (`scripts/sync_hub.py`), then the house nodes
+  build from the registry package.
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
