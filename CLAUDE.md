@@ -27,14 +27,15 @@ Current split (2026-11-05, "SDO client only first", 8 PRs): PR 1 = the hub witho
 loopback. PR 1 (esphome/esphome#22410, cut on `canopen-pr1-sdo-client`) is **merged upstream** (2026-11-24,
 squash `206bb68485`); its docs PR esphome/esphome.io#8059 is merged too (2026-11-25, squash `d3f9241e3` on `next`). `canopen-full` in `~/repos/esphome` is rebuilt
 on `upstream/dev` as one commit "PRs 3-8 on top of PR 2 (to be split)" (`f0e18d854d`, 2026-11-25), plus the PR 3
-cut's fixes, the Copilot review fixes of #23299 and bdraco's 3 PR 3 commits ported back (`c9a2eaef3c`); the history before, with bdraco's PR 2 review commits ported, is
+cut's fixes, the Copilot review fixes of #23299 and bdraco's 6 PR 3 commits ported back (`e8c940ed02`); the history before, with bdraco's PR 2 review commits ported, is
 `canopen-full-backup3` (pushed; older: `canopen-full-backup2`). PR 2 (esphome/esphome#23266, cut on
 `canopen-pr2-frames`) is **merged upstream** (2026-11-25, squash `29f8ea8e39`, identical to the cut head
-`79dc2e5ede`); its docs PR esphome/esphome.io#8243 (esphome-docs branch `canopen-pr2-frames`) is open. PR 3 (the
-node core + loopback) is open upstream: esphome/esphome#23299 (2026-11-25, cut on `canopen-pr3-node`; Copilot's
-review answered, bdraco's commits on top, head `fe354804ff`);
-its docs are on esphome-docs branch `canopen-pr3-node` (on `canopen-pr2-frames`), reviewable as the fork PR
-mrk-its/esphome-docs#1 until #8243 is merged, then rebased on `next` for the esphome.io PR (`docs/canopennode.md`,
+`79dc2e5ede`); its docs PR esphome/esphome.io#8243 is merged too (2026-11-25, squash `67bb87134` on `next`, with a
+paragraph by bdraco on the frame listener's callback and `context`). PR 3 (the node core + loopback) is open upstream:
+esphome/esphome#23299 (2026-11-25, cut on `canopen-pr3-node`; both Copilot rounds answered, bdraco's commits on top,
+head `9e7687e388`, tested on his hardware, esphbot "ready to merge", waiting for a maintainer); its docs PR is
+esphome/esphome.io#8254 (esphome-docs branch `canopen-pr3-node`, rebased on `next`; the pre-rebase branch is
+`backup/canopen-pr3-node-pre-rebase`; the fork PR mrk-its/esphome-docs#1 is closed) (`docs/canopennode.md`,
 "PR 3 as cut"). The cut's history and test
 results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then into the open PR's cut. Before work in `~/repos/esphome` or `~/repos/esphome-docs`, read their AGENTS.md / CLAUDE.md
 (conventions, `node script/lint.mjs` for the docs).

@@ -28,7 +28,7 @@ Where to continue (2026-11-24):
   `a055ba97aa` "[canopen] PRs 2-8 on top of PR 1 (to be split)": `canopen-full`'s files for the 59 paths it changes
   (the two PR 1 test configs it renamed deleted), dev's for the rest; 109 C++ + 40 Python tests pass. The old history
   is `canopen-full-backup2` (pushed). `git diff upstream/dev canopen-full` is now exactly PRs 2-8. PR 2 is cut on
-  `canopen-pr2-frames` (`20f842f1b3`, pushed; "PR 2 as cut"), upstream PR esphome/esphome#23266 (2026-11-24); its docs are on esphome-docs branch `canopen-pr2-frames` (rebased on `next` after #8059 merged, `d64270a78`; the pre-rebase branch is `backup/canopen-pr2-frames-pre-rebase`), docs PR esphome/esphome.io#8243 (2026-11-25). `~/repos/esphome-docs` `canopen-full` is not
+  `canopen-pr2-frames` (`20f842f1b3`, pushed; "PR 2 as cut"), upstream PR esphome/esphome#23266 (2026-11-24); its docs are on esphome-docs branch `canopen-pr2-frames` (rebased on `next` after #8059 merged, `d64270a78`; the pre-rebase branch is `backup/canopen-pr2-frames-pre-rebase`), docs PR esphome/esphome.io#8243 (2026-11-25, merged the same day). PR 3's docs: esphome/esphome.io#8254. `~/repos/esphome-docs` `canopen-full` is not
   rebuilt yet (#8059 is merged, so it can be). "New split" holds the refactor and the cutting steps; the old
   `canopen-pr1-node` (the node core) is superseded. PR 2 is **merged upstream** (2026-11-25, squash `29f8ea8e39`,
   identical to the cut head `79dc2e5ede`, with bdraco's 5 review commits, ported to `canopen-full`). `canopen-full`
@@ -943,8 +943,9 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   node parts, worded after `feature/canopen-sdo-client-only` (`bae1c36ff`; the esphome-docs `canopen-full` page still
   has `node_id` required): intro, `node_id` / `heartbeat_interval` / `sdo_client` / `nmt_startup` / identity /
   device info / `on_nmt_state_change`, SDO Client Only, Several Nodes, Object Dictionary (PR 3's objects), NMT State
-  of This Node, requests to the own id. Fork PR mrk-its/esphome-docs#1 (base `canopen-pr2-frames`); the esphome.io PR
-  follows after #8243 (rebase on `next`).
+  of This Node, requests to the own id. First reviewed as the fork PR mrk-its/esphome-docs#1 (base
+  `canopen-pr2-frames`); after #8243 was merged, rebased on `next` (clean; `30bb7c4f7`, the pre-rebase branch is
+  `backup/canopen-pr3-node-pre-rebase`) and opened as esphome/esphome.io#8254 (2026-11-25); the fork PR is closed.
 - **Copilot review** (2026-11-25, 14 comments on `a0b68cae02`), all answered in the threads, plus a summary comment:
   - fixed: `CONF_HARDWARE_VERSION` from `esphome/components/const` (esphome/esphome#23300, merged; the fork got the
     constant too, uncommitted), `canopennode_path` dropped (`dfbdca9ec1`); node members and setters only with
@@ -958,7 +959,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     NMT Reset Communication only logged (its own PR), local delivery overwriting back-to-back frames (with PRs 4 / 6).
   - Docs: `0x1014` / `0x1280` read only, `heartbeat_interval` from 100 ms, no SDO in STOPPED, the shared channel between
     `canopen` components (esphome-docs `canopen-pr3-node` up to `b0fc465aa`).
-  - Still open: the docs' "the node doesn't send EMCY frames" (the producer is on; e.g. a TX overflow sends one).
+  - The docs' "the node doesn't send EMCY frames" is corrected (`7d0c6b1fd`): EMCY only for errors the stack detects
+    (with our driver only a full TX buffer reaches the producer), no API for own messages.
 - **bdraco's commits** (2026-11-25, on top of `33eda18fd6`, head `fe354804ff`; CI green):
   - `a32c32089f`: one `setup()` for both modes (`setup_client_only_()` gone, node parts under `if (node)`),
     `to_nmt_state()` a cast with `static_assert`s on CANopenNode's values, `rx_capped()` called directly (no
@@ -973,8 +975,29 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     grouped by size as well. Afterwards `driver_can.cpp`, `sdo_client.cpp`, `device_info.cpp`, `frames.cpp` and
     `automation.h` are identical on both branches, `od.*` / `canopen.*` differ only by PRs 4-8. The direct
     `rx_capped()` needs the fork stub (Platform notes in CLAUDE.md).
+- **Copilot's second round** (2026-11-25, 8 comments on `fe354804ff`), all resolved by bdraco: fixed in his commits
+  below (A: the flush test fed a frame no CANopenNode object takes, B: `memcpy` from `nullptr` for an empty local
+  frame, C: a local transfer that ended early sent an SDO abort on the bus); declined with reasons in the threads (D:
+  STOPPED drops the late-answer guard, E: a local `set_nmt_state(STOPPED)` applies one loop late, F: the capped-RX gate
+  delays STOPPED cleanup and own-id transfers, G: `0x1017` writable below 100 ms over SDO, H: more build fixtures).
+  esphbot's suggestion of a final-validate warning for shared SDO channels: declined in a PR comment (the config can't
+  tell whether two components ever talk to one node at the same time).
+- **bdraco's second batch** (2026-11-25, head `9e7687e388`): `3ef32bc17c` local transfers compiled only with a node
+  (`CO_CONFIG_SDO_CLI` `0x03` without any `node_id`, about 750 B), an empty local frame skips the copy, the flush test
+  feeds an NMT command; `c0e9ee180f` local transfers end without an abort on the bus or a guard (`sdo_is_local_()`),
+  a client-only config drops the node options' defaults (its validated config validates again), tests for own-id
+  reads and NMT commands; `9e7687e388` `set_heartbeat_interval(uint16_t)`, the "late calls" comment narrowed to OD
+  entries. Ported to `canopen-full` (`1e59f83406`, `8d17ef3d5d`, `e8c940ed02`; one conflict, the class comment, which
+  there lists what `canopen-full` checks: OD entries and handlers, PDO configurations, monitored nodes).
+- **bdraco's hardware tests** (two ESP32-C3 boards, 250 kbit/s; comments on the PR): `fe354804ff` passed with caveats,
+  `9e7687e388` passed. Client-only firmware is +3,020 B flash / +8 B RAM over `dev` (the runtime OD builder; was
+  +3,992 B before `3ef32bc17c`); heartbeat period = interval + up to one loop pass (1,008 ms for 1 s);
+  `get_nmt_state()` is `UNKNOWN` until the first loop pass. PR description and docs updated to match (size claim,
+  implementation notes, test counts 113 C++ / 31 Python; docs `7d0c6b1fd`).
 - **PR 2 docs** (#8243): Kōan's round (2026-11-25) in `4354f6b56` (TPDO1 comment `0x180`-`0x1FF`, "The 50 ms are
-  counted"), description updated (listeners can be added at any time).
+  counted"), description updated (listeners can be added at any time). Merged 2026-11-25 (squash `67bb87134` on
+  `next`), after bdraco merged `next` into the branch and added a paragraph on the frame listener's plain-function
+  callback and `context` lifetime (`26969462c`).
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
