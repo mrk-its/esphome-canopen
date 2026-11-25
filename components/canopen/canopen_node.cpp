@@ -22,10 +22,12 @@ CANopenNode::CANopenNode(CANopenComponent *parent, uint8_t node_id) : canopen_(p
         break;
     }
   });
+#ifdef USE_CANOPEN_EMCY  // set by register_node(); this file is compiled even without a CANopenNode subclass
   parent->add_on_emcy_callback([this](uint8_t node_id, const Emergency &emergency) {
     if (node_id == this->node_id_)
       this->on_node_emcy(emergency);
   });
+#endif
 }
 
 }  // namespace esphome::canopen

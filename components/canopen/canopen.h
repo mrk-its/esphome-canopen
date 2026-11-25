@@ -3,6 +3,7 @@
 #include <array>
 #include <cstring>
 #include <initializer_list>
+#include <utility>
 #include <vector>
 
 #include "esphome/core/automation.h"
@@ -128,14 +129,19 @@ class CANopenComponent : public Component {
   // --- Raw frames (frames.cpp) ---
   // every heartbeat / EMCY frame on the bus, from any node (our own frames aren't received; those of other local
   // nodes are)
+#ifdef USE_CANOPEN_HEARTBEAT
   template<typename F> void add_on_heartbeat_callback(F &&callback) {
     this->heartbeat_callback_.add(std::forward<F>(callback));
   }
+#endif
+#ifdef USE_CANOPEN_EMCY
   template<typename F> void add_on_emcy_callback(F &&callback) { this->emcy_callback_.add(std::forward<F>(callback)); }
+#endif
   // Raw frames the OD doesn't describe (e.g. other devices' PDOs). The callback gets every standard-ID data frame
-  // with (can_id ^ id) & mask == 0, after CANopenNode has seen it. Can be called before or after setup(). Listeners
-  // can't be removed; add them at setup or boot, as each one grows a vector on the heap.
-  void add_frame_listener(uint32_t can_id, uint32_t mask, FrameCallback callback, void *context);
+  // with (can_id ^ id) & mask == 0, after CANopenNode has seen it. Can be called before or after setup(), also from a
+  // frame callback. Adding a listener twice does nothing; each hub needs its own listener object. It can't be removed
+  // and must stay alive (make it static).
+  void add_frame_listener(FrameListener &listener);
   // Sends a standard-ID data frame now. Returns false for a CAN ID above 0x7FF, more than 8 bytes, or if the canbus
   // platform refuses it (e.g. TX buffers full); it isn't queued or retried, unlike CANopenNode's own frames.
   bool send_frame(uint32_t can_id, const uint8_t *data, size_t len);
@@ -272,17 +278,15 @@ class CANopenComponent : public Component {
   // --- Raw frames (frames.cpp) ---
   // frame listeners and heartbeat / EMCY callbacks for a received frame, after CANopenNode
   void dispatch_frame_(const CO_CANrxMsg_t &msg);
-  void init_frame_listeners_();
-  void check_frame_listener_(uint32_t can_id, uint32_t mask);
-  struct FrameListener {
-    uint32_t can_id;
-    uint32_t mask;
-    FrameCallback callback;
-    void *context;
-  };
-  std::vector<FrameListener> frame_listeners_;
-  LazyCallbackManager<void(uint8_t, NMTState)> heartbeat_callback_;
-  LazyCallbackManager<void(uint8_t, const Emergency &)> emcy_callback_;
+  void check_frame_listener_(uint16_t can_id, uint16_t mask);
+  FrameListener *frame_listeners_{nullptr};
+  // Compiled only when on_heartbeat / on_emcy are configured, so never empty: no lazy allocation needed
+#ifdef USE_CANOPEN_HEARTBEAT
+  CallbackManager<void(uint8_t, NMTState)> heartbeat_callback_;
+#endif
+#ifdef USE_CANOPEN_EMCY
+  CallbackManager<void(uint8_t, const Emergency &)> emcy_callback_;
+#endif
 
 #ifdef USE_CANOPEN_SDO_CLIENT
   // --- SDO client (sdo_client.cpp) ---
@@ -334,7 +338,6 @@ class CANopenComponent : public Component {
   std::array<uint8_t, 4> sdo_rx_value_{};
   uint8_t sdo_cli_highest_sub_{3};
   uint8_t sdo_cli_node_{0};
-  uint8_t sdo_abort_node_{0};  // node of the last cancelled transfer, for its log
   bool sdo_busy_{false};
   bool sdo_abort_pending_{false};
   bool sdo_cancel_pending_{false};  // cancel_sdo() hit the active transfer: process_sdo_() aborts it

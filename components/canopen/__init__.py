@@ -224,8 +224,9 @@ async def register_node(
 
     Compiles the parts of the hub the component uses (SDO client, NMT master) and, with a heartbeat_timeout
     (TimePeriod, validated with UINT16_MS), monitors the node: its events reach the on_node_* hooks. The hub merges it with
-    heartbeat_clients, keeping the shortest timeout.
+    heartbeat_clients, keeping the shortest timeout. The node's EMCY frames reach on_node_emcy().
     """
+    cg.add_define("USE_CANOPEN_EMCY")
     if sdo:
         enable_sdo_client()
     if nmt:
@@ -470,6 +471,10 @@ async def to_code(config: ConfigType) -> None:
         cg.add(var.set_next_local(local[0]))
     local.append(var)
     cg.add(var.set_response_timeout(config[CONF_RESPONSE_TIMEOUT]))
+    if CONF_ON_HEARTBEAT in config:
+        cg.add_define("USE_CANOPEN_HEARTBEAT")
+    if CONF_ON_EMCY in config:
+        cg.add_define("USE_CANOPEN_EMCY")
     if CONF_NODE_ID not in config or config.get(CONF_SDO_CLIENT):
         enable_sdo_client()
     if CONF_NODE_ID not in config:

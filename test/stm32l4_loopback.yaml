@@ -11,12 +11,14 @@ esphome:
   name: stm32l4-loopback
   on_boot:
     - lambda: |-
-        id(node_b).add_frame_listener(0x37E, 0x7FF, +[](void *, uint32_t can_id, const uint8_t *data, uint8_t len) {
+        static canopen::FrameListener on_b{0x37E, 0x7FF, +[](void *, uint32_t can_id, const uint8_t *data, uint8_t len) {
           ESP_LOGI("test", "node_b listener: 0x%03x, %u bytes, first %u", (unsigned) can_id, len, len ? data[0] : 0);
-        }, nullptr);
-        id(node_a).add_frame_listener(0x37E, 0x7FF, +[](void *, uint32_t, const uint8_t *, uint8_t) {
+        }, nullptr};
+        id(node_b).add_frame_listener(on_b);
+        static canopen::FrameListener on_a{0x37E, 0x7FF, +[](void *, uint32_t, const uint8_t *, uint8_t) {
           ESP_LOGE("test", "node_a got its own frame");
-        }, nullptr);
+        }, nullptr};
+        id(node_a).add_frame_listener(on_a);
     - delay: 5s
     - lambda: |-
         id(node_b).read_sdo<uint32_t>(0x7e, 0x1018, 1, +[](void *, const canopen::SDOReply &r) {

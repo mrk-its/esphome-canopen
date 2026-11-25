@@ -11,7 +11,9 @@ ESPHOME_LOG_TAG(TAG, "canopen");
 // indexed by NodeEvent; the last entry for other values
 PROGMEM_STRING_TABLE(NodeEventStrings, "online", "offline", "NMT changed", "reset", "unknown");
 
-const LogString *node_event_to_string(NodeEvent event) { return NodeEventStrings::get_log_str(event); }
+const LogString *node_event_to_string(NodeEvent event) {
+  return NodeEventStrings::get_log_str(static_cast<uint8_t>(event), NodeEventStrings::LAST_INDEX);
+}
 
 void CANopenComponent::monitor_node(uint8_t node_id, uint16_t timeout_ms) {
   if (this->co_ != nullptr) {

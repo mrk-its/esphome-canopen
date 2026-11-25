@@ -261,6 +261,8 @@ class CANopenEntities : public Component {
   static void on_od_writer_frame(void *context, uint32_t can_id, const uint8_t *data, uint8_t len) {
     static_cast<CANopenEntities *>(context)->handle_od_writer_frame(data, len);
   }
+  // the hub keeps a pointer to it: a member, so it lives as long as the component
+  canopen::FrameListener od_writer_listener_{OD_WRITER_COB_ID, 0x780, on_od_writer_frame, this};
 #ifdef USE_LIGHT
   // light values reach the mapper through a listener object
   class LightListener : public light::LightRemoteValuesListener {

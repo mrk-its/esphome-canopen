@@ -345,6 +345,7 @@ def test_codegen_tpdo_requests(tmp_path: Path) -> None:
     main_cpp, defines = generate(tmp_path, [], extra, remote_nodes=nodes)
     assert re.findall(r"->add_tpdo_request\((\d+), (\d+)\);", main_cpp) == [("56", "3")]
     assert "#define CANOPEN_ENTITIES_TPDO_REQUESTS 1" in defines
+    assert "#define USE_CANOPEN_HEARTBEAT" in defines  # the hub's heartbeat callback, for remote boot-ups
 
     # only nodes that can't answer: nothing to ask, nothing compiled
     extra = {
@@ -354,6 +355,7 @@ def test_codegen_tpdo_requests(tmp_path: Path) -> None:
     main_cpp, defines = generate(tmp_path, [], extra, remote_nodes={"old": REMOTE_NODES["dimmer"], "off": str(off_node)})
     assert "add_tpdo_request" not in main_cpp
     assert "CANOPEN_ENTITIES_TPDO_REQUESTS" not in defines
+    assert "USE_CANOPEN_HEARTBEAT" not in defines
 
 
 @needs_esphome

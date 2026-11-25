@@ -562,7 +562,7 @@ uint32_t encode_remote_cmd(uint8_t encoding, float value, uint8_t size, float mi
 
 void CANopenEntities::setup() {
   if (this->od_writer_)
-    this->hub_->add_frame_listener(OD_WRITER_COB_ID, 0x780, on_od_writer_frame, this);
+    this->hub_->add_frame_listener(this->od_writer_listener_);
   auto &od = this->hub_->get_od();
 #ifdef CANOPEN_ENTITIES_REMOTE_SLOTS
   for (size_t n = 0; n < this->slots_.size(); n++) {

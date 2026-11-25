@@ -636,6 +636,9 @@ async def to_code(config: ConfigType) -> None:
     }
     if requests := remote.tpdo_requests(plan, no_answer):
         cg.add_define("CANOPEN_ENTITIES_TPDO_REQUESTS", len(requests))
+        # the boot-up heartbeats of remote nodes (add_on_heartbeat_callback()); the hub only compiles the callback
+        # when something uses it
+        cg.add_define("USE_CANOPEN_HEARTBEAT")
         for remote_node_id, mask in requests:
             cg.add(var.add_tpdo_request(remote_node_id, mask))
     for n, (remote_node_id, tpdo, entries) in enumerate(plan):

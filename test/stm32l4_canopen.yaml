@@ -20,15 +20,18 @@ esphome:
         // PR 8: OD handlers, added before the hub's setup() (on_boot runs at priority 600, the hub at 400)
         od_handler_test::register_objects(id(can_gate));
         // TPDO1 of every node (0x181..0x1ff)
-        id(can_gate).add_frame_listener(0x180, 0x780, +[](void *, uint32_t can_id, const uint8_t *data, uint8_t len) {
+        static canopen::FrameListener tpdo1{0x180, 0x780, +[](void *, uint32_t can_id, const uint8_t *data, uint8_t len) {
           ESP_LOGI("test", "rx 0x%03x, %u bytes, first 0x%02x", (unsigned) can_id, len, len ? data[0] : 0);
-        }, nullptr);
+        }, nullptr};
+        id(can_gate).add_frame_listener(tpdo1);
         // SDO requests to our server (0x600 + 0x7f), e.g. from can2mqtt
-        id(can_gate).add_frame_listener(0x67F, 0x7FF, +[](void *, uint32_t, const uint8_t *data, uint8_t len) {
+        static canopen::FrameListener sdo_requests{0x67F, 0x7FF, +[](void *, uint32_t, const uint8_t *data, uint8_t len) {
           ESP_LOGI("test", "SDO request to us: cmd 0x%02x, 0x%02x%02x:%u", data[0], data[2], data[1], data[3]);
-        }, nullptr);
+        }, nullptr};
+        id(can_gate).add_frame_listener(sdo_requests);
         // overlaps the heartbeat consumer for node 0x01: setup() logs a warning
-        id(can_gate).add_frame_listener(0x700, 0x780, +[](void *, uint32_t, const uint8_t *, uint8_t) {}, nullptr);
+        static canopen::FrameListener heartbeats{0x700, 0x780, +[](void *, uint32_t, const uint8_t *, uint8_t) {}, nullptr};
+        id(can_gate).add_frame_listener(heartbeats);
     - delay: 5s
     - lambda: sdo_test::start(id(can_gate), 0x7f);
     - delay: 75s
