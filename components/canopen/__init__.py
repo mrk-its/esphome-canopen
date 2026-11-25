@@ -264,10 +264,18 @@ CALLBACK_AUTOMATIONS = (
 )
 
 
-# 0x1016 (consumer timeout) and 0x1017 (producer time) hold uint16 ms
+# 0x1016 (consumer timeout) and response_timeout hold uint16 ms
 UINT16_MS = cv.All(
     cv.positive_time_period_milliseconds,
     cv.Range(min=cv.TimePeriod(milliseconds=1), max=cv.TimePeriod(milliseconds=65535)),
+)
+
+# 0x1017, sent from loop() (every 16 ms by default): a shorter producer time couldn't be kept
+HEARTBEAT_INTERVAL = cv.All(
+    cv.positive_time_period_milliseconds,
+    cv.Range(
+        min=cv.TimePeriod(milliseconds=100), max=cv.TimePeriod(milliseconds=65535)
+    ),
 )
 
 # 0x1018; vendor ids are assigned by CiA
@@ -344,7 +352,7 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
             # without node_id: SDO client only (see validate_client_only)
             cv.Optional(CONF_NODE_ID): cv.All(cv.int_, cv.Range(min=1, max=127)),
-            cv.Optional(CONF_HEARTBEAT_INTERVAL, "5000ms"): UINT16_MS,
+            cv.Optional(CONF_HEARTBEAT_INTERVAL, "5000ms"): HEARTBEAT_INTERVAL,
             cv.Optional(CONF_HEARTBEAT_CLIENTS, []): cv.ensure_list(HB_CLIENT_SCHEMA),
             # events of the heartbeat_clients nodes (online, offline, NMT changed, reset)
             cv.Optional(CONF_ON_NODE_EVENT): automation.validate_automation({}),
