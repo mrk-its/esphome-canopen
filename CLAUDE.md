@@ -167,7 +167,8 @@ temporarily (the `canopennode_path:` option was dropped 2026-11-25: nothing used
 - The hub's own tests are in `~/repos/esphome`: `script/cpp_unit_test.py canopen`,
   `script/test_build_components.py -c canopen -t <target>` (see `docs/canopennode.md`).
 - Upstream ESPHome (`dev` from GitHub) venv: `~/repos/esphome-upstream-venv` (update with
-  `bin/pip install -U "esphome @ git+https://github.com/esphome/esphome@dev"`). Use it, not the esphomeplatformzephyr
+  `bin/pip install --force-reinstall --no-deps "esphome @ git+https://github.com/esphome/esphome@dev"`; a plain `-U` does
+  nothing while `dev` keeps the same version string). Use it, not the esphomeplatformzephyr
   venv, to check upstream compatibility (the fork may carry APIs upstream doesn't have). Upstream PRs target `dev`,
   so the hub may use APIs newer than the last release (e.g. `canbus::send_data(..., data, len)`, in `dev` but not in
   2026.9.x).
