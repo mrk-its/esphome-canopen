@@ -895,6 +895,14 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   time base), `abort_sdo_()` ends the request before it sends or logs. Pushed back: the guard starts when the driver
   takes the abort, not when it's on the bus (`canbus` has no transmit completion; comment added). 8 new tests (73 C++
   in the cut, 126 on `canopen-full`), each failing without its fix. Docs updated (esphome-docs `67a1f177e`).
+  Kōan review: EMCY error reset (code 0) logged at INFO (`784704da37`). Copilot round 2 (2026-11-25), in
+  `6fb053048c` (`canopen-full` `78fc5dba07`): `cancel_sdo()` only clears the active request's callback, the abort
+  goes out in the next `process_sdo_()` pass (it may run from a log handler inside a transmission owning the TX
+  buffer: request sent after its abort, `CANtxCount` wrapped); the guard starts whole in the pass after the driver
+  took the abort; `finish_sdo_()` logs after the callback; `init_frame_listeners_()` by index; `send_frame()` takes
+  `size_t len`. Pushed back: listener vector on the heap (documented: permanent, add at setup / boot). Tests:
+  `FakeCanbus::on_send` (cancel during the first / a retried send), buffer transfers cancelled after the first
+  segment; 79 C++ in the cut, 132 on `canopen-full`. Docs `e11375dad`.
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
