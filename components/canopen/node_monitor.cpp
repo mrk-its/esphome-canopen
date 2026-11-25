@@ -2,25 +2,16 @@
 #include "canopen.h"
 
 #include "esphome/core/log.h"
+#include "esphome/core/progmem.h"
 
 namespace esphome::canopen {
 
 ESPHOME_LOG_TAG(TAG, "canopen");
 
-const LogString *node_event_to_string(NodeEvent event) {
-  switch (event) {
-    case NodeEvent::NODE_EVENT_ONLINE:
-      return LOG_STR("online");
-    case NodeEvent::NODE_EVENT_OFFLINE:
-      return LOG_STR("offline");
-    case NodeEvent::NODE_EVENT_NMT_CHANGED:
-      return LOG_STR("NMT changed");
-    case NodeEvent::NODE_EVENT_RESET:
-      return LOG_STR("reset");
-    default:
-      return LOG_STR("unknown");
-  }
-}
+// indexed by NodeEvent; the last entry for other values
+PROGMEM_STRING_TABLE(NodeEventStrings, "online", "offline", "NMT changed", "reset", "unknown");
+
+const LogString *node_event_to_string(NodeEvent event) { return NodeEventStrings::get_log_str(event); }
 
 void CANopenComponent::monitor_node(uint8_t node_id, uint16_t timeout_ms) {
   if (this->co_ != nullptr) {
