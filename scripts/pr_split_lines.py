@@ -74,6 +74,7 @@ IFDEFS = {
     "USE_CANOPEN_NODE": 3,
     "USE_CANOPEN_SDO_CLIENT": 1,
     "USE_CANOPEN_NMT_MASTER": 4,
+    "USE_CANOPEN_NODE_MONITOR": 4,
     "USE_CANOPEN_PDO": 6,
     "CANOPEN_SDO_BLOCK_SIZE": 7,
 }
@@ -166,6 +167,7 @@ TEST_FILES = {
     "od_test.cpp": 3,
     "client_only_test.cpp": 3,  # its server is a local node
     "loopback_test.cpp": 3,
+    "node_monitor_test.cpp": 4,
     "canopen_node_test.cpp": 5,
     "pdo_test.cpp": 6,
     "storage_test.cpp": 6,

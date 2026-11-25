@@ -999,6 +999,52 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   `next`), after bdraco merged `next` into the branch and added a paragraph on the frame listener's plain-function
   callback and `context` lifetime (`26969462c`).
 
+#### PR 4 as cut (2026-11-26, not opened yet)
+- **Why now:** PR 3 (#23299) is close to merge; PR 4 is prepared so it can go up right after (a PR opened before would
+  carry PR 3's commits). Two items deferred in PR 3's review land here.
+- **On `canopen-full`** (local, NOT pushed yet), on top of `e8c940ed02`:
+  - `02454e52f3` frames between local nodes go through a per-receiver queue: `FixedRingBuffer<LocalFrame, 16>`
+    (`local_queue_`, allocated in `setup()` only with local peers), filled by the sender's `transmit()`
+    (`queue_local_()`, no logging), emptied at the start of the receiver's `loop()` (`deliver_local_()`), each frame
+    through `handle_frame_()` (shared with `on_frame_()`: `receive_()`, SDO reply, `process_node_()` if taken). Full
+    queue: frame lost, counted (`local_dropped_`), logged from `loop()`. Fixes Copilot's PR 3 points (back-to-back
+    frames to one CANopenNode object overwrite each other; a relayed frame overtaking its cause). A peer now sees a
+    local frame in its own next `loop()` (3 loopback tests adapted). New tests: `BackToBackFramesToOneObjectAreKept`,
+    `CanopenLocal.FramesKeepBusOrder`, `FullQueueLosesFrames` (the first two fail with direct delivery).
+  - `abe8b31b3a` heartbeat consumer only when used: `enable_node_monitor()` (for `heartbeat_clients` and
+    `register_node(heartbeat_timeout=...)`) defines `USE_CANOPEN_NODE_MONITOR`; otherwise a `CoroPriority.FINAL` job
+    (`_final_build_flags`, scheduled once from `to_code()`) adds `-DCO_CONFIG_HB_CONS=0`. `monitor_node()`, 0x1016, the
+    consumer callbacks are under the define; `get_node_state()` / `is_node_online()` fall back to UNKNOWN / false;
+    `node_event_callback_` stays (the `CANopenNode` profile base uses it). ESP8266 node without monitoring: 0
+    `CO_HBconsumer` symbols, 2,804 B less flash (checked on builds with and without). Codegen test
+    `test_node_monitor_only_when_used`; unit-test override calls `enable_node_monitor()`; `defines.h` has the define.
+  - `8368ad29d9` `tests/components/canopen/node_monitor_test.cpp`: node events (online with state, NMT changed, reset),
+    offline after a 30 ms timeout (real clock: `process_node_()` uses `micros()`, the test sleeps), 0x1016 entries
+    (shortest timeout, nothing after setup), NMT master commands (other node, own id, all nodes, invalid id),
+    client-only refusing. 160 C++ tests pass on `canopen-full`.
+- **Cut** `canopen-pr4-monitor-nmt` (`c723acee71`, one commit "[canopen] Add node monitoring (heartbeat_clients,
+  on_node_event) and the NMT master (canopen.nmt)", local, not pushed): `canopen-full`'s canopen dirs minus PRs 5-8
+  (files deleted, lines by `--annotate` >= 5), `od.*` / `od_test` / `processing_test` / `node.yaml` from the PR 3 cut,
+  the class comment = PR 3's plus PR 4's parts, PR 3-style comments restored (no `OdObject` / PDO mentions, no
+  `automation.h` / `preferences.h` / `<initializer_list>` includes), `CONF_CANOPEN_ID` dropped, `sdo_block_size`
+  removed as in PR 3, `test_canopen.py` = PR 3's plus PR 4's tests (lambda id back to `_5`), `defines.h` +
+  `USE_CANOPEN_NMT_MASTER`, `USE_CANOPEN_NODE_MONITOR`, `CO_CONFIG_NMT 0x03`. Size: +411 / -24 code, +405 tests;
+  123 C++ + 38 Python tests pass. Cross-checked: vs `canopen-full` only PRs 5-8 differ (driver_can, nmt_master,
+  node_monitor, frames, sdo_client, device_info identical); vs the PR 3 cut only PR 4 parts.
+- **Builds started 2026-11-26** (results not yet seen when this was written): cut esp8266-ard / esp32-idf /
+  rp2040-ard, client-only and no-monitoring configs (`scratchpad/clientonly/client_only.yaml`,
+  `scratchpad/nodemon/node_nomon.yaml`); esphome-canopen hub synced to `canopen-full` `8368ad29d9` (uncommitted), pytest,
+  esp8266 mapper, `stm32l4_canopen`.
+- **Open steps:** (1) check those builds; commit the hub sync and `scripts/pr_split_lines.py` (now: `USE_CANOPEN_NODE_MONITOR`
+  and `node_monitor_test.cpp` = PR 4) in esphome-canopen; push `canopen-full` and `canopen_entities`. (2) When #23299 is
+  merged: rebase the cut onto `dev` (`git rebase --onto upstream/dev canopen-pr3-node canopen-pr4-monitor-nmt` style;
+  PR 3 is squashed), cut the PR 4 docs on esphome-docs `canopen-pr3-node`/`next` (heartbeat_clients, on_node_event,
+  canopen.nmt, node monitoring lambdas, the local queue / `get_node_state()` fallback), open both PRs (the user may
+  need to run `gh pr create` for esphome.io: the permission check blocked it once). (3) clang-tidy not run on the cut.
+- Worktrees (may be gone after a reboot: scratchpad): `full-wt` = `canopen-full`, `pr3` = `canopen-pr3-node`, `pr4` =
+  `canopen-pr4-monitor-nmt`, `docs-pr3` = esphome-docs `canopen-pr3-node`; the branches are in `~/repos/esphome` /
+  `~/repos/esphome-docs`.
+
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
 decoded heartbeat frames, so node monitoring works on a hub without `node_id` and can come right after PR 2.

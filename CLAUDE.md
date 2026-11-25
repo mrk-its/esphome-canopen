@@ -36,7 +36,9 @@ esphome/esphome#23299 (2026-11-25, cut on `canopen-pr3-node`; both Copilot round
 head `9e7687e388`, tested on his hardware, esphbot "ready to merge", waiting for a maintainer); its docs PR is
 esphome/esphome.io#8254 (esphome-docs branch `canopen-pr3-node`, rebased on `next`; the pre-rebase branch is
 `backup/canopen-pr3-node-pre-rebase`; the fork PR mrk-its/esphome-docs#1 is closed) (`docs/canopennode.md`,
-"PR 3 as cut"). The cut's history and test
+"PR 3 as cut"). PR 4 (node monitoring + NMT master, plus the local frame queue and the heartbeat consumer only when
+used) is cut locally on `canopen-pr4-monitor-nmt` (`c723acee71`, on `canopen-pr3-node`), to be rebased on `dev` and
+opened once #23299 is merged (`docs/canopennode.md`, "PR 4 as cut", with the open steps). The cut's history and test
 results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then into the open PR's cut. Before work in `~/repos/esphome` or `~/repos/esphome-docs`, read their AGENTS.md / CLAUDE.md
 (conventions, `node script/lint.mjs` for the docs).
 OTA in the hub on CiA 302-3 program download objects (`0x1F50`/`0x1F51`/`0x1F56`/`0x1F57`) instead of the mapper's `0x3000`:
