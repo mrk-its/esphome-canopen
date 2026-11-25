@@ -54,7 +54,8 @@ void CANopenComponent::setup() {
 #ifdef USE_CANOPEN_NODE
   auto &od = this->od_;
   od.add_var(0x1001, ODA_SDO_R, &this->err_reg_, sizeof(this->err_reg_));
-  od.add_var(0x1014, ODA_SDO_RW, &this->cob_emcy_, sizeof(this->cob_emcy_));
+  // read only: without CO_CONFIG_EM_PROD_CONFIGURABLE a write wouldn't reach the EMCY producer
+  od.add_var(0x1014, ODA_SDO_R, &this->cob_emcy_, sizeof(this->cob_emcy_));
   od.add_var(0x1017, ODA_SDO_RW, &this->hb_producer_ms_, sizeof(this->hb_producer_ms_));
   this->add_device_info_od_();
   this->add_node_monitor_od_();
