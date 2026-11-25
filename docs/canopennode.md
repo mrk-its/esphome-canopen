@@ -1023,7 +1023,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     (shortest timeout, nothing after setup), NMT master commands (other node, own id, all nodes, invalid id),
     client-only refusing. 160 C++ tests pass on `canopen-full`.
 - **Cut** `canopen-pr4-monitor-nmt` (`c723acee71`, one commit "[canopen] Add node monitoring (heartbeat_clients,
-  on_node_event) and the NMT master (canopen.nmt)", local, not pushed): `canopen-full`'s canopen dirs minus PRs 5-8
+  on_node_event) and the NMT master (canopen.nmt)", pushed to mrk-its/esphome): `canopen-full`'s canopen dirs minus PRs 5-8
   (files deleted, lines by `--annotate` >= 5), `od.*` / `od_test` / `processing_test` / `node.yaml` from the PR 3 cut,
   the class comment = PR 3's plus PR 4's parts, PR 3-style comments restored (no `OdObject` / PDO mentions, no
   `automation.h` / `preferences.h` / `<initializer_list>` includes), `CONF_CANOPEN_ID` dropped, `sdo_block_size`
@@ -1039,8 +1039,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   tmpfs quota broke tidy (libdeps in the worktree's `.pio`) and builds: run them with
   `PLATFORMIO_WORKSPACE_DIR=~/.cache/esphome-tidy-pio/<wt>` and `pio` on `PATH` (the venv's `bin`), builds outside
   `/tmp`.
-- **Docs cut** on esphome-docs `canopen-pr4-monitor-nmt` (`90d041b15`, on `canopen-pr3-node` `e3044c456`, local, not
-  pushed): `canopen.mdx` +115 / -5: intro bullets, `heartbeat_clients` / `on_node_event` options, "Heartbeat
+- **Docs cut** on esphome-docs `canopen-pr4-monitor-nmt` (`90d041b15`, on `canopen-pr3-node` `e3044c456`, pushed to
+  mrk-its/esphome-docs): `canopen.mdx` +115 / -5: intro bullets, `heartbeat_clients` / `on_node_event` options, "Heartbeat
   Monitoring" (events checked against CANopenNode's consumer: no timeout before the first heartbeat, offline again
   after a boot-up until the next heartbeat; logging; an `on_node_event` example re-configuring a restarted node; the
   `is_node_online()` / `get_node_state()` lambdas, UNKNOWN / false when not monitored), `0x1016` in the OD table,
@@ -1049,7 +1049,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   `CO_CANsend()` queues), "Several Nodes": monitoring / NMT between local nodes, the local queue (next loop pass, bus
   order, 16 frames, the rest lost + warning). `node script/lint.mjs` passes; the examples pass `esphome config` and
   compile (esp32-idf, `PYTHONPATH` = the PR 4 worktree).
-- **Open steps:** (1) push `canopen-pr4-monitor-nmt` (esphome) and the docs branch when opening. (2) When #23299 is
+- **Open steps:** (1) both PR 4 branches are pushed to the forks (2026-11-26; force-push after the rebase). (2) When #23299 is
   merged: rebase the cut onto `dev` (`git rebase --onto upstream/dev canopen-pr3-node canopen-pr4-monitor-nmt` style;
   PR 3 is squashed), rebase the docs branch onto `next` once #8254 is merged (`--onto origin/next canopen-pr3-node`),
   re-run the checks, open both PRs (the user may need to run `gh pr create` for esphome.io: the permission check
