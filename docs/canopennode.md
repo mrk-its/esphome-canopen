@@ -123,7 +123,8 @@ The bullets below are the state of step 1 (2026-10-29), kept for the CANopenNode
 - **Library source:** the fork from GitHub, `cg.add_library("CANopenNode", None, CANOPENNODE_SOURCE)` with
   `https://github.com/mrk-its/CANopenNode.git#<commit>` (branch `esphome`, pinned to a commit so a push to the fork
   doesn't change builds; bump it in `__init__.py`).
-  - `canopennode_path: <absolute path>` (optional) uses a local checkout instead (`file://`), for development.
+  - `canopennode_path: <absolute path>` (a local checkout instead, `file://`) was dropped on 2026-11-25 (Copilot on
+    #23299: per hub although firmware-wide, relative paths against the working directory; nothing used it).
   - The esphomeplatformzephyr library converter (`esphome/platformio/library.py`, Zephyr backend
     `esphome/components/zephyr/library.py`) works like this:
     - it takes registry, git, url or `file://` sources (`LocalSource`; **relative `file://` is rejected**);

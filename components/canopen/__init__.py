@@ -1,13 +1,12 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 from esphome import automation
 import esphome.codegen as cg
 from esphome.components import esp32
 from esphome.components.canbus import CONF_CANBUS_ID, CanbusComponent
-from esphome.components.const import CONF_SERIAL_NUMBER
+from esphome.components.const import CONF_HARDWARE_VERSION, CONF_SERIAL_NUMBER
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_COMMAND,
@@ -42,7 +41,6 @@ CONF_ON_EMCY = "on_emcy"
 CONF_ON_NMT_STATE_CHANGE = "on_nmt_state_change"
 CONF_NMT_STARTUP = "nmt_startup"
 CONF_SDO_BLOCK_SIZE = "sdo_block_size"
-CONF_CANOPENNODE_PATH = "canopennode_path"
 CONF_RESPONSE_TIMEOUT = "response_timeout"
 CONF_SDO_CLIENT = "sdo_client"
 CONF_SUBINDEX = "subindex"
@@ -50,7 +48,6 @@ CONF_VENDOR_ID = "vendor_id"
 CONF_PRODUCT_CODE = "product_code"
 CONF_REVISION_NUMBER = "revision_number"
 CONF_DEVICE_NAME = "device_name"
-CONF_HARDWARE_VERSION = "hardware_version"
 CONF_SOFTWARE_VERSION = "software_version"
 
 # https://github.com/esphome-libs/CANopenNode: upstream plus ESPHome's CO_driver_target.h
@@ -267,11 +264,6 @@ CALLBACK_AUTOMATIONS = (
 )
 
 
-def absolute_path(value: Any) -> str:
-    # the zephyr library converter rejects relative file:// sources
-    return str(Path(cv.string(value)).expanduser().resolve())
-
-
 # 0x1016 (consumer timeout) and 0x1017 (producer time) hold uint16 ms
 UINT16_MS = cv.All(
     cv.positive_time_period_milliseconds,
@@ -377,8 +369,6 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_DEVICE_NAME): cv.string,
             cv.Optional(CONF_HARDWARE_VERSION): cv.string,
             cv.Optional(CONF_SOFTWARE_VERSION): cv.string,
-            # local CANopenNode checkout instead of the registry package (development)
-            cv.Optional(CONF_CANOPENNODE_PATH): absolute_path,
         }
     ).extend(cv.COMPONENT_SCHEMA),
     validate_heartbeat_clients,
@@ -441,23 +431,19 @@ def _final_validate(config: ConfigType) -> ConfigType:
 FINAL_VALIDATE_SCHEMA = _final_validate
 
 
-def add_canopennode_library(path: str | None = None) -> None:
+def add_canopennode_library() -> None:
     """Add the CANopenNode library (also used by the C++ unit tests).
 
     Its target header (CO_driver_target.h) is in the library itself, so no include path is needed.
     """
     if CORE.is_esp32:
-        esp32.add_idf_component(
-            name="esphome/canopennode", ref=CANOPENNODE_VERSION, path=path
-        )
-    elif path is not None:
-        cg.add_library("CANopenNode", None, f"file://{path}")
+        esp32.add_idf_component(name="esphome/canopennode", ref=CANOPENNODE_VERSION)
     else:
         cg.add_library("esphome/CANopenNode", CANOPENNODE_VERSION)
 
 
 async def to_code(config: ConfigType) -> None:
-    add_canopennode_library(config.get(CONF_CANOPENNODE_PATH))
+    add_canopennode_library()
 
     canbus = await cg.get_variable(config[CONF_CANBUS_ID])
     var = cg.new_Pvariable(

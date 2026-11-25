@@ -92,7 +92,8 @@ full hub is in an ESPHome release. CANopenNode is pinned in the hub (`CANOPENNOD
 of the fork's `esphome` branch: `library.json` (upstream PR #664), the SDO block size patch and the port header
 `CO_driver_target.h` (in the fork since 2026-11-01, for clang-tidy); pin the commit, not the branch; bump it after
 pushing the fork, in both places: `CANOPENNODE_SOURCE` and the CANopenNode line of `platformio.ini` `lib_deps_base` in
-`~/repos/esphome` (the clang-tidy setup, on `canopen-full`); `canopennode_path: <local checkout>` overrides it for development).
+`~/repos/esphome` (the clang-tidy setup, on `canopen-full`); for a local CANopenNode checkout, point the version at it
+temporarily (the `canopennode_path:` option was dropped 2026-11-25: nothing used it).
 
 ## CAN OTA flow
 - OD 0x3000: `:1` ctrl, `:2` size, `:3` MD5 (16 bytes), `:4` image data (SDO block download), `:5` flags
