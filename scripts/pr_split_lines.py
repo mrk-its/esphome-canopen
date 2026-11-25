@@ -60,7 +60,8 @@ OTA_PR = 8
 # banner title (start) -> PR; the first match wins
 BANNERS = [
     ("Identity", 3),
-    ("Object dictionary", 5),  # get_od() / write_od() / read_od(): the API for other components
+    ("OD access", 5),  # write_od() / read_od(): through the handlers
+    ("Object dictionary", 3),  # get_od(): other components add their entries
     ("Node monitoring", 4),
     ("Raw frames", 2),
     ("SDO client", 1),

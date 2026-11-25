@@ -16,46 +16,6 @@ struct LogString;
 
 namespace esphome::canopen {
 
-// NMT state as sent in a heartbeat (CiA 301); also used for our own state
-enum class NMTState : uint8_t {
-  NMT_STATE_BOOTUP = 0,
-  NMT_STATE_STOPPED = 4,
-  NMT_STATE_OPERATIONAL = 5,
-  NMT_STATE_PRE_OPERATIONAL = 127,
-  NMT_STATE_UNKNOWN = 255,
-};
-
-// the states a heartbeat can carry; CiA 301 values are sparse
-inline constexpr std::array<NMTState, 4> NMT_STATES{NMTState::NMT_STATE_BOOTUP, NMTState::NMT_STATE_STOPPED,
-                                                    NMTState::NMT_STATE_OPERATIONAL,
-                                                    NMTState::NMT_STATE_PRE_OPERATIONAL};
-
-const LogString *nmt_state_to_string(NMTState state);
-
-// Events of a monitored node (CANopenComponent::monitor_node(), from CANopenNode's heartbeat consumer):
-// ONLINE: first heartbeat, or the first after a timeout; OFFLINE: no heartbeat within the timeout;
-// NMT_CHANGED: the state in the heartbeat changed (also unknown -> state right after ONLINE, state -> unknown after
-// OFFLINE); RESET: boot-up message, the node restarted and lost its runtime configuration.
-enum class NodeEvent : uint8_t { NODE_EVENT_ONLINE, NODE_EVENT_OFFLINE, NODE_EVENT_NMT_CHANGED, NODE_EVENT_RESET };
-
-const LogString *node_event_to_string(NodeEvent event);
-
-// NMT commands (CiA 301), see CANopenComponent::send_nmt()
-enum class NMTCommand : uint8_t {
-  NMT_COMMAND_START = 1,
-  NMT_COMMAND_STOP = 2,
-  NMT_COMMAND_PRE_OPERATIONAL = 128,
-  NMT_COMMAND_RESET_NODE = 129,
-  NMT_COMMAND_RESET_COMMUNICATION = 130,
-};
-
-// one object mapped into a PDO, see CANopenComponent::configure_tpdo() / configure_rpdo()
-struct PdoMapping {
-  uint16_t index;
-  uint8_t sub;
-  uint8_t bits;  // multiple of 8
-};
-
 enum class SDOResult : uint8_t {
   SDO_RESULT_SUCCESS,
   SDO_RESULT_ABORT,            // see abort_code
@@ -100,6 +60,46 @@ struct SDOReply {
 
 // Called exactly once per request; with REJECTED before the request call returns false, or from a failed setup().
 using SDOCallback = void (*)(void *context, const SDOReply &reply);
+
+// NMT state as sent in a heartbeat (CiA 301); also used for our own state
+enum class NMTState : uint8_t {
+  NMT_STATE_BOOTUP = 0,
+  NMT_STATE_STOPPED = 4,
+  NMT_STATE_OPERATIONAL = 5,
+  NMT_STATE_PRE_OPERATIONAL = 127,
+  NMT_STATE_UNKNOWN = 255,
+};
+
+// the states a heartbeat can carry; CiA 301 values are sparse
+inline constexpr std::array<NMTState, 4> NMT_STATES{NMTState::NMT_STATE_BOOTUP, NMTState::NMT_STATE_STOPPED,
+                                                    NMTState::NMT_STATE_OPERATIONAL,
+                                                    NMTState::NMT_STATE_PRE_OPERATIONAL};
+
+const LogString *nmt_state_to_string(NMTState state);
+
+// Events of a monitored node (CANopenComponent::monitor_node(), from CANopenNode's heartbeat consumer):
+// ONLINE: first heartbeat, or the first after a timeout; OFFLINE: no heartbeat within the timeout;
+// NMT_CHANGED: the state in the heartbeat changed (also unknown -> state right after ONLINE, state -> unknown after
+// OFFLINE); RESET: boot-up message, the node restarted and lost its runtime configuration.
+enum class NodeEvent : uint8_t { NODE_EVENT_ONLINE, NODE_EVENT_OFFLINE, NODE_EVENT_NMT_CHANGED, NODE_EVENT_RESET };
+
+const LogString *node_event_to_string(NodeEvent event);
+
+// NMT commands (CiA 301), see CANopenComponent::send_nmt()
+enum class NMTCommand : uint8_t {
+  NMT_COMMAND_START = 1,
+  NMT_COMMAND_STOP = 2,
+  NMT_COMMAND_PRE_OPERATIONAL = 128,
+  NMT_COMMAND_RESET_NODE = 129,
+  NMT_COMMAND_RESET_COMMUNICATION = 130,
+};
+
+// one object mapped into a PDO, see CANopenComponent::configure_tpdo() / configure_rpdo()
+struct PdoMapping {
+  uint16_t index;
+  uint8_t sub;
+  uint8_t bits;  // multiple of 8
+};
 
 // raw CAN frame listener (see CANopenComponent::add_frame_listener()); data is valid only during the call
 using FrameCallback = void (*)(void *context, uint32_t can_id, const uint8_t *data, uint8_t len);
