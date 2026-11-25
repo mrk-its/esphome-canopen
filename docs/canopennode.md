@@ -30,7 +30,11 @@ Where to continue (2026-11-24):
   is `canopen-full-backup2` (pushed). `git diff upstream/dev canopen-full` is now exactly PRs 2-8. PR 2 is cut on
   `canopen-pr2-frames` (`20f842f1b3`, pushed; "PR 2 as cut"), upstream PR esphome/esphome#23266 (2026-11-24); its docs are on esphome-docs branch `canopen-pr2-frames` (rebased on `next` after #8059 merged, `d64270a78`; the pre-rebase branch is `backup/canopen-pr2-frames-pre-rebase`), docs PR esphome/esphome.io#8243 (2026-11-25). `~/repos/esphome-docs` `canopen-full` is not
   rebuilt yet (#8059 is merged, so it can be). "New split" holds the refactor and the cutting steps; the old
-  `canopen-pr1-node` (the node core) is superseded.
+  `canopen-pr1-node` (the node core) is superseded. PR 2 is **merged upstream** (2026-11-25, squash `29f8ea8e39`,
+  identical to the cut head `79dc2e5ede`, with bdraco's 5 review commits, ported to `canopen-full`). `canopen-full`
+  was rebuilt again on `upstream/dev` as `f0e18d854d` "[canopen] PRs 3-8 on top of PR 2 (to be split)" (the history
+  before is `canopen-full-backup3`, pushed), then `72308fbd7e` (fixes from the PR 3 cut). PR 3 is cut on
+  `canopen-pr3-node` and open upstream: esphome/esphome#23299 ("PR 3 as cut").
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
 - **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
   `components_next`); the old component (`components/canopen`, canopen-stack) and `components_next/canopen` (a stale
@@ -902,6 +906,46 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   `size_t len`. Pushed back: listener vector on the heap (documented: permanent, add at setup / boot). Tests:
   `FakeCanbus::on_send` (cancel during the first / a retried send), buffer transfers cancelled after the first
   segment; 79 C++ in the cut, 132 on `canopen-full`. Docs `e11375dad`.
+
+#### PR 3 as cut (2026-11-25)
+- **Branch** `canopen-pr3-node` in `~/repos/esphome`, `a0b68cae02` on `upstream/dev` `7eb55fbee4` (PR 2 merged),
+  one commit "[canopen] Add the CANopen node: node_id, NMT, heartbeat producer, SDO server, identity", pushed to
+  mrk-its. Upstream PR esphome/esphome#23299 (2026-11-25).
+- **Built by deleting** from `canopen-full` (`f0e18d854d`; its PR 1 / 2 parts now equal `dev`): the canopen
+  directories from `canopen-full`, then
+  - files of PRs 4-8 deleted: `node_monitor.cpp`, `nmt_master.cpp`, `od_handler.*`, `canopen_node.*`, `pdo.cpp`,
+    `pdo_storage.cpp`, `ota/`, and their tests (`canopen_node_test`, `pdo_test`, `storage_test`, `sdo_block_test`,
+    `ota/`, `test-ota.*.yaml`, the profile / OTA / block size / `client_only_nmt` configs, `fake_canopen_profile`);
+  - lines of PRs 4-8 removed by `pr_split_lines.py --annotate` in `canopen.cpp`, `canopen.h`, `types.h`,
+    `__init__.py` (by hand: the `esphome.const` import, which the script tags PR 4 because of `CONF_COMMAND`, the
+    schema entries and `_final_validate`'s block size check, `CONF_CANOPEN_ID`); `od.*` without the handler
+    extension, `OD_TPDO` / `OD_RPDO`; comments naming later features; includes only later PRs need
+    (`preferences.h`, `automation.h`, `<initializer_list>` in `canopen.h`, `<type_traits>` in `od.h`);
+  - `to_nmt_state()` `static` again (public only for PR 4's `node_monitor.cpp`); `get_od()` kept (the loopback and
+    client-only tests add OD entries with it), `write_od()` / `read_od()` left to PR 5;
+  - kept as on `dev` to keep the diff small: `types.h` (`NMTState` in place, one comment changed),
+    `sdo_cancel_test.cpp` (bdraco's client-only fixture), the `cancel_sdo()` lambda in `common.yaml`,
+    `test_response_timeout_fits_uint16` (all lost on `canopen-full`; ported back in `72308fbd7e`, with `get_od()`
+    under its own banner and the script rule "Object dictionary" = PR 3, "OD access" = PR 5);
+  - tests trimmed: `od_test` (`Strings`, `Record`), `processing_test` without the RPDO burst, `client_only_test`
+    `NoNmt` without `send_nmt()`, `frames_test` without `NodeEventToString`; `no_ota.yaml` renamed `node.yaml`;
+    test `__init__.py` enables only the SDO client; `defines.h` adds `USE_CANOPEN_NODE`, `USE_CANOPEN_SDO_CLIENT`,
+    `CO_CONFIG_SDO_CLI 0x0B`.
+- **Tests:** 108 C++ + 29 Python; builds esp8266-ard, esp32-idf, rp2040-ard (only ESP-IDF's legacy TWAI notice);
+  pre-commit. clang-tidy not run (upstream CI runs it on the changed files).
+- **Size:** outside `tests/` +887 / -119 (808 non-blank added lines, 656 without comment-only lines; the script
+  counts ~550 for PR 3: the rest rewrites PR 1 / 2 code, `canopen.h` regrouped, `receive_()` / loopback in the
+  driver, `0x1280` on the runtime OD); `tests/` +938 / -95. Not split further (2026-11-25): the runtime OD alone
+  would have one record as its user, the loopback is how the SDO server is tested; identity / device info (~110
+  lines) is the clean cut if a reviewer asks.
+- **Docs:** esphome-docs branch `canopen-pr3-node` on `canopen-pr2-frames` (`eb98f33a5`): the PR 2 page plus the
+  node parts, worded after `feature/canopen-sdo-client-only` (`bae1c36ff`; the esphome-docs `canopen-full` page still
+  has `node_id` required): intro, `node_id` / `heartbeat_interval` / `sdo_client` / `nmt_startup` / identity /
+  device info / `on_nmt_state_change`, SDO Client Only, Several Nodes, Object Dictionary (PR 3's objects), NMT State
+  of This Node, requests to the own id. Fork PR mrk-its/esphome-docs#1 (base `canopen-pr2-frames`); the esphome.io PR
+  follows after #8243 (rebase on `next`).
+- **PR 2 docs** (#8243): Kōan's round (2026-11-25) in `4354f6b56` (TPDO1 comment `0x180`-`0x1FF`, "The 50 ms are
+  counted"), description updated (listeners can be added at any time).
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
