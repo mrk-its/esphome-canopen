@@ -2,10 +2,12 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <memory>
 #include <type_traits>
 #include <vector>
 
 #include "esphome/core/defines.h"  // before CANopenNode: clang-tidy gets the CO_CONFIG_* values from it
+#include "esphome/core/helpers.h"
 
 #define OD_DEFINITION
 // Use the library search path: quoted includes match our canopen.h on Windows.
@@ -24,9 +26,8 @@ constexpr uint8_t OD_TPDO = ODA_TPDO;
 constexpr uint8_t OD_RPDO = ODA_RPDO;
 
 // Object dictionary built at runtime (CO_MULTIPLE_OD). Entries are collected with add_*() and turned into the sorted
-// OD_entry_t list by finalize(). The value storage is owned by the caller and must outlive the OD. All allocation
-// happens before finalize() (in setup): the containers only grow until then, and entries refer to their objects by
-// position, so the pointers CANopenNode gets are taken once they no longer move.
+// OD_entry_t list by finalize(), which copies them into arrays of their exact size and frees what was collected. The
+// value storage is owned by the caller and must outlive the OD. All allocation happens in setup.
 class ObjectDictionary {
  public:
   struct RecordSub {
@@ -50,7 +51,7 @@ class ObjectDictionary {
 
   // Builds the entry list. Entries can't be added after this. False if an index was added twice.
   bool finalize();
-  bool finalized() const { return this->finalized_; }
+  bool finalized() const { return this->od_.list != nullptr; }
 
   OD_entry_t *find(uint16_t index) { return OD_find(&this->od_, index); }
   OD_t *od() { return &this->od_; }
@@ -72,7 +73,8 @@ class ObjectDictionary {
   size_t value_size(uint16_t index, uint8_t sub);
 
  protected:
-  // an entry until finalize(): its object and extension by position in vars_ / arrays_ / records_ / extensions_
+  // an entry until finalize(): its object and extension by position in the vars / arrays / records / extensions
+  // collected so far
   struct PendingEntry {
     uint16_t index;
     uint8_t sub_count;
@@ -80,8 +82,17 @@ class ObjectDictionary {
     uint16_t object;
     uint16_t extension;  // position + 1, 0 = none
   };
+  // what add_*() collects until finalize()
+  struct Pending {
+    std::vector<PendingEntry> entries;
+    std::vector<OD_obj_var_t> vars;
+    std::vector<OD_obj_array_t> arrays;
+    std::vector<OD_obj_record_t> records;  // the subs of all records, each record's in a row
+    std::vector<OD_extension_t> extensions;
+  };
 
-  bool can_add_(uint16_t index) const;
+  // nullptr once finalized: CANopenNode then holds pointers into the arrays below
+  Pending *pending_(uint16_t index);
 
   // --- Handlers (od_handler.cpp) ---
   void set_extension_(uint16_t index, const OD_extension_t &extension);
@@ -100,14 +111,13 @@ class ObjectDictionary {
     return static_cast<ODR_t>(ret);
   }
 
-  std::vector<PendingEntry> pending_;  // released by finalize()
-  std::vector<OD_obj_var_t> vars_;
-  std::vector<OD_obj_array_t> arrays_;
-  std::vector<OD_obj_record_t> records_;  // the subs of all records, each record's in a row
-  std::vector<OD_extension_t> extensions_;
-  std::vector<OD_entry_t> entries_;
+  std::unique_ptr<Pending> pending_storage_;
+  FixedVector<OD_obj_var_t> vars_;
+  FixedVector<OD_obj_array_t> arrays_;
+  FixedVector<OD_obj_record_t> records_;
+  FixedVector<OD_extension_t> extensions_;
+  FixedVector<OD_entry_t> entries_;
   OD_t od_{0, nullptr};
-  bool finalized_{false};
 };
 
 }  // namespace esphome::canopen

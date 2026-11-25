@@ -8,12 +8,13 @@ namespace esphome::canopen {
 ESPHOME_LOG_TAG(TAG, "canopen.od");
 
 void ObjectDictionary::set_extension_(uint16_t index, const OD_extension_t &extension) {
-  if (!this->can_add_(index))
+  Pending *p = this->pending_(index);
+  if (p == nullptr)
     return;
-  for (auto &entry : this->pending_) {
+  for (auto &entry : p->entries) {
     if (entry.index == index) {
-      this->extensions_.push_back(extension);
-      entry.extension = this->extensions_.size();
+      p->extensions.push_back(extension);
+      entry.extension = p->extensions.size();
       return;
     }
   }
@@ -22,7 +23,7 @@ void ObjectDictionary::set_extension_(uint16_t index, const OD_extension_t &exte
 
 OdResult ObjectDictionary::read(uint16_t index, uint8_t sub, void *data, size_t max_len, size_t *len) {
   *len = 0;
-  if (!this->finalized_)
+  if (!this->finalized())
     return OdResult::OD_RESULT_DEVICE_STATE;
   OD_IO_t io;
   auto ret = static_cast<OdResult>(OD_getSub(OD_find(&this->od_, index), sub, &io, false));
@@ -45,7 +46,7 @@ OdResult ObjectDictionary::read(uint16_t index, uint8_t sub, void *data, size_t 
 }
 
 size_t ObjectDictionary::value_size(uint16_t index, uint8_t sub) {
-  if (!this->finalized_)
+  if (!this->finalized())
     return 0;
   OD_IO_t io;
   if (OD_getSub(OD_find(&this->od_, index), sub, &io, false) != ODR_OK)
@@ -54,7 +55,7 @@ size_t ObjectDictionary::value_size(uint16_t index, uint8_t sub) {
 }
 
 OdResult ObjectDictionary::write(uint16_t index, uint8_t sub, const void *data, size_t len) {
-  if (!this->finalized_)
+  if (!this->finalized())
     return OdResult::OD_RESULT_DEVICE_STATE;
   OD_IO_t io;
   auto ret = static_cast<OdResult>(OD_getSub(OD_find(&this->od_, index), sub, &io, false));

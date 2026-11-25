@@ -228,13 +228,13 @@ class CANopenComponent : public Component {
 
  protected:
   void on_frame_(const canbus::CanFrame &frame);
-  void receive_(uint16_t ident, const uint8_t *data, uint8_t len);
+  /// Returns whether a CANopenNode object took the frame
+  bool receive_(uint16_t ident, const uint8_t *data, uint8_t len);
   // A client-only hub with no request queued or running and no frame waiting to be resent. A node always has work
   // (heartbeat, PDO timers).
   bool idle_() const;
   // CO_process() and our node's own processing: per received frame and in loop()
   void process_node_();
-  void setup_client_only_();
   // marks the hub failed and ends the requests queued before setup()
   void fail_setup_(const LogString *reason);
   // The features' parts of setup(), called in this order: add_*_od_() add OD entries (before the OD is finalized),
@@ -242,38 +242,37 @@ class CANopenComponent : public Component {
 
   canbus::Canbus *canbus_;
   CANopenComponent *next_local_{nullptr};
-  uint8_t node_id_;
   CO_t *co_{nullptr};
   CO_config_t config_{};  // must outlive co_
   ObjectDictionary od_;
-
-  bool hold_flush_{false};
   uint16_t response_timeout_ms_{500};
+  uint8_t node_id_;
+  bool hold_flush_{false};
 
 #ifdef USE_CANOPEN_NODE
-  uint8_t err_reg_{0};             // 0x1001
-  uint32_t cob_emcy_{0x80};        // 0x1014, CANopenNode adds the node id
-  uint16_t hb_producer_ms_{5000};  // 0x1017
-  uint32_t last_us_{0};            // the node's clock (CO_process(), PDOs)
-  bool start_operational_{true};
-  NMTState nmt_state_{NMTState::NMT_STATE_UNKNOWN};
-  LazyCallbackManager<void(NMTState)> nmt_state_callback_;
-
   // --- Identity and device information (device_info.cpp) ---
   void set_device_info_defaults_();
   void add_device_info_od_();
   void config_device_info_(CO_config_t &cfg);
   void dump_device_info_config_();
+
+  LazyCallbackManager<void(NMTState)> nmt_state_callback_;
+  uint32_t cob_emcy_{0x80};                // 0x1014, CANopenNode adds the node id
+  uint32_t last_us_{0};                    // the node's clock (CO_process(), PDOs)
   uint32_t dev_type_{0};                   // 0x1000
   const char *device_name_{nullptr};       // 0x1008
   const char *hardware_version_{nullptr};  // 0x1009, only if set
   const char *software_version_{nullptr};  // 0x100A
-  uint8_t identity_highest_sub_{4};        // 0x1018
   std::array<uint32_t, 4> identity_{};     // 0x1018:1..4
   // 0x1200 (SDO server 1): CANopenNode fills in the default COB-IDs 0x600 / 0x580 + node id
-  uint8_t sdo_srv_highest_sub_{2};
   uint32_t sdo_srv_cob_rx_{0};
   uint32_t sdo_srv_cob_tx_{0};
+  uint16_t hb_producer_ms_{5000};    // 0x1017
+  uint8_t err_reg_{0};               // 0x1001
+  uint8_t identity_highest_sub_{4};  // 0x1018
+  uint8_t sdo_srv_highest_sub_{2};   // 0x1200
+  NMTState nmt_state_{NMTState::NMT_STATE_UNKNOWN};
+  bool start_operational_{true};
 #endif  // USE_CANOPEN_NODE
 
   // --- Node monitoring (node_monitor.cpp) ---
@@ -286,9 +285,9 @@ class CANopenComponent : public Component {
   static void on_hb_nmt_changed(uint8_t node_id, uint8_t idx, CO_NMT_internalState_t state, void *object);
   static void on_hb_timeout(uint8_t node_id, uint8_t idx, void *object);
   static void on_hb_remote_reset(uint8_t node_id, uint8_t idx, void *object);
-  uint8_t hb_cons_count_{0};       // 0x1016:0
   std::vector<uint32_t> hb_cons_;  // 0x1016:1.., (node_id << 16) | timeout_ms
   LazyCallbackManager<void(uint8_t, NodeEvent, NMTState)> node_event_callback_;
+  uint8_t hb_cons_count_{0};  // 0x1016:0
 
   // --- Raw frames (frames.cpp) ---
   // frame listeners and heartbeat / EMCY callbacks for a received frame, after CANopenNode
