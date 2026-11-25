@@ -133,11 +133,12 @@ class CANopenComponent : public Component {
   }
   template<typename F> void add_on_emcy_callback(F &&callback) { this->emcy_callback_.add(std::forward<F>(callback)); }
   // Raw frames the OD doesn't describe (e.g. other devices' PDOs). The callback gets every standard-ID data frame
-  // with (can_id ^ id) & mask == 0, after CANopenNode has seen it. Can be called before or after setup().
+  // with (can_id ^ id) & mask == 0, after CANopenNode has seen it. Can be called before or after setup(). Listeners
+  // can't be removed; add them at setup or boot, as each one grows a vector on the heap.
   void add_frame_listener(uint32_t can_id, uint32_t mask, FrameCallback callback, void *context);
-  // Sends a standard-ID data frame now. Returns false if the canbus platform refuses it (e.g. TX buffers full); it
-  // isn't queued or retried, unlike CANopenNode's own frames.
-  bool send_frame(uint32_t can_id, const uint8_t *data, uint8_t len);
+  // Sends a standard-ID data frame now. Returns false for a CAN ID above 0x7FF, more than 8 bytes, or if the canbus
+  // platform refuses it (e.g. TX buffers full); it isn't queued or retried, unlike CANopenNode's own frames.
+  bool send_frame(uint32_t can_id, const uint8_t *data, size_t len);
 
 #ifdef USE_CANOPEN_SDO_CLIENT
   // --- SDO client (sdo_client.cpp) ---
@@ -336,6 +337,7 @@ class CANopenComponent : public Component {
   uint8_t sdo_abort_node_{0};  // node of the last cancelled transfer, for its log
   bool sdo_busy_{false};
   bool sdo_abort_pending_{false};
+  bool sdo_cancel_pending_{false};  // cancel_sdo() hit the active transfer: process_sdo_() aborts it
 #endif
 
 #ifdef USE_CANOPEN_PDO
