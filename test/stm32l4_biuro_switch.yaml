@@ -7,11 +7,10 @@
 # (same board and partition layout as stm32l4_canopen.yaml, which has the hardware tests)
 
 external_components:
-  # the hub from the fork's working tree; canbus too (rx_capped(), from the canopen PR 1), as on the house nodes
-  - source: ../../esphome/esphome/components
-    components: [canopen, canbus]
+  # the hub (a copy, scripts/sync_hub.py), canopen_entities and canopen_buttons, as on the house nodes; canbus from the
+  # esphomeplatformzephyr venv (its working tree has rx_capped(), see CLAUDE.md "Platform notes")
   - source: ../components
-    components: [canopen_entities, canopen_buttons]
+    components: [canopen, canopen_entities, canopen_buttons]
 
 esphome:
   name: stm32l4-biuro-switch
