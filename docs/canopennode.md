@@ -1031,18 +1031,31 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   `USE_CANOPEN_NMT_MASTER`, `USE_CANOPEN_NODE_MONITOR`, `CO_CONFIG_NMT 0x03`. Size: +411 / -24 code, +405 tests;
   123 C++ + 38 Python tests pass. Cross-checked: vs `canopen-full` only PRs 5-8 differ (driver_can, nmt_master,
   node_monitor, frames, sdo_client, device_info identical); vs the PR 3 cut only PR 4 parts.
-- **Builds started 2026-11-26** (results not yet seen when this was written): cut esp8266-ard / esp32-idf /
-  rp2040-ard, client-only and no-monitoring configs (`scratchpad/clientonly/client_only.yaml`,
-  `scratchpad/nodemon/node_nomon.yaml`); esphome-canopen hub synced to `canopen-full` `8368ad29d9` (uncommitted), pytest,
-  esp8266 mapper, `stm32l4_canopen`.
-- **Open steps:** (1) check those builds; commit the hub sync and `scripts/pr_split_lines.py` (now: `USE_CANOPEN_NODE_MONITOR`
-  and `node_monitor_test.cpp` = PR 4) in esphome-canopen; push `canopen-full` and `canopen_entities`. (2) When #23299 is
+- **Checks (2026-11-26), all green:** the cut builds esp8266-ard / esp32-idf / rp2040-ard
+  (`test_build_components.py`, no canopen warnings), client-only and no-monitoring configs (`client_only.yaml`,
+  `node_nomon.yaml`, ESP8266); esphome-canopen with the hub synced to `canopen-full` `8368ad29d9` (committed,
+  `441daab`): pytest (97), esp8266 mapper, `stm32l4_canopen`. clang-tidy on the cut clean: esp32-idf-tidy on the
+  component + tests (18 files), esp8266-arduino-tidy, bk72xx-tidy, nrf52-tidy on the component (8 files). The `/tmp`
+  tmpfs quota broke tidy (libdeps in the worktree's `.pio`) and builds: run them with
+  `PLATFORMIO_WORKSPACE_DIR=~/.cache/esphome-tidy-pio/<wt>` and `pio` on `PATH` (the venv's `bin`), builds outside
+  `/tmp`.
+- **Docs cut** on esphome-docs `canopen-pr4-monitor-nmt` (`90d041b15`, on `canopen-pr3-node` `e3044c456`, local, not
+  pushed): `canopen.mdx` +115 / -5: intro bullets, `heartbeat_clients` / `on_node_event` options, "Heartbeat
+  Monitoring" (events checked against CANopenNode's consumer: no timeout before the first heartbeat, offline again
+  after a boot-up until the next heartbeat; logging; an `on_node_event` example re-configuring a restarted node; the
+  `is_node_online()` / `get_node_state()` lambdas, UNKNOWN / false when not monitored), `0x1016` in the OD table,
+  the stack's EMCY on a consumer timeout, `on_node_event` trigger, `canopen.nmt` action (applies to us for our id or
+  0; rejected without `node_id`), "NMT Master" lambda (`send_nmt()` false only while the previous command still waits:
+  `CO_CANsend()` queues), "Several Nodes": monitoring / NMT between local nodes, the local queue (next loop pass, bus
+  order, 16 frames, the rest lost + warning). `node script/lint.mjs` passes; the examples pass `esphome config` and
+  compile (esp32-idf, `PYTHONPATH` = the PR 4 worktree).
+- **Open steps:** (1) push `canopen-pr4-monitor-nmt` (esphome) and the docs branch when opening. (2) When #23299 is
   merged: rebase the cut onto `dev` (`git rebase --onto upstream/dev canopen-pr3-node canopen-pr4-monitor-nmt` style;
-  PR 3 is squashed), cut the PR 4 docs on esphome-docs `canopen-pr3-node`/`next` (heartbeat_clients, on_node_event,
-  canopen.nmt, node monitoring lambdas, the local queue / `get_node_state()` fallback), open both PRs (the user may
-  need to run `gh pr create` for esphome.io: the permission check blocked it once). (3) clang-tidy not run on the cut.
+  PR 3 is squashed), rebase the docs branch onto `next` once #8254 is merged (`--onto origin/next canopen-pr3-node`),
+  re-run the checks, open both PRs (the user may need to run `gh pr create` for esphome.io: the permission check
+  blocked it once). (3) Port the docs back to esphome-docs `canopen-full` (diverged, still the pre-rebase text).
 - Worktrees (may be gone after a reboot: scratchpad): `full-wt` = `canopen-full`, `pr3` = `canopen-pr3-node`, `pr4` =
-  `canopen-pr4-monitor-nmt`, `docs-pr3` = esphome-docs `canopen-pr3-node`; the branches are in `~/repos/esphome` /
+  `canopen-pr4-monitor-nmt`, `docs-pr3` = esphome-docs `canopen-pr3-node`, `docs-pr4` = esphome-docs `canopen-pr4-monitor-nmt`; the branches are in `~/repos/esphome` /
   `~/repos/esphome-docs`.
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
