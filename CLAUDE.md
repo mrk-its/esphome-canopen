@@ -27,7 +27,7 @@ Current split (2026-11-05, "SDO client only first", 8 PRs): PR 1 = the hub witho
 loopback. PR 1 (esphome/esphome#22410, cut on `canopen-pr1-sdo-client`) is **merged upstream** (2026-11-24,
 squash `206bb68485`); its docs PR esphome/esphome.io#8059 is merged too (2026-11-25, squash `d3f9241e3` on `next`). `canopen-full` in `~/repos/esphome` is rebuilt
 on `upstream/dev` as one commit "PRs 2-8 on top of PR 1 (to be split)" (`a055ba97aa`; the old history, with
-bdraco's review commits ported, is `canopen-full-backup2`); PR 2 (esphome/esphome#23266, opened 2026-11-24, cut on `canopen-pr2-frames`; docs on esphome-docs branch `canopen-pr2-frames`, rebased on `next` after #8059, PR not opened yet; `docs/canopennode.md`, "PR 2 as cut"). The cut's history and test
+bdraco's review commits ported, is `canopen-full-backup2`); PR 2 (esphome/esphome#23266, opened 2026-11-24, cut on `canopen-pr2-frames`; docs on esphome-docs branch `canopen-pr2-frames`, rebased on `next` after #8059, docs PR esphome/esphome.io#8243; `docs/canopennode.md`, "PR 2 as cut"). The cut's history and test
 results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then into the open PR's cut. Before work in `~/repos/esphome` or `~/repos/esphome-docs`, read their AGENTS.md / CLAUDE.md
 (conventions, `node script/lint.mjs` for the docs).
 OTA in the hub on CiA 302-3 program download objects (`0x1F50`/`0x1F51`/`0x1F56`/`0x1F57`) instead of the mapper's `0x3000`:
