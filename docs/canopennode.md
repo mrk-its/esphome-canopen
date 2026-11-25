@@ -945,6 +945,34 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   device info / `on_nmt_state_change`, SDO Client Only, Several Nodes, Object Dictionary (PR 3's objects), NMT State
   of This Node, requests to the own id. Fork PR mrk-its/esphome-docs#1 (base `canopen-pr2-frames`); the esphome.io PR
   follows after #8243 (rebase on `next`).
+- **Copilot review** (2026-11-25, 14 comments on `a0b68cae02`), all answered in the threads, plus a summary comment:
+  - fixed: `CONF_HARDWARE_VERSION` from `esphome/components/const` (esphome/esphome#23300, merged; the fork got the
+    constant too, uncommitted), `canopennode_path` dropped (`dfbdca9ec1`); node members and setters only with
+    `USE_CANOPEN_NODE`, `0x1014` / `0x1280` read only (`e3f9c80f02`); `dump_config()` after a failed setup, one flush
+    per `loop()` (`in_frame_` -> `hold_flush_`, also around `process_node_()`), no SDO in STOPPED (requests end with
+    `SDO_RESULT_REJECTED`; `6b71642da4`); `heartbeat_interval` at least 100 ms (`33eda18fd6`). New tests:
+    `LocalPair.ReadOnlyCommunicationObjects`, `CanopenProcessing.SdoTimeoutCountsFromTheFlushThatSentTheRequest`,
+    `CanopenProcessing.StoppedNodeRejectsSdoRequests`, `test_heartbeat_interval_range`; each fails without its fix.
+  - not changed, explained: local nodes' SDO clients share a server's channel (documented under Shared SDO Channel),
+    the boot-up message replaced by a heartbeat on a bus that refuses frames for over 500 ms (CANopenNode's producer),
+    NMT Reset Communication only logged (its own PR), local delivery overwriting back-to-back frames (with PRs 4 / 6).
+  - Docs: `0x1014` / `0x1280` read only, `heartbeat_interval` from 100 ms, no SDO in STOPPED, the shared channel between
+    `canopen` components (esphome-docs `canopen-pr3-node` up to `b0fc465aa`).
+  - Still open: the docs' "the node doesn't send EMCY frames" (the producer is on; e.g. a TX overflow sends one).
+- **bdraco's commits** (2026-11-25, on top of `33eda18fd6`, head `fe354804ff`; CI green):
+  - `a32c32089f`: one `setup()` for both modes (`setup_client_only_()` gone, node parts under `if (node)`),
+    `to_nmt_state()` a cast with `static_assert`s on CANopenNode's values, `rx_capped()` called directly (no
+    compatibility template), `receive_()` returns whether a CANopenNode object took the frame and only then the node
+    processes it at once, `add_optional` in the codegen.
+  - `7489a8fdb3`: `add_*()` collect into a temporary `Pending` block, `finalize()` copies it into exact-size
+    `FixedVector`s and frees it (`shrink_to_fit()` doesn't free everywhere); `finalized()` is `od_.list != nullptr`.
+  - `fe354804ff`: members ordered by size (about 16 bytes of padding less per node hub).
+  - Ported to `canopen-full` (`8fbc2a199b`, `34ac7fb9dc`, `c9a2eaef3c`, cherry-picked): the PDO / storage and node
+    monitor hooks go into the `if (node)` blocks; `to_nmt_state()` stays public (`node_monitor.cpp`); the handler
+    extensions (PR 5) are collected in `Pending` too and copied into their own `FixedVector`; the node monitor members
+    grouped by size as well. Afterwards `driver_can.cpp`, `sdo_client.cpp`, `device_info.cpp`, `frames.cpp` and
+    `automation.h` are identical on both branches, `od.*` / `canopen.*` differ only by PRs 4-8. The direct
+    `rx_capped()` needs the fork stub (Platform notes in CLAUDE.md).
 - **PR 2 docs** (#8243): Kōan's round (2026-11-25) in `4354f6b56` (TPDO1 comment `0x180`-`0x1FF`, "The 50 ms are
   counted"), description updated (listeners can be added at any time).
 

@@ -27,11 +27,12 @@ Current split (2026-11-05, "SDO client only first", 8 PRs): PR 1 = the hub witho
 loopback. PR 1 (esphome/esphome#22410, cut on `canopen-pr1-sdo-client`) is **merged upstream** (2026-11-24,
 squash `206bb68485`); its docs PR esphome/esphome.io#8059 is merged too (2026-11-25, squash `d3f9241e3` on `next`). `canopen-full` in `~/repos/esphome` is rebuilt
 on `upstream/dev` as one commit "PRs 3-8 on top of PR 2 (to be split)" (`f0e18d854d`, 2026-11-25), plus the PR 3
-cut's fixes ported back (`72308fbd7e`); the history before, with bdraco's PR 2 review commits ported, is
+cut's fixes, the Copilot review fixes of #23299 and bdraco's 3 PR 3 commits ported back (`c9a2eaef3c`); the history before, with bdraco's PR 2 review commits ported, is
 `canopen-full-backup3` (pushed; older: `canopen-full-backup2`). PR 2 (esphome/esphome#23266, cut on
 `canopen-pr2-frames`) is **merged upstream** (2026-11-25, squash `29f8ea8e39`, identical to the cut head
 `79dc2e5ede`); its docs PR esphome/esphome.io#8243 (esphome-docs branch `canopen-pr2-frames`) is open. PR 3 (the
-node core + loopback) is open upstream: esphome/esphome#23299 (2026-11-25, cut on `canopen-pr3-node`, `a0b68cae02`);
+node core + loopback) is open upstream: esphome/esphome#23299 (2026-11-25, cut on `canopen-pr3-node`; Copilot's
+review answered, bdraco's commits on top, head `fe354804ff`);
 its docs are on esphome-docs branch `canopen-pr3-node` (on `canopen-pr2-frames`), reviewable as the fork PR
 mrk-its/esphome-docs#1 until #8243 is merged, then rebased on `next` for the esphome.io PR (`docs/canopennode.md`,
 "PR 3 as cut"). The cut's history and test
@@ -130,6 +131,11 @@ temporarily (the `canopennode_path:` option was dropped 2026-11-25: nothing used
   as the esphomeplatformzephyr fork. Fork-only APIs (e.g. `SWAP_METHOD_SCHEMA`,
   `esphome.components.zephyr.mcuboot`) are imported in `try/except ImportError` or lazily; use
   `getattr(CORE, "is_zephyr", False)` / `is_stm32`.
+- The hub targets ESPHome `dev`, which the esphomeplatformzephyr fork lags behind: its working tree in
+  `~/repos/esphomeplatformzephyr` carries two uncommitted additions the hub copy needs (2026-11-25, until `dev` is merged
+  into the fork): `CONF_HARDWARE_VERSION` in `esphome/components/const/__init__.py` (#23300) and
+  `bool rx_capped() const { return false; }` in `esphome/components/canbus/canbus.h` (PR 1's `canbus` API). The zrodlana
+  venv is an editable install of that tree. Keep them when switching branches there.
 - `OTA_COMPRESSION` is off on stm32 and `platform: zephyr` (miniz inflate needs ~43 KB of heap).
 - `platform: zephyr` (esphomeplatformzephyr fork):
   - OTA needs `zephyr: advanced: bootloader: mcuboot` and a slot0/slot1 partition layout. The backend
