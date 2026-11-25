@@ -21,6 +21,7 @@ from esphome.const import (
     CONF_VALUE,
 )
 from esphome.core import CORE, ID, EsphomeError
+from esphome.coroutine import CoroPriority, coroutine_with_priority
 from esphome.cpp_generator import MockObj, TemplateArgsType
 import esphome.final_validate as fv
 from esphome.types import ConfigType
@@ -170,6 +171,22 @@ def enable_pdo() -> None:
     cg.add_build_flag("-DCO_CONFIG_STORAGE=0x01")
 
 
+def enable_node_monitor() -> None:
+    """Compile node monitoring (CANopenNode's heartbeat consumer, monitor_node()): for heartbeat_clients and components
+    that monitor a node (register_node(heartbeat_timeout=...)). Without it the consumer isn't built."""
+    if not _enable_once("node_monitor"):
+        return
+    cg.add_define("USE_CANOPEN_NODE_MONITOR")
+
+
+@coroutine_with_priority(CoroPriority.FINAL)
+async def _final_build_flags() -> None:
+    # after every component's codegen, so that register_node() calls count too: CANopenNode's port header enables the
+    # heartbeat consumer, which links in its code even without monitored nodes
+    if "node_monitor" not in _get_data().enabled:
+        cg.add_build_flag("-DCO_CONFIG_HB_CONS=0")
+
+
 def enable_nmt_master() -> None:
     """Compile the NMT master (send_nmt()): for actions and components that use it."""
     if not _enable_once("nmt_master"):
@@ -232,6 +249,7 @@ async def register_node(
     if nmt:
         enable_nmt_master()
     if heartbeat_timeout is not None:
+        enable_node_monitor()
         hub = await cg.get_variable(config[CONF_CANOPEN_ID])
         cg.add(
             hub.monitor_node(config[CONF_NODE_ID], heartbeat_timeout.total_milliseconds)
@@ -448,6 +466,8 @@ def add_canopennode_library() -> None:
 
 async def to_code(config: ConfigType) -> None:
     add_canopennode_library()
+    if _enable_once("final_build_flags"):
+        CORE.add_job(_final_build_flags)
 
     canbus = await cg.get_variable(config[CONF_CANBUS_ID])
     var = cg.new_Pvariable(
@@ -491,6 +511,8 @@ async def to_code(config: ConfigType) -> None:
     cg.add_optional(var.set_device_name, config.get(CONF_DEVICE_NAME))
     cg.add_optional(var.set_hardware_version, config.get(CONF_HARDWARE_VERSION))
     cg.add_optional(var.set_software_version, config.get(CONF_SOFTWARE_VERSION))
+    if config[CONF_HEARTBEAT_CLIENTS]:
+        enable_node_monitor()
     for client in config[CONF_HEARTBEAT_CLIENTS]:
         cg.add(
             var.monitor_node(

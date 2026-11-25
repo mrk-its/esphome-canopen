@@ -1,4 +1,5 @@
-// Monitoring of other nodes by their heartbeat (CANopenNode heartbeat consumer, 0x1016): node events and states.
+// Monitoring of other nodes by their heartbeat (CANopenNode heartbeat consumer, 0x1016): node events and states. The
+// consumer is built only with USE_CANOPEN_NODE_MONITOR (canopen.enable_node_monitor()).
 #include "canopen.h"
 
 #include "esphome/core/log.h"
@@ -15,6 +16,7 @@ const LogString *node_event_to_string(NodeEvent event) {
   return NodeEventStrings::get_log_str(static_cast<uint8_t>(event), NodeEventStrings::LAST_INDEX);
 }
 
+#ifdef USE_CANOPEN_NODE_MONITOR
 void CANopenComponent::monitor_node(uint8_t node_id, uint16_t timeout_ms) {
   if (this->co_ != nullptr) {
     ESP_LOGE(TAG, "monitor_node(0x%02x) after setup, ignored", node_id);
@@ -78,6 +80,7 @@ void CANopenComponent::dump_node_monitor_config_() {
     ESP_LOGCONFIG(TAG, "  Heartbeat client: node 0x%02x, timeout %u ms", (unsigned) (c >> 16), (unsigned) (c & 0xFFFF));
   }
 }
+#endif  // USE_CANOPEN_NODE_MONITOR
 
 void CANopenComponent::node_event_(uint8_t node_id, NodeEvent event, NMTState state) {
   if (event == NodeEvent::NODE_EVENT_OFFLINE) {
@@ -89,6 +92,7 @@ void CANopenComponent::node_event_(uint8_t node_id, NodeEvent event, NMTState st
   this->node_event_callback_.call(node_id, event, state);
 }
 
+#ifdef USE_CANOPEN_NODE_MONITOR
 // CANopenNode heartbeat consumer callbacks (called from CO_process())
 void CANopenComponent::on_hb_started(uint8_t node_id, uint8_t idx, void *object) {
   auto *self = static_cast<CANopenComponent *>(object);
@@ -111,5 +115,6 @@ void CANopenComponent::on_hb_remote_reset(uint8_t node_id, uint8_t idx, void *ob
   static_cast<CANopenComponent *>(object)->node_event_(node_id, NodeEvent::NODE_EVENT_RESET,
                                                        NMTState::NMT_STATE_BOOTUP);
 }
+#endif  // USE_CANOPEN_NODE_MONITOR
 
 }  // namespace esphome::canopen
