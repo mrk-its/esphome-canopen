@@ -1073,7 +1073,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   "canopen <id>: on_node_event never fires, no node is monitored" from `_final_build_flags` (FINAL, so components
   enabling the monitor count), test `test_node_event_without_monitored_nodes` (config `node_event_unmonitored.yaml`);
   49 / 40 Python tests pass. Commits in the cut worktree need `../esphome/venv/bin` on `PATH` (pre-commit's pylint).
-  Still open: #1, #2 (= esphbot 3, `nmt_master: true`?), #11. The local `canopen-full`
+  Replies posted and the 8 fixed Copilot threads resolved; esphbot answered in a PR comment. Still open (threads
+  unresolved, no reply): #1, #2 (= esphbot 3, `nmt_master: true`?), #11. The local `canopen-full`
   branch had been deleted from `../esphome`; recreated from `origin/canopen-full` in a scratchpad worktree.
 - **Open steps:** (1) rebase the docs branch onto `next` once #8254 is merged (`--onto <esphome.io next>
   canopen-pr3-node`; `../esphome-docs` has only the mrk-its remote), open it (the user may need to run `gh pr create`
