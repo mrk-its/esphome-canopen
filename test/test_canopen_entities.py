@@ -2,8 +2,8 @@
 
 Codegen and validation go through the ESPHome CLI of the upstream venv (`esphome compile --only-generate`,
 `esphome config`), with the canopen hub from an upstream checkout (branch canopen-next) as a local external
-component. Paths: $ESPHOME_UPSTREAM_VENV (default ~/repos/esphome-upstream-venv), $ESPHOME_CANOPEN_HUB (default
-~/repos/esphome/esphome/components); the tests are skipped without them.
+component. Paths: $ESPHOME_UPSTREAM_VENV (default ../esphome/venv), $ESPHOME_CANOPEN_HUB (default this repo's
+components/); the tests are skipped without them.
 """
 
 import importlib.util
@@ -19,7 +19,7 @@ import yaml
 
 REPO = Path(__file__).parent.parent
 MAPPER = REPO / "components" / "canopen_entities"
-VENV = Path(os.environ.get("ESPHOME_UPSTREAM_VENV", Path.home() / "repos" / "esphome-upstream-venv"))
+VENV = Path(os.environ.get("ESPHOME_UPSTREAM_VENV", REPO.parent / "esphome" / "venv"))
 # the hub: this repo's copy (scripts/sync_hub.py), or another checkout's components directory
 HUB = Path(os.environ.get("ESPHOME_CANOPEN_HUB", REPO / "components"))
 ESPHOME = VENV / "bin" / "esphome"

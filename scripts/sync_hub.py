@@ -6,7 +6,7 @@ This repo ships a copy so users need one external_components source. The copy is
 working tree, and components/canopen/SYNCED_FROM records that commit and a digest of the files; test/test_hub_copy.py
 fails if the copy differs from it.
 
-Usage: scripts/sync_hub.py [--repo ~/repos/esphome] [--ref canopen-full] [--worktree]
+Usage: scripts/sync_hub.py [--repo ../esphome] [--ref canopen-full] [--worktree]
 
 --worktree copies the fork's working tree instead (uncommitted hub changes, e.g. for a hardware test); the copy is
 then marked as such, and test_hub_copy.py fails until the hub is committed and synced from a commit.
@@ -72,7 +72,7 @@ def main() -> int:
     parser.add_argument(
         "--repo",
         type=Path,
-        default=Path.home() / "repos" / "esphome",
+        default=ROOT.parent / "esphome",
         help="ESPHome fork checkout",
     )
     parser.add_argument(

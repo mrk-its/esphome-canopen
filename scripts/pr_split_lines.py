@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Non-blank lines of the upstream `canopen` hub per planned upstream PR (docs/canopennode.md, "New split").
 
-Usage: scripts/pr_split_lines.py [path to esphome/components/canopen]   (default: ~/repos/esphome, branch canopen-full)
+Usage: scripts/pr_split_lines.py [path to esphome/components/canopen]   (default: ../esphome, branch canopen-full)
        scripts/pr_split_lines.py --annotate FILE                        (print FILE with the PR of every line)
 
 Lines are classified by markers, not line numbers, so the script keeps working while the files change:
@@ -383,7 +383,10 @@ def main() -> None:
             print(f"{pr if line.strip() else ' '} | {line}")
         return
     root = Path(
-        args[0] if args else Path.home() / "repos/esphome/esphome/components/canopen"
+        args[0]
+        if args
+        else Path(__file__).resolve().parent.parent.parent
+        / "esphome/esphome/components/canopen"
     )
     files = sorted(
         p

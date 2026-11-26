@@ -2,7 +2,7 @@
 # dimmer4's light5 ("biuro", node 0x37) by reading its state 0x2051:1 and writing the opposite to its command 0x2052:1
 # (canopen.sdo_read / canopen.sdo_write). The green LED blinks on CAN traffic.
 # The hub comes from a worktree of branch canopen-pr1-sdo-client next to this repo, canbus from canopen-full:
-#   git -C ~/repos/esphome worktree add --detach ~/repos/esphome-pr1 canopen-pr1-sdo-client
+#   git -C ../esphome worktree add --detach ../esphome-pr1 canopen-pr1-sdo-client
 # Build with the esphomeplatformzephyr venv:
 #   ../esphomeplatformzephyr/venv/bin/esphome compile test/stm32l4_biuro_switch_sdo_client.yaml
 # Not a CANopen node, so no CAN OTA from this image. It can be installed over CAN by a node image (e.g.

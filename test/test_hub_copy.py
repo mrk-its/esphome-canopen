@@ -1,5 +1,5 @@
 """components/canopen is a copy of the hub (scripts/sync_hub.py): it must match what SYNCED_FROM records (run: pytest
-test/). Edits belong in the ESPHome fork (~/repos/esphome, canopen-full), followed by a re-sync."""
+test/). Edits belong in the ESPHome fork (../esphome, canopen-full), followed by a re-sync."""
 
 import importlib.util
 import os
@@ -15,7 +15,7 @@ _spec = importlib.util.spec_from_file_location(
 sync_hub = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(sync_hub)
 
-FORK = Path(os.environ.get("ESPHOME_FORK", Path.home() / "repos" / "esphome"))
+FORK = Path(os.environ.get("ESPHOME_FORK", ROOT.parent / "esphome"))
 
 
 def test_copy_unmodified():

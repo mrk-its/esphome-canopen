@@ -2,7 +2,7 @@
 
 ESPHome external component `canopen_entities` (`components/canopen_entities`), exposing ESPHome entities over
 CANopen, plus CAN OTA and remote logs. It sits on the `canopen` hub (generic CiA 301 on CANopenNode, going upstream;
-developed in `~/repos/esphome`, branch `canopen-full`; this repo ships a generated copy in `components/canopen`, see
+developed in `../esphome`, branch `canopen-full`; this repo ships a generated copy in `components/canopen`, see
 "Layout"). The host side is
 [can2mqtt](https://github.com/mrk-its/can2mqtt) (MQTT/Home Assistant bridge, also the OTA uploader).
 OD layout for entities: see OBJECT_DICTIONARY.md.
@@ -10,37 +10,39 @@ The old component (on canopen-stack) is only on `main` (there as `components/can
 `canopen_entities`, 2026-11-01); nodes still running it interoperate (same OD, `remote.py` reads their YAML).
 User docs: README.md is the overview / quick start only; the option reference lives in `docs/configuration.md`,
 `docs/linking-nodes.md`, `docs/ota.md`, `docs/remote-logs.md`, old -> new in `docs/migration.md`. Document new options
-there. The hub's own options are documented in esphome-docs (`~/repos/esphome-docs`, branch `canopen-full`); the user
+there. The hub's own options are documented in esphome-docs (`../esphome-docs`, branch `canopen-full`); the user
 docs link its `canopen.mdx` on GitHub. Users load both components from this repo (one `external_components` entry).
 Port to CANopenNode (replacing canopen-stack), in progress: plan and handoff state in `docs/canopennode.md`,
 current step in `docs/device_api_canopennode.md` (step 1: `docs/minimal_canopennode.md`, done; step 3:
 `docs/sdo_server_canopennode.md`). Upstream PRs 1-3 as built and tested: `docs/upstream_prs_1-3.md`. Hub PRs 7+
-(generic CiA 301 for `canopen_entities`) are developed on branch `canopen-next` in `~/repos/esphome`
+(generic CiA 301 for `canopen_entities`) are developed on branch `canopen-next` in `../esphome`
 ("Hub for the entity mapper" in `docs/canopennode.md`; PRs 7-12 (SDO server, OD API, own PDOs, store/restore,
 loopback between local nodes, SDO block transfer) done).
 Upstream PRs are being re-split (the old `canopen-1..4` branches are deleted, `docs/upstream_prs_1-3.md` is superseded): the hub
-refactored by feature on branch `canopen-full` in `~/repos/esphome`, the file -> PR map, line counts and cutting
+refactored by feature on branch `canopen-full` in `../esphome`, the file -> PR map, line counts and cutting
 steps in `docs/canopennode.md`, "Upstream PRs" -> "SDO client only first" (the current split; "New split" holds the
 refactor and the cutting steps); per-PR line counts with `scripts/pr_split_lines.py`.
 Current split (2026-11-05, "SDO client only first", 8 PRs): PR 1 = the hub without `node_id` (the SDO client,
 `sdo_read` / `sdo_write`), PR 2 raw frames + heartbeat / EMCY triggers, PR 3 the node core (`USE_CANOPEN_NODE`) +
 loopback. PR 1 (esphome/esphome#22410, cut on `canopen-pr1-sdo-client`) is **merged upstream** (2026-11-24,
-squash `206bb68485`); its docs PR esphome/esphome.io#8059 is merged too (2026-11-25, squash `d3f9241e3` on `next`). `canopen-full` in `~/repos/esphome` is rebuilt
+squash `206bb68485`); its docs PR esphome/esphome.io#8059 is merged too (2026-11-25, squash `d3f9241e3` on `next`). `canopen-full` in `../esphome` is rebuilt
 on `upstream/dev` as one commit "PRs 3-8 on top of PR 2 (to be split)" (`f0e18d854d`, 2026-11-25), plus the PR 3
 cut's fixes, the Copilot review fixes of #23299 and bdraco's 6 PR 3 commits ported back (`e8c940ed02`); the history before, with bdraco's PR 2 review commits ported, is
 `canopen-full-backup3` (pushed; older: `canopen-full-backup2`). PR 2 (esphome/esphome#23266, cut on
 `canopen-pr2-frames`) is **merged upstream** (2026-11-25, squash `29f8ea8e39`, identical to the cut head
 `79dc2e5ede`); its docs PR esphome/esphome.io#8243 is merged too (2026-11-25, squash `67bb87134` on `next`, with a
-paragraph by bdraco on the frame listener's callback and `context`). PR 3 (the node core + loopback) is open upstream:
-esphome/esphome#23299 (2026-11-25, cut on `canopen-pr3-node`; both Copilot rounds answered, bdraco's commits on top,
-head `9e7687e388`, tested on his hardware, esphbot "ready to merge", waiting for a maintainer); its docs PR is
+paragraph by bdraco on the frame listener's callback and `context`). PR 3 (the node core + loopback,
+esphome/esphome#23299, cut on `canopen-pr3-node`, head `9e7687e388`) is **merged upstream** (2026-11-26, squash
+`e187cf0e5d`, same canopen tree as the cut head); its docs PR is
 esphome/esphome.io#8254 (esphome-docs branch `canopen-pr3-node`, rebased on `next`; the pre-rebase branch is
 `backup/canopen-pr3-node-pre-rebase`; the fork PR mrk-its/esphome-docs#1 is closed) (`docs/canopennode.md`,
 "PR 3 as cut"). PR 4 (node monitoring + NMT master, plus the local frame queue and the heartbeat consumer only when
-used) is cut locally on `canopen-pr4-monitor-nmt` (`c723acee71`, on `canopen-pr3-node`; builds and clang-tidy clean),
-its docs on esphome-docs `canopen-pr4-monitor-nmt` (`90d041b15`, on `canopen-pr3-node`), to be rebased on `dev` /
-`next` and opened once #23299 is merged (`docs/canopennode.md`, "PR 4 as cut", with the open steps). The cut's history and test
-results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then into the open PR's cut. Before work in `~/repos/esphome` or `~/repos/esphome-docs`, read their AGENTS.md / CLAUDE.md
+used) is open upstream: esphome/esphome#23327 (2026-11-26, `canopen-pr4-monitor-nmt`, rebased on `dev`
+`6f7cd90870`, pushed to mrk-its; Copilot / esphbot review fixes on top, head `eff62bc872`, Copilot #1 and #11 still
+open); its docs on esphome-docs `canopen-pr4-monitor-nmt` (`93bdec276`, on
+`canopen-pr3-node`), to be rebased on `next` and opened once #8254 is merged, then linked in #23327's description
+(`docs/canopennode.md`, "PR 4 as cut", with the open steps). The cut's history and test
+results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then into the open PR's cut. Before work in `../esphome` or `../esphome-docs`, read their AGENTS.md / CLAUDE.md
 (conventions, `node script/lint.mjs` for the docs).
 OTA in the hub on CiA 302-3 program download objects (`0x1F50`/`0x1F51`/`0x1F56`/`0x1F57`) instead of the mapper's `0x3000`:
 `docs/canopen_ota.md`. Implemented on `canopen-full` and in can2mqtt `dev`, tested over CAN on the nucleo only; the mapper's
@@ -88,7 +90,7 @@ OTA stays until the rest is tested. OTA is PR 8 of the current split (`canopen_o
 the cover moves while held, last press wins, the stop goes out twice. New button kinds go here, not into
 canopen_entities.
 `components/canopen/`: **a generated copy of the hub, never edit it here.** The hub is developed and tested in
-`~/repos/esphome` (branch `canopen-full`, pushed to mrk-its/esphome), from where the upstream PRs are cut.
+`../esphome` (branch `canopen-full`, pushed to mrk-its/esphome), from where the upstream PRs are cut.
 `scripts/sync_hub.py` copies `esphome/components/canopen` from a commit (`--ref`, default `canopen-full`) and writes
 `components/canopen/SYNCED_FROM` (commit, digest); `test/test_hub_copy.py` fails if the copy was edited, differs from
 that commit, or was synced with `--worktree` (the fork's uncommitted state, for a hardware test of hub changes before
@@ -97,7 +99,7 @@ full hub is in an ESPHome release. CANopenNode is pinned in the hub (`CANOPENNOD
 of the fork's `esphome` branch: `library.json` (upstream PR #664), the SDO block size patch and the port header
 `CO_driver_target.h` (in the fork since 2026-11-01, for clang-tidy); pin the commit, not the branch; bump it after
 pushing the fork, in both places: `CANOPENNODE_SOURCE` and the CANopenNode line of `platformio.ini` `lib_deps_base` in
-`~/repos/esphome` (the clang-tidy setup, on `canopen-full`); for a local CANopenNode checkout, point the version at it
+`../esphome` (the clang-tidy setup, on `canopen-full`); for a local CANopenNode checkout, point the version at it
 temporarily (the `canopennode_path:` option was dropped 2026-11-25: nothing used it).
 
 ## CAN OTA flow
@@ -136,7 +138,7 @@ temporarily (the `canopennode_path:` option was dropped 2026-11-25: nothing used
   `esphome.components.zephyr.mcuboot`) are imported in `try/except ImportError` or lazily; use
   `getattr(CORE, "is_zephyr", False)` / `is_stm32`.
 - The hub targets ESPHome `dev`, which the esphomeplatformzephyr fork lags behind: its working tree in
-  `~/repos/esphomeplatformzephyr` carries two uncommitted additions the hub copy needs (2026-11-25, until `dev` is merged
+  `../esphomeplatformzephyr` carries two uncommitted additions the hub copy needs (2026-11-25, until `dev` is merged
   into the fork): `CONF_HARDWARE_VERSION` in `esphome/components/const/__init__.py` (#23300) and
   `bool rx_capped() const { return false; }` in `esphome/components/canbus/canbus.h` (PR 1's `canbus` API). The zrodlana
   venv is an editable install of that tree. Keep them when switching branches there.
@@ -162,14 +164,15 @@ temporarily (the `canopennode_path:` option was dropped 2026-11-25: nothing used
   `components/canopen_entities/log_buffer.cpp` with stub headers (`test/logs/stubs/`) and runs it (ASan/UBSan if
   available). `test/test_canopen_entities.py` runs codegen / validation through the upstream venv with the hub copy
   in `components/` (`$ESPHOME_UPSTREAM_VENV`, `$ESPHOME_CANOPEN_HUB` for another hub; skipped without the venv).
-  `test/test_hub_copy.py` checks the hub copy (see "Layout"; `$ESPHOME_FORK`, default `~/repos/esphome`). `test/remote_node.yaml`
+  `test/test_hub_copy.py` checks the hub copy (see "Layout"; `$ESPHOME_FORK`, default `../esphome`). `test/remote_node.yaml`
   is a node in the old component's format, the fixture of `test_mapper_remote.py`. pytest is in the
-  esphomeplatformzephyr venv.
-- The hub's own tests are in `~/repos/esphome`: `script/cpp_unit_test.py canopen`,
-  `script/test_build_components.py -c canopen -t <target>` (see `docs/canopennode.md`).
-- Upstream ESPHome (`dev` from GitHub) venv: `~/repos/esphome-upstream-venv` (update with
-  `bin/pip install --force-reinstall --no-deps "esphome @ git+https://github.com/esphome/esphome@dev"`; a plain `-U` does
-  nothing while `dev` keeps the same version string). Use it, not the esphomeplatformzephyr
+  esphomeplatformzephyr venv and the upstream venv.
+- The hub's own tests are in `../esphome`: `script/cpp_unit_test.py canopen`,
+  `script/test_build_components.py -c canopen -t <target>` (see `docs/canopennode.md`), with the upstream venv; for a
+  worktree, set `PYTHONPATH` to it (the venv's install points at the `../esphome` checkout).
+- Upstream ESPHome venv: `../esphome/venv` (made by `script/setup` there): an editable install of the `../esphome`
+  checkout, so it is upstream `dev` while that checkout is on `dev` (tracks `upstream/dev`; update with
+  `git -C ../esphome pull`). Use it, not the esphomeplatformzephyr
   venv, to check upstream compatibility (the fork may carry APIs upstream doesn't have). Upstream PRs target `dev`,
   so the hub may use APIs newer than the last release (e.g. `canbus::send_data(..., data, len)`, in `dev` but not in
   2026.9.x).
