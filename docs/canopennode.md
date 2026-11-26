@@ -1149,8 +1149,9 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
 - **Next: docs.** (1) Once esphome/esphome.io#8254 (PR 3's docs) is merged: rebase the docs branch onto `next`
   (`git rebase --onto <esphome.io next> canopen-pr3-node`; `../esphome-docs` has only the mrk-its remote, add
   `esphome/esphome.io` to fetch `next`), open the docs PR (the user may need to run `gh pr create` for esphome.io: the
-  permission check blocked it once), link it in #23327's description. (2) Port the docs back to esphome-docs
-  `canopen-full` (diverged, still the pre-rebase text), including `93bdec276`. (3) Any fix of #1 / #11 that changes
+  permission check blocked it once), link it in #23327's description. (2) ~~Port the docs back to esphome-docs `canopen-full`~~ done 2026-11-26: `83f007e3b` = PR 4's docs text
+  (`283659d98`) plus the full-only parts (`sdo_block_size`, the PDO rows of the OD table and "PDOs"; OTA was never
+  documented there), on top of the old branch (fast-forward). (3) Any fix of #1 / #11 that changes
   behaviour goes into the docs branch too.
 - **Flow for each fix** (as done for the review): commit on `canopen-full` first, run `script/cpp_unit_test.py canopen`
   and `pytest tests/component_tests/canopen` there, check the new test fails without the fix; cherry-pick onto
