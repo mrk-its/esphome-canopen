@@ -1133,6 +1133,11 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   in `canopen-full` `46701e9716`, cut `7c02552a66`: stage first, then `deliver_local_()`, then the frame. Test
   `LocalPair.ReplyToAnOlderLocalFrameAfterTheBusFrame` (fails on the old code); 175 / 138 C++ + 56 Python (cut) pass.
   Answered in a PR comment (#issuecomment-7204973518).
+- **Copilot round 5 (review on `7c02552a66`, summary only, "Needs a closer look", no open issues)**: NMT command
+  ordering and the reset-transmission timing flagged for human assessment; the one concrete point: the case-3 stderr
+  check of `ResetNodeRebootsAfterItsFrame` also matched the driver's refused retries (`FakeCanbus::on_send` runs
+  before the frame is taken or refused). The exit code already caught a missing hand-over; the message now only for
+  `!bus.busy`. `canopen-full` `0c71d64999`, cut `33c31e3bab` (pushed 2026-11-27); 175 / 138 C++ pass.
 - **Copilot #1** (thread 4705205472, = esphbot 6; and round 2's 4712656233): a templated `canopen.nmt` node_id is cut
   to `uint8_t`, so 256 becomes 0 = all nodes. **Decided (2026-11-26): no code change.** `uint8_t` is the node-id type
   across the hub's API (`read_sdo()`, `write_sdo()`, `monitor_node()`, the SDO actions); node id 0 stays a valid
