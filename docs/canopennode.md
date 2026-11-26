@@ -999,7 +999,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   `next`), after bdraco merged `next` into the branch and added a paragraph on the frame listener's plain-function
   callback and `context` lifetime (`26969462c`).
 
-#### PR 4 as cut (2026-11-26, not opened yet)
+#### PR 4 as cut (2026-11-26, esphome/esphome#23327)
 - **Why now:** PR 3 (#23299) is close to merge; PR 4 is prepared so it can go up right after (a PR opened before would
   carry PR 3's commits). Two items deferred in PR 3's review land here.
 - **On `canopen-full`** (local, NOT pushed yet), on top of `e8c940ed02`:
@@ -1049,11 +1049,36 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   `CO_CANsend()` queues), "Several Nodes": monitoring / NMT between local nodes, the local queue (next loop pass, bus
   order, 16 frames, the rest lost + warning). `node script/lint.mjs` passes; the examples pass `esphome config` and
   compile (esp32-idf, `PYTHONPATH` = the PR 4 worktree).
-- **Open steps:** (1) both PR 4 branches are pushed to the forks (2026-11-26; force-push after the rebase). (2) When #23299 is
-  merged: rebase the cut onto `dev` (`git rebase --onto upstream/dev canopen-pr3-node canopen-pr4-monitor-nmt` style;
-  PR 3 is squashed), rebase the docs branch onto `next` once #8254 is merged (`--onto origin/next canopen-pr3-node`),
-  re-run the checks, open both PRs (the user may need to run `gh pr create` for esphome.io: the permission check
-  blocked it once). (3) Port the docs back to esphome-docs `canopen-full` (diverged, still the pre-rebase text).
+- **Rebased and opened (2026-11-26):** #23299 merged (squash `e187cf0e5d`, canopen tree identical to its head
+  `9e7687e388`; no other `dev` commit touched canopen / canbus / const). `git rebase --onto upstream/dev
+  origin/canopen-pr3-node`: clean, `3f4b44effe` on `dev` `6f7cd90870`, `range-diff` identical to `c723acee71`;
+  force-pushed to mrk-its. Re-run: 123 C++ + 38 Python tests, `esphome config` and builds esp8266-ard / esp32-idf /
+  rp2040-ard (only ESP-IDF's legacy TWAI notice); clang-tidy not re-run (same code). esphome-canopen pytest (97)
+  with `../esphome/venv`. Opened as esphome/esphome#23327 without the docs link.
+- **Review (2026-11-26):** Copilot (11 comments) and esphbot (changes requested; its points overlap Copilot's, plus
+  `on_node_event` without `heartbeat_clients` never firing). Fixed (pushed to mrk-its 2026-11-26: `canopen-full` `67611e6c23`, cut `4f80eb3f9c`; hub synced here): Copilot #4
+  (`queue_local_()` uses `enable_loop_soon_any_context()`: `enable_loop()` logs at VV and is meant for the component's
+  own context) = `canopen-full` `84546abfad`, cut `c86306677f`; Copilot #3, #5a, #6, #7, #8, #9, #10 =
+  `canopen-full` `edbb935c3f`, cut `2eee1b96d9`: `send_nmt()` refuses (and logs) a command while `NMT_TXbuff` is full
+  or, for us / all, while `internalCommand` is pending, logs refused / failed commands; 0x1016 `ODA_SDO_R`;
+  `monitor_node()` ignores id 0 / > 127 / own / timeout 0; `init_node_monitor_()` sets
+  `HBcons->NMTisPreOrOperationalPrev = true` (the first `CO_process()` otherwise clears a heartbeat / boot-up received
+  before it); `on_frame_()` calls `deliver_local_()` first. 5 new tests, each fails without its fix (the busy-buffer
+  one reboots: the "rejected" broadcast reset_node got applied). 165 / 128 C++ + 38 Python tests pass; no builds or
+  clang-tidy yet. Copilot #5b = `canopen-full` `8fad14a320`, cut `07ab44bad3` (conflict with the PDO lines resolved):
+  on `CO_RESET_APP` `process_node_()` sets `reset_pending_` and reboots once `CANtxCount == 0` (loop() flushes before
+  it processes the node) or after `RESET_FLUSH_TIMEOUT_MS` (100); test `ResetNodeRebootsAfterItsFrame` runs each case
+  in an `EXPECT_EXIT` child (the host's `safe_reboot()` is `exit(0)`, which the runner would take as a pass), fails
+  without the fix. 166 / 129 C++ tests pass. esphbot 8 = `canopen-full` `67611e6c23`, cut `4f80eb3f9c`: warning
+  "canopen <id>: on_node_event never fires, no node is monitored" from `_final_build_flags` (FINAL, so components
+  enabling the monitor count), test `test_node_event_without_monitored_nodes` (config `node_event_unmonitored.yaml`);
+  49 / 40 Python tests pass. Commits in the cut worktree need `../esphome/venv/bin` on `PATH` (pre-commit's pylint).
+  Still open: #1, #2 (= esphbot 3, `nmt_master: true`?), #11. The local `canopen-full`
+  branch had been deleted from `../esphome`; recreated from `origin/canopen-full` in a scratchpad worktree.
+- **Open steps:** (1) rebase the docs branch onto `next` once #8254 is merged (`--onto <esphome.io next>
+  canopen-pr3-node`; `../esphome-docs` has only the mrk-its remote), open it (the user may need to run `gh pr create`
+  for esphome.io: the permission check blocked it once), link it in #23327's description. (2) Port the docs back to
+  esphome-docs `canopen-full` (diverged, still the pre-rebase text).
 - Worktrees (may be gone after a reboot: scratchpad): `full-wt` = `canopen-full`, `pr3` = `canopen-pr3-node`, `pr4` =
   `canopen-pr4-monitor-nmt`, `docs-pr3` = esphome-docs `canopen-pr3-node`, `docs-pr4` = esphome-docs `canopen-pr4-monitor-nmt`; the branches are in `~/repos/esphome` /
   `~/repos/esphome-docs`.
