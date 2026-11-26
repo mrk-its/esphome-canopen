@@ -1002,7 +1002,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
 #### PR 4 as cut (2026-11-26, esphome/esphome#23327)
 - **Why now:** PR 3 (#23299) is close to merge; PR 4 is prepared so it can go up right after (a PR opened before would
   carry PR 3's commits). Two items deferred in PR 3's review land here.
-- **On `canopen-full`** (local, NOT pushed yet), on top of `e8c940ed02`:
+- **On `canopen-full`** (pushed), on top of `e8c940ed02`:
   - `02454e52f3` frames between local nodes go through a per-receiver queue: `FixedRingBuffer<LocalFrame, 16>`
     (`local_queue_`, allocated in `setup()` only with local peers), filled by the sender's `transmit()`
     (`queue_local_()`, no logging), emptied at the start of the receiver's `loop()` (`deliver_local_()`), each frame
@@ -1079,15 +1079,53 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   rejection; a lambda-only `send_nmt()` builds on ESP8266 with it and fails without. Docs: esphome-docs
   `canopen-pr4-monitor-nmt` `93bdec276` (pushed over SSH: `origin` there is HTTPS without credentials): `nmt_master`,
   0x1016 read only, `send_nmt()` false cases, `reset_node` to all restarts us once sent. #2 thread replied and resolved,
-  esphbot 3 answered in a PR comment. Still open: #1, #11. The local `canopen-full`
-  branch had been deleted from `../esphome`; recreated from `origin/canopen-full` in a scratchpad worktree.
-- **Open steps:** (1) rebase the docs branch onto `next` once #8254 is merged (`--onto <esphome.io next>
-  canopen-pr3-node`; `../esphome-docs` has only the mrk-its remote), open it (the user may need to run `gh pr create`
-  for esphome.io: the permission check blocked it once), link it in #23327's description. (2) Port the docs back to
-  esphome-docs `canopen-full` (diverged, still the pre-rebase text).
-- Worktrees (may be gone after a reboot: scratchpad): `full-wt` = `canopen-full`, `pr3` = `canopen-pr3-node`, `pr4` =
-  `canopen-pr4-monitor-nmt`, `docs-pr3` = esphome-docs `canopen-pr3-node`, `docs-pr4` = esphome-docs `canopen-pr4-monitor-nmt`; the branches are in `~/repos/esphome` /
-  `~/repos/esphome-docs`.
+  esphbot 3 answered in a PR comment. Still open: #1, #11 (see "Next" below).
+- **State at the end of 2026-11-26 (handoff to another machine).** Everything is committed and pushed:
+  - mrk-its/esphome `canopen-full` = `8cf24cb83f`; `canopen-pr4-monitor-nmt` (= #23327's head) = `eff62bc872`
+    (`3f4b44effe` + 6 review-fix commits; upstream squashes). #23327 CI: 79 checks pass, 7 skipped (builds and
+    clang-tidy included), after the last push.
+  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `93bdec276` (on `canopen-pr3-node`); the docs PR isn't opened.
+  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `8cf24cb83f` (`test_hub_copy.py` passes).
+  - Review: 9 of Copilot's 11 threads replied and resolved; esphbot's points answered in two PR comments
+    (#issuecomment-7198868548, -7199214927). No human review yet. Unresolved threads: #1 and #11 (no reply on them).
+- **Next: Copilot #1** (thread 4705205472, = esphbot 6): a templated `canopen.nmt` node_id is cut to `uint8_t` (the
+  action's lambda is generated returning `cg.uint8`), so 256 becomes 0 = all nodes. Proposed (not decided by the
+  user): action arg `(CONF_NODE_ID, cg.int32)`, `bool send_nmt(int32_t node_id, ...)` refusing `< 0 || > 127` with the
+  warning, cast to `uint8_t` only for `CO_NMT_sendCommand()`; tests: `send_nmt(256 / -1)` refused, nothing sent;
+  codegen check of the lambda's return type. Trade-off: other node-id parameters (`read_sdo`, `monitor_node`) stay
+  `uint8_t`; the SDO actions narrow the same way (merged PR 1; a separate PR if wanted). Alternatives: a public
+  `send_nmt_checked()` for codegen (clutter), or a reply only (weak: 0 hits every node).
+- **Next: Copilot #11** (thread 4705205903): CANopenNode's consumer calls the started / remote-reset / timeout
+  callbacks before it stores `HBstate` / `NMTstate` (`301/CO_HBconsumer.c` lines 340/344, 326/333, 360/365-366; the
+  NMT-changed one after), so an `on_node_event` automation querying `is_node_online()` / `get_node_state()` sees the
+  old state (ONLINE: false / UNKNOWN; OFFLINE: true / last state; RESET: still online). The event's arguments are
+  right. Proposed fix: the static `on_hb_*` callbacks only push `{node_id, event, state}` into a member vector
+  (reserved in `setup()`, 2 per monitored node), `process_node_()` dispatches them via `node_event_()` after
+  `CO_process()` returns (under `USE_CANOPEN_NODE_MONITOR`); user callbacks then also no longer run inside CANopenNode's
+  processing. Test: a callback recording `is_node_online()` / `get_node_state()` for ONLINE / OFFLINE / RESET (fails
+  now). Then reply on the thread and resolve it.
+- **Next: docs.** (1) Once esphome/esphome.io#8254 (PR 3's docs) is merged: rebase the docs branch onto `next`
+  (`git rebase --onto <esphome.io next> canopen-pr3-node`; `../esphome-docs` has only the mrk-its remote, add
+  `esphome/esphome.io` to fetch `next`), open the docs PR (the user may need to run `gh pr create` for esphome.io: the
+  permission check blocked it once), link it in #23327's description. (2) Port the docs back to esphome-docs
+  `canopen-full` (diverged, still the pre-rebase text), including `93bdec276`. (3) Any fix of #1 / #11 that changes
+  behaviour goes into the docs branch too.
+- **Flow for each fix** (as done for the review): commit on `canopen-full` first, run `script/cpp_unit_test.py canopen`
+  and `pytest tests/component_tests/canopen` there, check the new test fails without the fix; cherry-pick onto
+  `canopen-pr4-monitor-nmt` (conflicts are lines of PRs 5-8: PDO, `sdo_block_size`, `register_node`, OTA; the cut's
+  plain node config is `node.yaml`, not `no_ota.yaml`), run the tests there; push both to mrk-its; `scripts/sync_hub.py`
+  here, `pytest test/`, commit and push; reply on the thread and resolve it (GraphQL `resolveReviewThread`).
+- **Setting up a machine** (sibling checkouts of esphome-canopen): `../esphome` (mrk-its/esphome, remote `upstream` =
+  esphome/esphome; `script/setup` makes `../esphome/venv`, an editable install of that checkout), `../esphome-docs`
+  (mrk-its/esphome-docs), `../CANopenNode` (the fork, for reading the library). Worktrees for the branches, e.g.
+  `git -C ../esphome worktree add --track -b canopen-full <dir>/full-wt origin/canopen-full` and the same for
+  `canopen-pr4-monitor-nmt`; esphome-docs `canopen-pr4-monitor-nmt` likewise (`npm ci` in that worktree before
+  `node script/lint.mjs`). Run the fork's tests with `PYTHONPATH=<worktree> ../esphome/venv/bin/python
+  script/cpp_unit_test.py canopen` (and `-m pytest tests/component_tests/canopen`); for commits there put
+  `../esphome/venv/bin` on `PATH` (pre-commit's pylint and clang-format). The unit-test binary ignores
+  `--gtest_filter`; use `GTEST_FILTER=... <build>/.pioenvs/cpptests-*/program`. Builds / clang-tidy outside `/tmp`
+  (`PLATFORMIO_WORKSPACE_DIR=~/.cache/esphome-tidy-pio/<wt>`). Pushing esphome-docs over HTTPS failed without
+  credentials here: push to `git@github.com:mrk-its/esphome-docs.git`.
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
