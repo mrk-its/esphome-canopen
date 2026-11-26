@@ -1081,12 +1081,12 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   0x1016 read only, `send_nmt()` false cases, `reset_node` to all restarts us once sent. #2 thread replied and resolved,
   esphbot 3 answered in a PR comment. Still open: #11 (see "Next" below); #1 answered without a code change.
 - **State at the end of 2026-11-26 (handoff to another machine).** Everything is committed and pushed:
-  - mrk-its/esphome `canopen-full` = `023b09c800`; `canopen-pr4-monitor-nmt` (= #23327's head) = `72a14b41f7`
-    (`3f4b44effe` + 9 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
+  - mrk-its/esphome `canopen-full` = `ff573b5fe0`; `canopen-pr4-monitor-nmt` (= #23327's head) = `7cc83fcc04`
+    (`3f4b44effe` + 10 review-fix commits; upstream squashes). Size: +588 / -31 code, +800 / -4 tests. #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
     (builds and clang-tidy included); not checked after `b777e48bcd`.
-  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `a83ce19bc` (on `canopen-pr3-node`; + "NMT commands for this node
-    apply right away"); the docs PR isn't opened.
-  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `023b09c800` (`test_hub_copy.py` passes).
+  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `ab09b70f7` (on `canopen-pr3-node`; + "NMT commands for this node
+    apply right away", + "Local nodes keep the bus order with frames from the bus"); the docs PR isn't opened.
+  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `ff573b5fe0` (`test_hub_copy.py` passes).
   - Review: 9 of Copilot's 11 threads replied and resolved; esphbot's points answered in two PR comments
     (#issuecomment-7198868548, -7199214927). No human review yet. #1 answered and resolved, #11 fixed and resolved (see below).
   - Copilot round 2 (on `eff62bc872`, 5 comments). Done: 4712656148 (`CANtxCount == 0` means the driver accepted the
@@ -1105,11 +1105,16 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
       queued buffer once. Tests `NmtForUsTest.*` (4) and `CanopenNmtMaster.CommandFromInsideItsOwnSend`, all fail on the
       old code (`SecondCommandForUsBeforeProcessing` replaced); 171 / 134 C++ + 52 / 43 Python pass; no builds /
       clang-tidy. Docs updated (`set_nmt_state()` / `send_nmt()` comments). Replied and resolved.
-    - Open, no reply yet: 4712656195 (`driver_can.cpp:37`): `Canbus::loop()` calls the hubs' frame callbacks one
-      after another, so a reply A sends while handling a bus frame is queued for B before B gets that bus frame; B's
-      `on_frame_()` then drains the reply first. Suggested fix: one canbus callback per local ring (its head) queues
-      each bus frame for all local nodes, then lets each drain; needs a head flag from codegen, the head registering
-      even when its own setup failed, bus frames through `local_queue_` (droppable when full). Not decided.
+    - 4712656195 (`driver_can.cpp:37`, a reply A sends while handling a bus frame reached local node B before that bus
+      frame): **done (2026-11-26)**, `canopen-full` `ff573b5fe0`, cut `7cc83fcc04` ("option B"). The local node whose
+      canbus callback runs first for a bus frame queues it for the other local nodes (`stage_bus_frame_()`, sets their
+      `bus_frame_staged_`) before it handles it; their callbacks then only drain their queue. Relies on
+      `Canbus::loop()` calling all callbacks for a frame before reading the next, and on the queue being allocated
+      right before the callback is registered. The flag is set even on a full queue (no double staging); a bus frame
+      on a full queue is lost for that node. Tests `LocalPair.ReplyAfterTheBusFrame`, `LocalPair.BusFrameOnAFullQueue`
+      (both fail on the old code; the second because bus frames were never dropped before);
+      `LocalFramesBeforeALaterBusFrame` now goes through `bus.loop()`. 173 / 136 C++ + 52 / 43 Python pass; no builds
+      / clang-tidy. Docs ("Several Nodes") updated. Replied and resolved: no open review threads left.
 - **Copilot #1** (thread 4705205472, = esphbot 6; and round 2's 4712656233): a templated `canopen.nmt` node_id is cut
   to `uint8_t`, so 256 becomes 0 = all nodes. **Decided (2026-11-26): no code change.** `uint8_t` is the node-id type
   across the hub's API (`read_sdo()`, `write_sdo()`, `monitor_node()`, the SDO actions); node id 0 stays a valid
