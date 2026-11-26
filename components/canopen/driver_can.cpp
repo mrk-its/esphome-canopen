@@ -33,6 +33,8 @@ void CANopenComponent::on_frame_(const canbus::CanFrame &frame) {
   const uint8_t len = frame.payload_length();
   if (frame.use_extended_id || len > 8)
     return;
+  // frames other local nodes sent before are older: they go first
+  this->deliver_local_();
   this->handle_frame_((frame.can_id & 0x7FF) | (frame.remote_transmission_request ? 0x800 : 0), frame.data, len);
 }
 
@@ -98,7 +100,8 @@ void CANopenComponent::queue_local_(uint16_t ident, const uint8_t *data, uint8_t
     this->local_dropped_++;
     return;
   }
-  this->enable_loop();
+  // enable_loop() may log (and is meant for a component's own context): only set the flag, the next pass enables it
+  this->enable_loop_soon_any_context();
 }
 
 void CANopenComponent::deliver_local_() {
