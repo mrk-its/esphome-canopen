@@ -1081,12 +1081,12 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   0x1016 read only, `send_nmt()` false cases, `reset_node` to all restarts us once sent. #2 thread replied and resolved,
   esphbot 3 answered in a PR comment. Still open: #11 (see "Next" below); #1 answered without a code change.
 - **State at the end of 2026-11-26 (handoff to another machine).** Everything is committed and pushed:
-  - mrk-its/esphome `canopen-full` = `ff573b5fe0`; `canopen-pr4-monitor-nmt` (= #23327's head) = `7cc83fcc04`
-    (`3f4b44effe` + 10 review-fix commits; upstream squashes). Size: +588 / -31 code, +800 / -4 tests. #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
+  - mrk-its/esphome `canopen-full` = `1e8e9d9b7f`; `canopen-pr4-monitor-nmt` (= #23327's head) = `b27f89fefa`
+    (`3f4b44effe` + 11 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
     (builds and clang-tidy included); not checked after `b777e48bcd`.
   - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `ab09b70f7` (on `canopen-pr3-node`; + "NMT commands for this node
     apply right away", + "Local nodes keep the bus order with frames from the bus"); the docs PR isn't opened.
-  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `ff573b5fe0` (`test_hub_copy.py` passes).
+  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `1e8e9d9b7f` (`test_hub_copy.py` passes).
   - Review: 9 of Copilot's 11 threads replied and resolved; esphbot's points answered in three PR comments
     (#issuecomment-7198868548, -7199214927, -7203675630 = point 6, `uint8_t` kept). No human review yet. #1 answered and resolved, #11 fixed and resolved (see below).
   - Copilot round 2 (on `eff62bc872`, 5 comments). Done: 4712656148 (`CANtxCount == 0` means the driver accepted the
@@ -1115,6 +1115,18 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
       (both fail on the old code; the second because bus frames were never dropped before);
       `LocalFramesBeforeALaterBusFrame` now goes through `bus.loop()`. 173 / 136 C++ + 52 / 43 Python pass; no builds
       / clang-tidy. Docs ("Several Nodes") updated. Replied and resolved: no open review threads left.
+- **Copilot round 3 (2026-11-26, after closing / reopening #23327)**: on `4b0926f608` four "previously missed issues"
+  in the review summary (no threads), on `7cc83fcc04` one thread (4713610978). Fixed in `canopen-full` `1e8e9d9b7f`,
+  cut `b27f89fefa` (pushed): `enable_nmt_master()` raises an `EsphomeError` when there are hubs but none has a
+  `node_id` (the thread: `send_nmt()` uses node-only members since `72a14b41f7`, so a component enabling the master in
+  client-only firmware didn't compile); the reset grace time covers 4 frames of 135 bits at the canbus `bit_rate`, at
+  least 20 ms (`reset_tx_grace_ms()` / `_bit_rate()` in codegen, `set_reset_tx_grace()`, cap = grace + 80 ms); `transmit()`
+  copies the payload before `send_data()` and queues the copy for local nodes; `monitor_node()` ignores (logs) calls on
+  a client-only hub (no test: the result was already UNKNOWN / false). The fourth point (received NMT frame overwriting
+  ours) was already fixed by `72a14b41f7`. Tests: `test_nmt_master_needs_a_node`, `test_reset_tx_grace`, `test_bit_rate`,
+  `test_reset_tx_grace_slow_bus` (fixture `node_20kbps.yaml`, needs `minimum_chip_revision` for 20 kbit/s on ESP32),
+  `test_reset_tx_grace_default`, `LocalPair.LocalCopyIsTheSentFrame`. 174 / 137 C++ + 65 / 56 Python pass; no builds
+  / clang-tidy. Thread replied and resolved, the four points answered in a PR comment (#issuecomment-7204241790).
 - **Copilot #1** (thread 4705205472, = esphbot 6; and round 2's 4712656233): a templated `canopen.nmt` node_id is cut
   to `uint8_t`, so 256 becomes 0 = all nodes. **Decided (2026-11-26): no code change.** `uint8_t` is the node-id type
   across the hub's API (`read_sdo()`, `write_sdo()`, `monitor_node()`, the SDO actions); node id 0 stays a valid
