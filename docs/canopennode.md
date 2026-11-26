@@ -1073,8 +1073,13 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   "canopen <id>: on_node_event never fires, no node is monitored" from `_final_build_flags` (FINAL, so components
   enabling the monitor count), test `test_node_event_without_monitored_nodes` (config `node_event_unmonitored.yaml`);
   49 / 40 Python tests pass. Commits in the cut worktree need `../esphome/venv/bin` on `PATH` (pre-commit's pylint).
-  Replies posted and the 8 fixed Copilot threads resolved; esphbot answered in a PR comment. Still open (threads
-  unresolved, no reply): #1, #2 (= esphbot 3, `nmt_master: true`?), #11. The local `canopen-full`
+  Replies posted and the 8 fixed Copilot threads resolved; esphbot answered in a PR comment. Copilot #2 / esphbot 3 =
+  `canopen-full` `8cf24cb83f`, cut `eff62bc872` (pushed): `nmt_master: true` (a node option, `NODE_OPTIONS`; `false`
+  = unset) calls `enable_nmt_master()`; tests `test_nmt_master_true`, `test_nmt_master_only_when_used`, client-only
+  rejection; a lambda-only `send_nmt()` builds on ESP8266 with it and fails without. Docs: esphome-docs
+  `canopen-pr4-monitor-nmt` `93bdec276` (pushed over SSH: `origin` there is HTTPS without credentials): `nmt_master`,
+  0x1016 read only, `send_nmt()` false cases, `reset_node` to all restarts us once sent. Still open: #1, #11; the #2
+  thread has no reply yet. The local `canopen-full`
   branch had been deleted from `../esphome`; recreated from `origin/canopen-full` in a scratchpad worktree.
 - **Open steps:** (1) rebase the docs branch onto `next` once #8254 is merged (`--onto <esphome.io next>
   canopen-pr3-node`; `../esphome-docs` has only the mrk-its remote), open it (the user may need to run `gh pr create`
