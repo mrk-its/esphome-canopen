@@ -1084,8 +1084,9 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   - mrk-its/esphome `canopen-full` = `1e8e9d9b7f`; `canopen-pr4-monitor-nmt` (= #23327's head) = `b27f89fefa`
     (`3f4b44effe` + 11 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
     (builds and clang-tidy included); not checked after `b777e48bcd`.
-  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `ab09b70f7` (on `canopen-pr3-node`; + "NMT commands for this node
-    apply right away", + "Local nodes keep the bus order with frames from the bus"); the docs PR isn't opened.
+  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `283659d98` (4 commits on `canopen-pr3-node` `e3dc011fe`; rebased
+    2026-11-26 after #8254's esphbot fixes: `device_name` default = `esphome: name`, the `on_nmt_state_change` example
+    only logs); the docs PR isn't opened.
   - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `1e8e9d9b7f` (`test_hub_copy.py` passes).
   - Review: 9 of Copilot's 11 threads replied and resolved; esphbot's points answered in three PR comments
     (#issuecomment-7198868548, -7199214927, -7203675630 = point 6, `uint8_t` kept). No human review yet. #1 answered and resolved, #11 fixed and resolved (see below).
