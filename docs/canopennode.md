@@ -1081,13 +1081,13 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   0x1016 read only, `send_nmt()` false cases, `reset_node` to all restarts us once sent. #2 thread replied and resolved,
   esphbot 3 answered in a PR comment. Still open: #11 (see "Next" below); #1 answered without a code change.
 - **State at the end of 2026-11-26 (handoff to another machine).** Everything is committed and pushed:
-  - mrk-its/esphome `canopen-full` = `d805648f7c`; `canopen-pr4-monitor-nmt` (= #23327's head) = `b777e48bcd`
-    (`3f4b44effe` + 7 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
+  - mrk-its/esphome `canopen-full` = `7930c40376`; `canopen-pr4-monitor-nmt` (= #23327's head) = `4b0926f608`
+    (`3f4b44effe` + 8 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
     (builds and clang-tidy included); not checked after `b777e48bcd`.
   - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `93bdec276` (on `canopen-pr3-node`); the docs PR isn't opened.
-  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `d805648f7c` (`test_hub_copy.py` passes).
+  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `7930c40376` (`test_hub_copy.py` passes).
   - Review: 9 of Copilot's 11 threads replied and resolved; esphbot's points answered in two PR comments
-    (#issuecomment-7198868548, -7199214927). No human review yet. Unresolved threads: #11 (no reply yet); #1 answered and resolved (see "Copilot #1" below).
+    (#issuecomment-7198868548, -7199214927). No human review yet. #1 answered and resolved, #11 fixed and resolved (see below).
   - Copilot round 2 (on `eff62bc872`, 5 comments). Done: 4712656148 (`CANtxCount == 0` means the driver accepted the
     frame, not that it is on the bus; the `canbus` API can't tell): `canopen-full` `d805648f7c`, cut `b777e48bcd`,
     the reboot also waits `RESET_TX_GRACE_MS` (20) after CANopenNode's queue is empty, still capped at 100 ms
@@ -1108,15 +1108,18 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   broadcast target; static `node_id:` values are schema-checked (0-127); a lambda returning a wider value narrows like
   any other `uint8_t` argument (GCC's `-Woverflow` warns for constants; runtime values only with `-Wconversion`, not
   enabled). Widening only `send_nmt()` would be inconsistent. Replied on both threads with that and resolved them.
-- **Next: Copilot #11** (thread 4705205903): CANopenNode's consumer calls the started / remote-reset / timeout
-  callbacks before it stores `HBstate` / `NMTstate` (`301/CO_HBconsumer.c` lines 340/344, 326/333, 360/365-366; the
-  NMT-changed one after), so an `on_node_event` automation querying `is_node_online()` / `get_node_state()` sees the
-  old state (ONLINE: false / UNKNOWN; OFFLINE: true / last state; RESET: still online). The event's arguments are
-  right. Proposed fix: the static `on_hb_*` callbacks only push `{node_id, event, state}` into a member vector
-  (reserved in `setup()`, 2 per monitored node), `process_node_()` dispatches them via `node_event_()` after
-  `CO_process()` returns (under `USE_CANOPEN_NODE_MONITOR`); user callbacks then also no longer run inside CANopenNode's
-  processing. Test: a callback recording `is_node_online()` / `get_node_state()` for ONLINE / OFFLINE / RESET (fails
-  now). Then reply on the thread and resolve it.
+- **Copilot #11** (thread 4705205903), **done (2026-11-26)**: CANopenNode's consumer calls the started / remote-reset /
+  timeout callbacks before it stores `HBstate` / `NMTstate`, so an `on_node_event` automation querying
+  `is_node_online()` / `get_node_state()` saw the old state. `canopen-full` `7930c40376`, cut `4b0926f608` (pushed): the
+  `on_hb_*` callbacks only push `{node_id, event, state}` into `FixedVector<PendingNodeEvent> pending_node_events_`
+  (`init(2 * hb_cons_.size())` in `init_node_monitor_()`), `process_node_()` calls `dispatch_node_events_()` after
+  `CO_process()`. Capacity: one consumer pass fires at most 2 callbacks per node (frame or timeout, then NMT changed; a
+  frame and a timeout exclude each other in one pass; more frames between passes collapse, `CANrxNew` is a flag), the
+  queue is drained after every `CO_process()`, the node set is fixed after setup; `push_back()` ignores overflow anyway.
+  Test `CanopenNodeMonitor.QueriesInAnEventSeeTheNewState` (fails on all 6 checks without the fix). 167 / 130 C++ +
+  52 / 43 Python tests pass; no builds / clang-tidy. Replied (with the capacity reasoning) and resolved. Side note: an
+  OFFLINE is followed by NMT_CHANGED(UNKNOWN) and a RESET by NMT_CHANGED(INITIALIZING) in the same pass (the consumer's
+  NMT-changed check after the timeout / boot-up); unchanged by this fix, not checked against the docs yet.
 - **Next: docs.** (1) Once esphome/esphome.io#8254 (PR 3's docs) is merged: rebase the docs branch onto `next`
   (`git rebase --onto <esphome.io next> canopen-pr3-node`; `../esphome-docs` has only the mrk-its remote, add
   `esphome/esphome.io` to fetch `next`), open the docs PR (the user may need to run `gh pr create` for esphome.io: the
