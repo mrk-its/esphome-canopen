@@ -1182,9 +1182,10 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   credentials here: push to `git@github.com:mrk-its/esphome-docs.git`.
 
 #### PR 5 as cut (2026-11-26, branch only)
-- **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `4a257a84f5`,
+- **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `10f03ae2a1`,
   one commit "[canopen] Add the OD handler API (OdObject, write_od() / read_od()) and the profile API (CANopenNode,
-  register_node())") on the PR 4 head `7c02552a66`. Not opened upstream: until #23327 is merged it would carry PR 4's
+  register_node())") on the PR 4 head `33c31e3bab` (rebased 2026-11-27 from `4a257a84f5` on `7c02552a66`: only PR 4's
+  round-5 test fix differs; 150 C++ tests pass). Not opened upstream: until #23327 is merged it would carry PR 4's
   commit; then rebase it onto `dev` (`git rebase --onto upstream/dev canopen-pr4-monitor-nmt`, after checking that the
   squash has PR 4's canopen tree) and open it.
 - **Content:** `od_handler.h/.cpp` (`OdObject`, `OdStream`), the handler parts of `od.*` (`set_object()`, `write()`,
