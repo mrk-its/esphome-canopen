@@ -1081,11 +1081,12 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   0x1016 read only, `send_nmt()` false cases, `reset_node` to all restarts us once sent. #2 thread replied and resolved,
   esphbot 3 answered in a PR comment. Still open: #11 (see "Next" below); #1 answered without a code change.
 - **State at the end of 2026-11-26 (handoff to another machine).** Everything is committed and pushed:
-  - mrk-its/esphome `canopen-full` = `7930c40376`; `canopen-pr4-monitor-nmt` (= #23327's head) = `4b0926f608`
-    (`3f4b44effe` + 8 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
+  - mrk-its/esphome `canopen-full` = `023b09c800`; `canopen-pr4-monitor-nmt` (= #23327's head) = `72a14b41f7`
+    (`3f4b44effe` + 9 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
     (builds and clang-tidy included); not checked after `b777e48bcd`.
-  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `93bdec276` (on `canopen-pr3-node`); the docs PR isn't opened.
-  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `7930c40376` (`test_hub_copy.py` passes).
+  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `a83ce19bc` (on `canopen-pr3-node`; + "NMT commands for this node
+    apply right away"); the docs PR isn't opened.
+  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `023b09c800` (`test_hub_copy.py` passes).
   - Review: 9 of Copilot's 11 threads replied and resolved; esphbot's points answered in two PR comments
     (#issuecomment-7198868548, -7199214927). No human review yet. #1 answered and resolved, #11 fixed and resolved (see below).
   - Copilot round 2 (on `eff62bc872`, 5 comments). Done: 4712656148 (`CANtxCount == 0` means the driver accepted the
@@ -1093,15 +1094,22 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     the reboot also waits `RESET_TX_GRACE_MS` (20) after CANopenNode's queue is empty, still capped at 100 ms
     (`reset_flushed_` / `reset_flushed_ms_`); the test checks no reboot 19 ms after the hand-over, a reboot at 20 ms
     (fails on the old code); replied (mentioning a possible `canbus` `tx_pending()` PR for exact completion) and
-    resolved. 4712656233 (`nmt_master.cpp:12`, = #1 again): answered with #1's reply and resolved. Open, no reply yet:
-    - 4712656195 (`driver_can.cpp:37`): `Canbus::loop()` calls the hubs' frame callbacks one after another, so a
-      reply A sends while handling a bus frame is queued for B before B gets that bus frame; B's `on_frame_()` then
-      drains the reply first. Suggests staging each bus frame for all local receivers before processing.
-    - 4712656270 (`nmt_master.cpp:24`): a command accepted for us / all can still be overwritten in `internalCommand`
-      by a received NMT frame or `set_nmt_state()` before `CO_process()`; suggests serializing all three sources.
-    - 4712656299 (`nmt_master.cpp:29`): a `logger.on_message` callback can re-enter `send_nmt()` inside
-      `send_data()` (before `bufferFull` is set): the nested call overwrites the command and counts the buffer twice
-      (`CANtxCount` stuck); suggests a re-entrancy guard around the library call.
+    resolved. 4712656233 (`nmt_master.cpp:12`, = #1 again): answered with #1's reply and resolved.
+    - 4712656270 (`nmt_master.cpp:24`, a command for us overwritten by a received NMT frame or `set_nmt_state()`
+      before `CO_process()`) and 4712656299 (`nmt_master.cpp:29`, `send_nmt()` re-entered from a log handler inside
+      its own send, `CANtxCount` counted twice): **done (2026-11-26)**, `canopen-full` `023b09c800`, cut `72a14b41f7`.
+      Commands for us (`send_nmt()` to our id / 0, `set_nmt_state()`) are applied right away (`apply_nmt_command_()`
+      runs `process_node_()`, keeping `hold_flush_`); from an automation the processing runs (flag `processing_`, set
+      inside `process_node_()`) they wait for the next processing, and `set_nmt_state()` is refused while one waits.
+      `nmt_sending_` around `CO_NMT_sendCommand()` refuses a nested `send_nmt()` (no logging); `CO_CANsend()` counts a
+      queued buffer once. Tests `NmtForUsTest.*` (4) and `CanopenNmtMaster.CommandFromInsideItsOwnSend`, all fail on the
+      old code (`SecondCommandForUsBeforeProcessing` replaced); 171 / 134 C++ + 52 / 43 Python pass; no builds /
+      clang-tidy. Docs updated (`set_nmt_state()` / `send_nmt()` comments). Replied and resolved.
+    - Open, no reply yet: 4712656195 (`driver_can.cpp:37`): `Canbus::loop()` calls the hubs' frame callbacks one
+      after another, so a reply A sends while handling a bus frame is queued for B before B gets that bus frame; B's
+      `on_frame_()` then drains the reply first. Suggested fix: one canbus callback per local ring (its head) queues
+      each bus frame for all local nodes, then lets each drain; needs a head flag from codegen, the head registering
+      even when its own setup failed, bus frames through `local_queue_` (droppable when full). Not decided.
 - **Copilot #1** (thread 4705205472, = esphbot 6; and round 2's 4712656233): a templated `canopen.nmt` node_id is cut
   to `uint8_t`, so 256 becomes 0 = all nodes. **Decided (2026-11-26): no code change.** `uint8_t` is the node-id type
   across the hub's API (`read_sdo()`, `write_sdo()`, `monitor_node()`, the SDO actions); node id 0 stays a valid
