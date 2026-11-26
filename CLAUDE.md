@@ -41,7 +41,8 @@ used) is open upstream: esphome/esphome#23327 (2026-11-26, `canopen-pr4-monitor-
 `6f7cd90870`, pushed to mrk-its; Copilot / esphbot review fixes on top, head `7c02552a66`, all review threads
 (4 Copilot rounds) fixed or answered and resolved; no builds / clang-tidy since the fixes); its docs on esphome-docs `canopen-pr4-monitor-nmt` (`283659d98`, on
 `canopen-pr3-node` `e3dc011fe`), to be rebased on `next` and opened once #8254 is merged, then linked in #23327's description
-(`docs/canopennode.md`, "PR 4 as cut", with the open steps). The cut's history and test
+(`docs/canopennode.md`, "PR 4 as cut", with the open steps). PR 5 (OD handler API + profile API) is cut on `canopen-pr5-od-profile` (`4a257a84f5`, on PR 4's
+head, pushed, not opened: `docs/canopennode.md`, "PR 5 as cut"). The cut's history and test
 results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then into the open PR's cut. Before work in `../esphome` or `../esphome-docs`, read their AGENTS.md / CLAUDE.md
 (conventions, `node script/lint.mjs` for the docs).
 OTA in the hub on CiA 302-3 program download objects (`0x1F50`/`0x1F51`/`0x1F56`/`0x1F57`) instead of the mapper's `0x3000`:

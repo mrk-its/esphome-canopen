@@ -1175,6 +1175,36 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   (`PLATFORMIO_WORKSPACE_DIR=~/.cache/esphome-tidy-pio/<wt>`). Pushing esphome-docs over HTTPS failed without
   credentials here: push to `git@github.com:mrk-its/esphome-docs.git`.
 
+#### PR 5 as cut (2026-11-26, branch only)
+- **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `4a257a84f5`,
+  one commit "[canopen] Add the OD handler API (OdObject, write_od() / read_od()) and the profile API (CANopenNode,
+  register_node())") on the PR 4 head `7c02552a66`. Not opened upstream: until #23327 is merged it would carry PR 4's
+  commit; then rebase it onto `dev` (`git rebase --onto upstream/dev canopen-pr4-monitor-nmt`, after checking that the
+  squash has PR 4's canopen tree) and open it.
+- **Content:** `od_handler.h/.cpp` (`OdObject`, `OdStream`), the handler parts of `od.*` (`set_object()`, `write()`,
+  `read()`, `value_size()`, `OD_extension_t` in `PendingEntry` / `extensions_`), `CANopenComponent::write_od()` /
+  `read_od()`, `canopen_node.h/.cpp` (`CANopenNode`), in `__init__.py` `CONF_CANOPEN_ID`, `CANopenNode`,
+  `CANOPEN_NODE_SCHEMA`, `require_node_id()`, `final_validate_canopen_node()`, `register_node()`, the
+  `enable_node_monitor()` docstring and `_final_build_flags` comment mentioning `register_node()`. Class comment of
+  `canopen.h`: PR 4's plus OD entries / handlers before setup, `write_od()` / `read_od()` at runtime, `od_handler.cpp`
+  and `canopen_node.h` in the file list. Left to later PRs: `OD_TPDO` / `OD_RPDO`, `PdoMapping`, PDO and storage code
+  (PR 6; also the "with PDOs" in the `OdObject` comment and "PDOs" in `require_node_id()`'s docstring), `sdo_block_size`
+  (PR 7), OTA (PR 8). No `defines.h` lines (no new define).
+- **Tests:** `canopen_node_test.cpp` (its hub renamed `EventHub`: it shared `fake_canbus.h`'s `testing::TestHub` name in
+  one binary, an ODR violation; also fixed on `canopen-full` `af74cc8544` with `<string>` in `od_test.cpp`), the handler
+  tests of `od_test.cpp` (`canopen-full`'s file + `<string>`), `profile.yaml` / `profile_own_id.yaml` /
+  `fake_canopen_profile` (without `enable_pdo()`), `test_register_node` (without the PDO asserts),
+  `test_register_node_own_id`, `profile.yaml` in `test_node_monitor_only_when_used`.
+- **Size:** +418 / -19 code, +489 / -1 tests.
+- **Checks (2026-11-26):** 150 C++ + 59 Python tests; builds esp8266-ard / esp32-idf / rp2040-ard
+  (`test_build_components.py`, no canopen warnings); clang-tidy esp32-idf-tidy on the component + tests (21 files)
+  clean, esp8266-arduino-tidy / bk72xx-tidy / nrf52-tidy on the component pending at the time of writing. Cross-checked:
+  vs `canopen-full` only PR 6-8 parts and the edits above differ.
+- **Worktrees:** `~/.cache/esphome-wt/pr5` and `~/.cache/esphome-wt/full` (out of `/tmp`: its tmpfs quota filled
+  during this work; builds / tidy with `PLATFORMIO_WORKSPACE_DIR=~/.cache/esphome-tidy-pio/<wt>`).
+- **Next:** docs (no YAML options; at most `write_od()` / `read_od()` under "Lambdas", not decided), then open it once
+  #23327 is merged.
+
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
 decoded heartbeat frames, so node monitoring works on a hub without `node_id` and can come right after PR 2.
