@@ -38,8 +38,8 @@ esphome/esphome.io#8254 (esphome-docs branch `canopen-pr3-node`, rebased on `nex
 `backup/canopen-pr3-node-pre-rebase`; the fork PR mrk-its/esphome-docs#1 is closed) (`docs/canopennode.md`,
 "PR 3 as cut"). PR 4 (node monitoring + NMT master, plus the local frame queue and the heartbeat consumer only when
 used) is open upstream: esphome/esphome#23327 (2026-11-26, `canopen-pr4-monitor-nmt`, rebased on `dev`
-`6f7cd90870`, pushed to mrk-its; Copilot / esphbot review fixes on top, head `b777e48bcd`, Copilot #1 and #11 plus 3 of round 2 still
-open); its docs on esphome-docs `canopen-pr4-monitor-nmt` (`93bdec276`, on
+`6f7cd90870`, pushed to mrk-its; Copilot / esphbot review fixes on top, head `b777e48bcd`, Copilot #11 plus 3 of round 2 still
+open; #1 answered: `uint8_t` node id kept); its docs on esphome-docs `canopen-pr4-monitor-nmt` (`93bdec276`, on
 `canopen-pr3-node`), to be rebased on `next` and opened once #8254 is merged, then linked in #23327's description
 (`docs/canopennode.md`, "PR 4 as cut", with the open steps). The cut's history and test
 results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then into the open PR's cut. Before work in `../esphome` or `../esphome-docs`, read their AGENTS.md / CLAUDE.md

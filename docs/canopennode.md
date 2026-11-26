@@ -1079,7 +1079,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   rejection; a lambda-only `send_nmt()` builds on ESP8266 with it and fails without. Docs: esphome-docs
   `canopen-pr4-monitor-nmt` `93bdec276` (pushed over SSH: `origin` there is HTTPS without credentials): `nmt_master`,
   0x1016 read only, `send_nmt()` false cases, `reset_node` to all restarts us once sent. #2 thread replied and resolved,
-  esphbot 3 answered in a PR comment. Still open: #1, #11 (see "Next" below).
+  esphbot 3 answered in a PR comment. Still open: #11 (see "Next" below); #1 answered without a code change.
 - **State at the end of 2026-11-26 (handoff to another machine).** Everything is committed and pushed:
   - mrk-its/esphome `canopen-full` = `d805648f7c`; `canopen-pr4-monitor-nmt` (= #23327's head) = `b777e48bcd`
     (`3f4b44effe` + 7 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
@@ -1087,29 +1087,27 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `93bdec276` (on `canopen-pr3-node`); the docs PR isn't opened.
   - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `d805648f7c` (`test_hub_copy.py` passes).
   - Review: 9 of Copilot's 11 threads replied and resolved; esphbot's points answered in two PR comments
-    (#issuecomment-7198868548, -7199214927). No human review yet. Unresolved threads: #1 and #11 (no reply on them).
+    (#issuecomment-7198868548, -7199214927). No human review yet. Unresolved threads: #11 (no reply yet); #1 answered and resolved (see "Copilot #1" below).
   - Copilot round 2 (on `eff62bc872`, 5 comments). Done: 4712656148 (`CANtxCount == 0` means the driver accepted the
     frame, not that it is on the bus; the `canbus` API can't tell): `canopen-full` `d805648f7c`, cut `b777e48bcd`,
     the reboot also waits `RESET_TX_GRACE_MS` (20) after CANopenNode's queue is empty, still capped at 100 ms
     (`reset_flushed_` / `reset_flushed_ms_`); the test checks no reboot 19 ms after the hand-over, a reboot at 20 ms
     (fails on the old code); replied (mentioning a possible `canbus` `tx_pending()` PR for exact completion) and
-    resolved. Open, no reply yet:
+    resolved. 4712656233 (`nmt_master.cpp:12`, = #1 again): answered with #1's reply and resolved. Open, no reply yet:
     - 4712656195 (`driver_can.cpp:37`): `Canbus::loop()` calls the hubs' frame callbacks one after another, so a
       reply A sends while handling a bus frame is queued for B before B gets that bus frame; B's `on_frame_()` then
       drains the reply first. Suggests staging each bus frame for all local receivers before processing.
-    - 4712656233 (`nmt_master.cpp:12`): = #1 again (`uint8_t` node id, 256 -> broadcast).
     - 4712656270 (`nmt_master.cpp:24`): a command accepted for us / all can still be overwritten in `internalCommand`
       by a received NMT frame or `set_nmt_state()` before `CO_process()`; suggests serializing all three sources.
     - 4712656299 (`nmt_master.cpp:29`): a `logger.on_message` callback can re-enter `send_nmt()` inside
       `send_data()` (before `bufferFull` is set): the nested call overwrites the command and counts the buffer twice
       (`CANtxCount` stuck); suggests a re-entrancy guard around the library call.
-- **Next: Copilot #1** (thread 4705205472, = esphbot 6): a templated `canopen.nmt` node_id is cut to `uint8_t` (the
-  action's lambda is generated returning `cg.uint8`), so 256 becomes 0 = all nodes. Proposed (not decided by the
-  user): action arg `(CONF_NODE_ID, cg.int32)`, `bool send_nmt(int32_t node_id, ...)` refusing `< 0 || > 127` with the
-  warning, cast to `uint8_t` only for `CO_NMT_sendCommand()`; tests: `send_nmt(256 / -1)` refused, nothing sent;
-  codegen check of the lambda's return type. Trade-off: other node-id parameters (`read_sdo`, `monitor_node`) stay
-  `uint8_t`; the SDO actions narrow the same way (merged PR 1; a separate PR if wanted). Alternatives: a public
-  `send_nmt_checked()` for codegen (clutter), or a reply only (weak: 0 hits every node).
+- **Copilot #1** (thread 4705205472, = esphbot 6; and round 2's 4712656233): a templated `canopen.nmt` node_id is cut
+  to `uint8_t`, so 256 becomes 0 = all nodes. **Decided (2026-11-26): no code change.** `uint8_t` is the node-id type
+  across the hub's API (`read_sdo()`, `write_sdo()`, `monitor_node()`, the SDO actions); node id 0 stays a valid
+  broadcast target; static `node_id:` values are schema-checked (0-127); a lambda returning a wider value narrows like
+  any other `uint8_t` argument (GCC's `-Woverflow` warns for constants; runtime values only with `-Wconversion`, not
+  enabled). Widening only `send_nmt()` would be inconsistent. Replied on both threads with that and resolved them.
 - **Next: Copilot #11** (thread 4705205903): CANopenNode's consumer calls the started / remote-reset / timeout
   callbacks before it stores `HBstate` / `NMTstate` (`301/CO_HBconsumer.c` lines 340/344, 326/333, 360/365-366; the
   NMT-changed one after), so an `on_node_event` automation querying `is_node_online()` / `get_node_state()` sees the
