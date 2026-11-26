@@ -1087,8 +1087,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `ab09b70f7` (on `canopen-pr3-node`; + "NMT commands for this node
     apply right away", + "Local nodes keep the bus order with frames from the bus"); the docs PR isn't opened.
   - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `ff573b5fe0` (`test_hub_copy.py` passes).
-  - Review: 9 of Copilot's 11 threads replied and resolved; esphbot's points answered in two PR comments
-    (#issuecomment-7198868548, -7199214927). No human review yet. #1 answered and resolved, #11 fixed and resolved (see below).
+  - Review: 9 of Copilot's 11 threads replied and resolved; esphbot's points answered in three PR comments
+    (#issuecomment-7198868548, -7199214927, -7203675630 = point 6, `uint8_t` kept). No human review yet. #1 answered and resolved, #11 fixed and resolved (see below).
   - Copilot round 2 (on `eff62bc872`, 5 comments). Done: 4712656148 (`CANtxCount == 0` means the driver accepted the
     frame, not that it is on the bus; the `canbus` API can't tell): `canopen-full` `d805648f7c`, cut `b777e48bcd`,
     the reboot also waits `RESET_TX_GRACE_MS` (20) after CANopenNode's queue is empty, still capped at 100 ms
