@@ -33,15 +33,15 @@ cut's fixes, the Copilot review fixes of #23299 and bdraco's 6 PR 3 commits port
 `79dc2e5ede`); its docs PR esphome/esphome.io#8243 is merged too (2026-11-25, squash `67bb87134` on `next`, with a
 paragraph by bdraco on the frame listener's callback and `context`). PR 3 (the node core + loopback,
 esphome/esphome#23299, cut on `canopen-pr3-node`, head `9e7687e388`) is **merged upstream** (2026-11-26, squash
-`e187cf0e5d`, same canopen tree as the cut head); its docs PR is
-esphome/esphome.io#8254 (esphome-docs branch `canopen-pr3-node`, rebased on `next`; the pre-rebase branch is
+`e187cf0e5d`, same canopen tree as the cut head); its docs PR
+esphome/esphome.io#8254 is merged too (2026-11-27, squash `b8edc4861` on `next`) (esphome-docs branch `canopen-pr3-node`, rebased on `next`; the pre-rebase branch is
 `backup/canopen-pr3-node-pre-rebase`; the fork PR mrk-its/esphome-docs#1 is closed) (`docs/canopennode.md`,
 "PR 3 as cut"). PR 4 (node monitoring + NMT master, plus the local frame queue and the heartbeat consumer only when
 used) is open upstream: esphome/esphome#23327 (2026-11-26, `canopen-pr4-monitor-nmt`, rebased on `dev`
 `6f7cd90870`, pushed to mrk-its; Copilot / esphbot review fixes on top, head `9de95590f6`, all review threads
 (5 Copilot rounds) fixed or answered and resolved, esphbot approved, bdraco's hardware test passed with caveats (all
-answered: 2 fixed, 1 documented, 1 kept, the queue compiled only with two or more nodes on a canbus); no builds / clang-tidy locally since the fixes); its docs on esphome-docs `canopen-pr4-monitor-nmt` (`974af2728`, on
-`canopen-pr3-node` `e3dc011fe`), to be rebased on `next` and opened once #8254 is merged, then linked in #23327's description
+answered: 2 fixed, 1 documented, 1 kept, the queue compiled only with two or more nodes on a canbus); no builds / clang-tidy locally since the fixes); its docs PR esphome/esphome.io#8285 (esphome-docs `canopen-pr4-monitor-nmt`
+`34c287463`, rebased on `next` `b8edc4861`; opened 2026-11-27, linked in #23327's description)
 (`docs/canopennode.md`, "PR 4 as cut", with the open steps). PR 5 (OD handler API + profile API) is cut on `canopen-pr5-od-profile` (`1623671c93`, on PR 4's
 head, pushed, not opened: `docs/canopennode.md`, "PR 5 as cut"). The cut's history and test
 results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then into the open PR's cut. Before work in `../esphome` or `../esphome-docs`, read their AGENTS.md / CLAUDE.md
