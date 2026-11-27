@@ -1080,14 +1080,35 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   `canopen-pr4-monitor-nmt` `93bdec276` (pushed over SSH: `origin` there is HTTPS without credentials): `nmt_master`,
   0x1016 read only, `send_nmt()` false cases, `reset_node` to all restarts us once sent. #2 thread replied and resolved,
   esphbot 3 answered in a PR comment. Still open: #11 (see "Next" below); #1 answered without a code change.
-- **State at the end of 2026-11-26 (handoff to another machine).** Everything is committed and pushed:
-  - mrk-its/esphome `canopen-full` = `46701e9716`; `canopen-pr4-monitor-nmt` (= #23327's head) = `7c02552a66`
-    (`3f4b44effe` + 12 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
+- **State on 2026-11-27.** Everything is committed and pushed:
+  - mrk-its/esphome `canopen-full` = `67fc76bac6`; `canopen-pr4-monitor-nmt` (= #23327's head) = `46f147c65c`
+    (`3f4b44effe` + 14 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
     (builds and clang-tidy included); not checked after `b777e48bcd`.
-  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `283659d98` (4 commits on `canopen-pr3-node` `e3dc011fe`; rebased
+  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `0f3c2d470` (5 commits on `canopen-pr3-node` `e3dc011fe`; rebased
     2026-11-26 after #8254's esphbot fixes: `device_name` default = `esphome: name`, the `on_nmt_state_change` example
     only logs); the docs PR isn't opened.
-  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `46701e9716` (`test_hub_copy.py` passes).
+  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `67fc76bac6` (`test_hub_copy.py` passes).
+  - esphbot approved (on `4b0926f608`, "ready to merge"); Copilot's last two reviews: no open issues; all 17 review
+    threads resolved. No maintainer approval yet.
+  - **bdraco's hardware test** of `33c31e3bab` (2026-11-27, #issuecomment on the PR; two ESP32-C3, 250 kbit/s, three
+    local nodes on one board): PASS WITH CAVEATS. Events, NMT commands (also to all / own id / local sibling,
+    `send_nmt()` lambda, id 200 refused), local queue (order, overflow; dev reorders 50/50, loses back-to-back NMT
+    frames), 15 min soak all fine; size vs dev: plain node -136 B (ESP8266), `heartbeat_clients` +3.1 kB,
+    `canopen.nmt` +0.6 kB. His findings: (1) **fixed**, see next point; (2) after RESET an NMT_CHANGED `bootup` event
+    follows while `get_node_state()` already returns UNKNOWN (only event disagreeing with the getter); (3)
+    `canopen.nmt` on a client-only hub is rejected at codegen, not validation (`esphome config` says valid); (4) the
+    PR text's 2,804 B is vs. consumer always on: vs dev a plain node is 136 B smaller; (5) EMCY `0x8130` on every
+    OFFLINE / RESET (CANopenNode behaviour). Also: the queue code (~600 B) is linked with a single local node too.
+    (2)-(5) not answered yet.
+  - **Monitoring while this node is STOPPED** (bdraco's (1)), done 2026-11-27: `CO_process()` runs the consumer only
+    in pre-op / op and clears every entry on stop (no event, ONLINE again after a start). `init_node_monitor_()` sets
+    `config_.CNT_HB_CONS = 0` after `CO_CANopenInit()` (`CO_GET_CNT(HB_CONS)` reads `co->config`, our `config_`; only
+    allocation, init and `CO_process()` read it), and `process_node_monitor_()` calls `CO_HBconsumer_process(..., true,
+    dt, nullptr)` after `CO_process()`, before `dispatch_node_events_()`. `canopen-full` `67fc76bac6`, cut
+    `46f147c65c` (clean pick); tests `MonitoringContinuesWhileStopped`, `TimeoutWhileStopped` (fail on the previous
+    head); 177 / 140 C++ pass. Docs `0f3c2d470` ("Monitoring goes on in every NMT state ..."). Answered in
+    #issuecomment-7211895096. **PR 5's branch is still on `33c31e3bab`: rebase it onto `46f147c65c`.** No builds /
+    clang-tidy run locally since the review fixes (CI on the PR runs them).
   - Review: 9 of Copilot's 11 threads replied and resolved; esphbot's points answered in three PR comments
     (#issuecomment-7198868548, -7199214927, -7203675630 = point 6, `uint8_t` kept). No human review yet. #1 answered and resolved, #11 fixed and resolved (see below).
   - Copilot round 2 (on `eff62bc872`, 5 comments). Done: 4712656148 (`CANtxCount == 0` means the driver accepted the
