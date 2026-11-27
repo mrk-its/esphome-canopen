@@ -38,7 +38,7 @@ esphome/esphome.io#8254 is merged too (2026-11-27, squash `b8edc4861` on `next`)
 `backup/canopen-pr3-node-pre-rebase`; the fork PR mrk-its/esphome-docs#1 is closed) (`docs/canopennode.md`,
 "PR 3 as cut"). PR 4 (node monitoring + NMT master, plus the local frame queue and the heartbeat consumer only when
 used) is open upstream: esphome/esphome#23327 (2026-11-26, `canopen-pr4-monitor-nmt`, rebased on `dev`
-`6f7cd90870`, pushed to mrk-its; Copilot / esphbot review fixes on top, head `9de95590f6`, all review threads
+`6f7cd90870`, pushed to mrk-its; Copilot / esphbot review fixes on top, then bdraco's 5 commits (slot-list heartbeat clients, fixed reset grace; ported to `canopen-full`), head `17adee303b`, all review threads
 (5 Copilot rounds) fixed or answered and resolved, esphbot approved, bdraco's hardware test passed with caveats (all
 answered: 2 fixed, 1 documented, 1 kept, the queue compiled only with two or more nodes on a canbus); no builds / clang-tidy locally since the fixes); its docs PR esphome/esphome.io#8285 (esphome-docs `canopen-pr4-monitor-nmt`
 `29cf55e68`, rebased on `next` `b8edc4861`; opened 2026-11-27, linked in #23327's description; Copilot's 5 comments fixed)
