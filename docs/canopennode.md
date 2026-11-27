@@ -1081,13 +1081,13 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   0x1016 read only, `send_nmt()` false cases, `reset_node` to all restarts us once sent. #2 thread replied and resolved,
   esphbot 3 answered in a PR comment. Still open: #11 (see "Next" below); #1 answered without a code change.
 - **State on 2026-11-27.** Everything is committed and pushed:
-  - mrk-its/esphome `canopen-full` = `3342fab152`; `canopen-pr4-monitor-nmt` (= #23327's head) = `2ee3fe8351`
-    (`3f4b44effe` + 15 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
+  - mrk-its/esphome `canopen-full` = `a12c11b2e0`; `canopen-pr4-monitor-nmt` (= #23327's head) = `9de95590f6`
+    (`3f4b44effe` + 16 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
     (builds and clang-tidy included); not checked after `b777e48bcd`.
   - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `974af2728` (6 commits on `canopen-pr3-node` `e3dc011fe`; rebased
     2026-11-26 after #8254's esphbot fixes: `device_name` default = `esphome: name`, the `on_nmt_state_change` example
     only logs); the docs PR isn't opened.
-  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `3342fab152` (`test_hub_copy.py` passes).
+  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `a12c11b2e0` (`test_hub_copy.py` passes).
   - esphbot approved (on `4b0926f608`, "ready to merge"); Copilot's last two reviews: no open issues; all 17 review
     threads resolved. No maintainer approval yet.
   - **bdraco's hardware test** of `33c31e3bab` (2026-11-27, #issuecomment on the PR; two ESP32-C3, 250 kbit/s, three
@@ -1105,9 +1105,18 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     177 / 140 C++ pass; `types.h` comment. (3) kept: actions can't see the hub config at validation, codegen check
     like `sdo_client: false`. (4) PR description updated with his numbers (and `nmt_master: true`). (5) documented
     (docs `974af2728`: `0x8130`, error register bit 4, error reset EMCY, EMCY while stopped queued until the next
-    start; the boot-up EMCY is CANopenNode's, not CiA 301's). Queue code with a single local node (~600 B): left for a
-    follow-up (a `USE_CANOPEN_LOCAL_NODES` define when codegen links two or more hubs on one canbus).
-    PR 5 rebased onto `2ee3fe8351` (see "PR 5 as cut"; the profile's `on_node_nmt_changed()` no longer gets BOOTUP,
+    start; the boot-up EMCY is CANopenNode's, not CiA 301's). Queue code with a single local node: first told bdraco
+    "a follow-up", then done in PR 4 (2026-11-27): `canopen-full` `a12c11b2e0`, cut `9de95590f6` (clean pick).
+    Codegen defines `USE_CANOPEN_LOCAL_NODES` when it links a second hub on a canbus (`to_code()`, where
+    `set_next_local()` is emitted); `set_next_local()`, `next_local_`, `local_queue_`, `local_dropped_`,
+    `bus_frame_staged_`, `queue_local_()` / `deliver_local_()` / `stage_bus_frame_()`, the staging in `on_frame_()`,
+    the queue checks in `setup()` / `idle_()` / `loop()` and `transmit()`'s payload copy and fan-out are under it;
+    `defines.h` and the unit-test override define it. ESP8266 node alone: 281,199 -> 280,339 B flash (-860 B); builds
+    of a single node, two nodes on one canbus and a client-only hub (esp8266, `~/.cache/esphome-nmt-master-check`) and
+    esphome-canopen's `esp8266_mapper.yaml` pass; 177 / 140 C++, 66 / 57 Python; codegen tests `test_local_nodes`
+    (define set), `test_single_node_has_no_local_queue`. No clang-tidy run (CI). Not yet told bdraco / not in the
+    PR description (its size numbers are now ~860 B better for a plain node).
+    PR 5 rebased onto `9de95590f6` (see "PR 5 as cut"; the profile's `on_node_nmt_changed()` no longer gets BOOTUP,
     its comment doesn't promise it).
   - **Monitoring while this node is STOPPED** (bdraco's (1)), done 2026-11-27: `CO_process()` runs the consumer only
     in pre-op / op and clears every entry on stop (no event, ONLINE again after a start). `init_node_monitor_()` sets
@@ -1212,10 +1221,11 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   credentials here: push to `git@github.com:mrk-its/esphome-docs.git`.
 
 #### PR 5 as cut (2026-11-26, branch only)
-- **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `3f71170bdc`,
+- **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `1623671c93`,
   one commit "[canopen] Add the OD handler API (OdObject, write_od() / read_od()) and the profile API (CANopenNode,
-  register_node())") on the PR 4 head `2ee3fe8351` (`3f71170bdc`, rebased 2026-11-27 from `f5b5ba5e7b` on
-  `46f147c65c`, before that from `10f03ae2a1` on `33c31e3bab` and from `4a257a84f5` on `7c02552a66`; each clean,
+  register_node())") on the PR 4 head `9de95590f6` (`1623671c93`, rebased 2026-11-27 from `3f71170bdc` on `2ee3fe8351`,
+  before that from `f5b5ba5e7b` on `46f147c65c`, from `10f03ae2a1` on `33c31e3bab` and from `4a257a84f5` on
+  `7c02552a66`; each clean,
   `range-diff` identical; 152 C++ + 59 Python tests pass; force-pushed with lease). Not opened upstream: until #23327 is merged it would carry PR 4's
   commit; then rebase it onto `dev` (`git rebase --onto upstream/dev canopen-pr4-monitor-nmt`, after checking that the
   squash has PR 4's canopen tree) and open it.
