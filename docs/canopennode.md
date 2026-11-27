@@ -1107,7 +1107,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     dt, nullptr)` after `CO_process()`, before `dispatch_node_events_()`. `canopen-full` `67fc76bac6`, cut
     `46f147c65c` (clean pick); tests `MonitoringContinuesWhileStopped`, `TimeoutWhileStopped` (fail on the previous
     head); 177 / 140 C++ pass. Docs `0f3c2d470` ("Monitoring goes on in every NMT state ..."). Answered in
-    #issuecomment-7211895096. **PR 5's branch is still on `33c31e3bab`: rebase it onto `46f147c65c`.** No builds /
+    #issuecomment-7211895096. PR 5 rebased onto it (see "PR 5 as cut"). No builds /
     clang-tidy run locally since the review fixes (CI on the PR runs them).
   - Review: 9 of Copilot's 11 threads replied and resolved; esphbot's points answered in three PR comments
     (#issuecomment-7198868548, -7199214927, -7203675630 = point 6, `uint8_t` kept). No human review yet. #1 answered and resolved, #11 fixed and resolved (see below).
@@ -1203,10 +1203,11 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   credentials here: push to `git@github.com:mrk-its/esphome-docs.git`.
 
 #### PR 5 as cut (2026-11-26, branch only)
-- **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `10f03ae2a1`,
+- **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `f5b5ba5e7b`,
   one commit "[canopen] Add the OD handler API (OdObject, write_od() / read_od()) and the profile API (CANopenNode,
-  register_node())") on the PR 4 head `33c31e3bab` (rebased 2026-11-27 from `4a257a84f5` on `7c02552a66`: only PR 4's
-  round-5 test fix differs; 150 C++ tests pass). Not opened upstream: until #23327 is merged it would carry PR 4's
+  register_node())") on the PR 4 head `46f147c65c` (`f5b5ba5e7b`, rebased 2026-11-27 from `10f03ae2a1` on
+  `33c31e3bab`, clean, `range-diff` identical; 152 C++ + 59 Python tests pass; force-pushed with lease; before that
+  from `4a257a84f5` on `7c02552a66`). Not opened upstream: until #23327 is merged it would carry PR 4's
   commit; then rebase it onto `dev` (`git rebase --onto upstream/dev canopen-pr4-monitor-nmt`, after checking that the
   squash has PR 4's canopen tree) and open it.
 - **Content:** `od_handler.h/.cpp` (`OdObject`, `OdStream`), the handler parts of `od.*` (`set_object()`, `write()`,
