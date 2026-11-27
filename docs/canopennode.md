@@ -1084,7 +1084,9 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   - mrk-its/esphome `canopen-full` = `a12c11b2e0`; `canopen-pr4-monitor-nmt` (= #23327's head) = `9de95590f6`
     (`3f4b44effe` + 16 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
     (builds and clang-tidy included); not checked after `b777e48bcd`.
-  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `974af2728` (6 commits on `canopen-pr3-node` `e3dc011fe`; rebased
+  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `34c287463` (2026-11-27: rebased onto esphome.io `next`
+    `b8edc4861` = #8254's squash, same `canopen.mdx` as `canopen-pr3-node` `d5659143d`; clean, diff vs base unchanged,
+    lint passes; pre-rebase `backup/canopen-pr4-monitor-nmt-pre-rebase`). Before: `974af2728` (6 commits on `canopen-pr3-node` `e3dc011fe`; rebased
     2026-11-26 after #8254's esphbot fixes: `device_name` default = `esphome: name`, the `on_nmt_state_change` example
     only logs); the docs PR isn't opened.
   - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `a12c11b2e0` (`test_hub_copy.py` passes).
@@ -1196,7 +1198,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   52 / 43 Python tests pass; no builds / clang-tidy. Replied (with the capacity reasoning) and resolved. Side note: an
   OFFLINE is followed by NMT_CHANGED(UNKNOWN) and a RESET by NMT_CHANGED(INITIALIZING) in the same pass (the consumer's
   NMT-changed check after the timeout / boot-up); unchanged by this fix, not checked against the docs yet.
-- **Next: docs.** (1) Once esphome/esphome.io#8254 (PR 3's docs) is merged: rebase the docs branch onto `next`
+- **Next: docs.** (1) esphome/esphome.io#8254 merged 2026-11-27 (`b8edc4861`), the docs branch rebased (`34c287463`, see
+  "State on 2026-11-27"); still to do: open the docs PR and link it in #23327. Originally: rebase the docs branch onto `next`
   (`git rebase --onto <esphome.io next> canopen-pr3-node`; `../esphome-docs` has only the mrk-its remote, add
   `esphome/esphome.io` to fetch `next`), open the docs PR (the user may need to run `gh pr create` for esphome.io: the
   permission check blocked it once), link it in #23327's description. (2) ~~Port the docs back to esphome-docs `canopen-full`~~ done 2026-11-26: `83f007e3b` = PR 4's docs text
