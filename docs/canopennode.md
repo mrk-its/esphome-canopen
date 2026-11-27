@@ -1114,8 +1114,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     `defines.h` and the unit-test override define it. ESP8266 node alone: 281,199 -> 280,339 B flash (-860 B); builds
     of a single node, two nodes on one canbus and a client-only hub (esp8266, `~/.cache/esphome-nmt-master-check`) and
     esphome-canopen's `esp8266_mapper.yaml` pass; 177 / 140 C++, 66 / 57 Python; codegen tests `test_local_nodes`
-    (define set), `test_single_node_has_no_local_queue`. No clang-tidy run (CI). Not yet told bdraco / not in the
-    PR description (its size numbers are now ~860 B better for a plain node).
+    (define set), `test_single_node_has_no_local_queue`. No clang-tidy run (CI). Told bdraco (#issuecomment-7212379802);
+    PR description updated (the queue paragraph, the size: a node alone on its canbus about -1 kB vs `dev` on ESP8266).
     PR 5 rebased onto `9de95590f6` (see "PR 5 as cut"; the profile's `on_node_nmt_changed()` no longer gets BOOTUP,
     its comment doesn't promise it).
   - **Monitoring while this node is STOPPED** (bdraco's (1)), done 2026-11-27: `CO_process()` runs the consumer only
