@@ -1,19 +1,12 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 import logging
-import math
-import re
 from typing import Any
 
 from esphome import automation
 import esphome.codegen as cg
 from esphome.components import esp32
-from esphome.components.canbus import (
-    CONF_BIT_RATE,
-    CONF_CANBUS_ID,
-    DEFAULT_BIT_RATE,
-    CanbusComponent,
-)
+from esphome.components.canbus import CONF_CANBUS_ID, CanbusComponent
 from esphome.components.const import CONF_HARDWARE_VERSION, CONF_SERIAL_NUMBER
 import esphome.config_validation as cv
 from esphome.const import (
@@ -115,31 +108,6 @@ def _hub_configs() -> list[ConfigType]:
     return hubs if isinstance(hubs, list) else []
 
 
-# An NMT reset node reboots once CANopenNode's queue is empty and the CAN controller had time to send what it holds:
-# up to 3 frames in its TX mailboxes plus ours, of at most 135 bits (8 data bytes with stuffing). 20 ms (the C++
-# default) covers that down to 50 kbit/s.
-RESET_TX_FRAMES = 4
-FRAME_BITS = 135
-DEFAULT_RESET_TX_GRACE_MS = 20
-
-
-def _bit_rate(canbus_id: ID) -> int:
-    """The bit rate of the canbus canbus_id, in bit/s."""
-    rate = DEFAULT_BIT_RATE
-    for bus in CORE.config.get("canbus", []):
-        if str(bus[CONF_ID]) == str(canbus_id):
-            rate = bus.get(CONF_BIT_RATE, DEFAULT_BIT_RATE)
-    match = re.fullmatch(r"(\d+)K(\d*)BPS", str(rate).upper())
-    return round(float(f"{match[1]}.{match[2] or 0}") * 1000)
-
-
-def reset_tx_grace_ms(bit_rate: int) -> int:
-    return max(
-        DEFAULT_RESET_TX_GRACE_MS,
-        math.ceil(RESET_TX_FRAMES * FRAME_BITS * 1000 / bit_rate),
-    )
-
-
 def enable_sdo_client() -> None:
     """Compile the SDO client (read_sdo(), write_sdo(), ...): for actions and components that use it."""
     if not _enable_once("sdo_client"):
@@ -207,9 +175,16 @@ def enable_pdo() -> None:
     cg.add_build_flag("-DCO_CONFIG_STORAGE=0x01")
 
 
+# monitor_node() calls; ESPHOME_CANOPEN_HEARTBEAT_CLIENTS sizes each hub's 0x1016 storage
+_register_hb_client = cg.slot_list(
+    "ESPHOME_CANOPEN_HEARTBEAT_CLIENTS", "monitor_node", DOMAIN
+)
+
+
 def enable_node_monitor() -> None:
-    """Compile node monitoring (CANopenNode's heartbeat consumer, monitor_node()): for heartbeat_clients and components
-    that monitor a node (register_node(heartbeat_timeout=...)). Without it the consumer isn't built."""
+    """Compile node monitoring (CANopenNode's heartbeat consumer) for heartbeat_clients and
+    register_node(heartbeat_timeout=...), which register each node through _register_hb_client so the storage is
+    sized. Without it the consumer isn't built."""
     if not _enable_once("node_monitor"):
         return
     cg.add_define("USE_CANOPEN_NODE_MONITOR")
@@ -221,24 +196,19 @@ async def _final_build_flags() -> None:
     # heartbeat consumer, which links in its code even without monitored nodes
     if "node_monitor" not in _get_data().enabled:
         cg.add_build_flag("-DCO_CONFIG_HB_CONS=0")
-        for hub in _hub_configs():
-            if CONF_ON_NODE_EVENT in hub:
-                _LOGGER.warning(
-                    "canopen %s: on_node_event never fires, no node is monitored (heartbeat_clients)",
-                    hub[CONF_ID],
-                )
+    # each hub has its own consumer, so another hub's heartbeat_clients don't help
+    for hub in _hub_configs():
+        if CONF_ON_NODE_EVENT in hub and not hub.get(CONF_HEARTBEAT_CLIENTS):
+            _LOGGER.warning(
+                "canopen %s: on_node_event never fires, this hub monitors no node (heartbeat_clients)",
+                hub[CONF_ID],
+            )
 
 
 def enable_nmt_master() -> None:
     """Compile the NMT master (send_nmt()): for actions and components that use it."""
     if not _enable_once("nmt_master"):
         return
-    # the NMT master is part of the node; the unit test build has no hubs and tests nodes
-    hubs = _hub_configs()
-    if hubs and not any(CONF_NODE_ID in hub for hub in hubs):
-        raise EsphomeError(
-            "the NMT master (send_nmt()) needs a CANopen node: no canopen component has a node_id (SDO clients only)"
-        )
     cg.add_define("USE_CANOPEN_NMT_MASTER")
     # callback change | master
     cg.add_build_flag("-DCO_CONFIG_NMT=0x03")
@@ -300,7 +270,9 @@ async def register_node(
         enable_node_monitor()
         hub = await cg.get_variable(config[CONF_CANOPEN_ID])
         cg.add(
-            hub.monitor_node(config[CONF_NODE_ID], heartbeat_timeout.total_milliseconds)
+            _register_hb_client(
+                hub, config[CONF_NODE_ID], heartbeat_timeout.total_milliseconds
+            )
         )
     return var
 
@@ -395,9 +367,11 @@ def validate_client_only(config: ConfigType) -> ConfigType:
     return {key: value for key, value in config.items() if key not in NODE_OPTIONS}
 
 
+NODE_ID = cv.All(cv.int_, cv.Range(min=1, max=127))
+
 HB_CLIENT_SCHEMA = cv.Schema(
     {
-        cv.Required(CONF_NODE_ID): cv.All(cv.int_, cv.Range(min=1, max=127)),
+        cv.Required(CONF_NODE_ID): NODE_ID,
         cv.Required(CONF_TIMEOUT): UINT16_MS,
     }
 )
@@ -419,7 +393,7 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(CANopenComponent),
             cv.GenerateID(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
             # without node_id: SDO client only (see validate_client_only)
-            cv.Optional(CONF_NODE_ID): cv.All(cv.int_, cv.Range(min=1, max=127)),
+            cv.Optional(CONF_NODE_ID): NODE_ID,
             cv.Optional(CONF_HEARTBEAT_INTERVAL, "5000ms"): HEARTBEAT_INTERVAL,
             cv.Optional(CONF_HEARTBEAT_CLIENTS, []): cv.ensure_list(HB_CLIENT_SCHEMA),
             # events of the heartbeat_clients nodes (online, offline, NMT changed, reset)
@@ -551,9 +525,6 @@ async def to_code(config: ConfigType) -> None:
     if config.get(CONF_NMT_MASTER):
         enable_nmt_master()
     cg.add(var.set_heartbeat_interval(config[CONF_HEARTBEAT_INTERVAL]))
-    grace_ms = reset_tx_grace_ms(_bit_rate(config[CONF_CANBUS_ID]))
-    if grace_ms != DEFAULT_RESET_TX_GRACE_MS:
-        cg.add(var.set_reset_tx_grace(grace_ms))
     if config[CONF_NMT_STARTUP] != "operational":
         cg.add(var.set_start_operational(False))
     if CONF_SDO_BLOCK_SIZE in config:
@@ -574,8 +545,8 @@ async def to_code(config: ConfigType) -> None:
         enable_node_monitor()
     for client in config[CONF_HEARTBEAT_CLIENTS]:
         cg.add(
-            var.monitor_node(
-                client[CONF_NODE_ID], client[CONF_TIMEOUT].total_milliseconds
+            _register_hb_client(
+                var, client[CONF_NODE_ID], client[CONF_TIMEOUT].total_milliseconds
             )
         )
 

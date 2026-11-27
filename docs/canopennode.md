@@ -1198,6 +1198,15 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   52 / 43 Python tests pass; no builds / clang-tidy. Replied (with the capacity reasoning) and resolved. Side note: an
   OFFLINE is followed by NMT_CHANGED(UNKNOWN) and a RESET by NMT_CHANGED(INITIALIZING) in the same pass (the consumer's
   NMT-changed check after the timeout / boot-up); unchanged by this fix, not checked against the docs yet.
+- **bdraco's commits on #23327 (2026-11-27)**, head `17adee303b`: `d27852e57b` (heartbeat consumer list as
+  `cg.slot_list()` `ESPHOME_CANOPEN_HEARTBEAT_CLIENTS` instead of a vector, `monitor_node()` only through
+  `_register_hb_client(hub, ...)`; a fixed 60 ms reset grace instead of the bit-rate-derived one, one reset deadline;
+  NMT master check per hub only; table-driven tests), `3dfff958cc` (the `on_node_event` warning per hub), `033caf5410`
+  (rename), `d895f67279` / `17adee303b` (comments). His hardware retest of `d27852e57b` passed (10-500 kbit/s); esphbot
+  merge-ready. Ported to `canopen-full` (`f9f169a9e5`, pushed; `17adee303b` empty there): `register_node(heartbeat_timeout=)`
+  now calls `_register_hb_client()`, the comments name `heartbeat_clients` and `register_node()`, `no_ota.yaml` for
+  `node.yaml`. 181 C++ + 54 Python tests, builds esp8266-ard / esp32-idf pass. Hub synced here. PR 5 still to rebase
+  onto `17adee303b` with the same `_register_hb_client()` change.
 - **Next: docs.** (1) esphome/esphome.io#8254 merged 2026-11-27 (`b8edc4861`), the docs branch rebased (`34c287463`, see
   "State on 2026-11-27"); docs PR esphome/esphome.io#8285 opened 2026-11-27 and linked in #23327's description. Copilot's review of #8285 (5 comments, 2026-11-27), all checked against the code and fixed in `29cf55e68`
   (pushed): a line over 120 chars; local frames also arrive before a bus frame (`on_frame_()` drains the queue first);
