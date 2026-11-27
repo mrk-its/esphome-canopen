@@ -1205,8 +1205,9 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   (rename), `d895f67279` / `17adee303b` (comments). His hardware retest of `d27852e57b` passed (10-500 kbit/s); esphbot
   merge-ready. Ported to `canopen-full` (`f9f169a9e5`, pushed; `17adee303b` empty there): `register_node(heartbeat_timeout=)`
   now calls `_register_hb_client()`, the comments name `heartbeat_clients` and `register_node()`, `no_ota.yaml` for
-  `node.yaml`. 181 C++ + 54 Python tests, builds esp8266-ard / esp32-idf pass. Hub synced here. PR 5 still to rebase
-  onto `17adee303b` with the same `_register_hb_client()` change.
+  `node.yaml`. 181 C++ + 54 Python tests, builds esp8266-ard / esp32-idf pass. Hub synced here. Then
+  `75a285d78f`: `test_register_node` checks `ESPHOME_CANOPEN_HEARTBEAT_CLIENTS` is 2 (`heartbeat_clients` + the
+  profile's slot; 1 with `hub.monitor_node()` directly).
 - **Next: docs.** (1) esphome/esphome.io#8254 merged 2026-11-27 (`b8edc4861`), the docs branch rebased (`34c287463`, see
   "State on 2026-11-27"); docs PR esphome/esphome.io#8285 opened 2026-11-27 and linked in #23327's description. Copilot's review of #8285 (5 comments, 2026-11-27), all checked against the code and fixed in `29cf55e68`
   (pushed): a line over 120 chars; local frames also arrive before a bus frame (`on_frame_()` drains the queue first);
@@ -1241,7 +1242,11 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
 #### PR 5 as cut (2026-11-26, branch only)
 - **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `1623671c93`,
   one commit "[canopen] Add the OD handler API (OdObject, write_od() / read_od()) and the profile API (CANopenNode,
-  register_node())") on the PR 4 head `9de95590f6` (`1623671c93`, rebased 2026-11-27 from `3f71170bdc` on `2ee3fe8351`,
+  register_node())") on the PR 4 head `17adee303b` (`d4a83338b1`, rebased 2026-11-27 onto bdraco's commits:
+  `register_node(heartbeat_timeout=)` calls `_register_hb_client()` (the slot list), the class comment / docstrings
+  name `register_node()` next to `heartbeat_clients`, `test_register_node` checks the slot count (fails with the old
+  call); 156 C++ + 48 Python tests, builds esp8266-ard / esp32-idf / rp2040-ard pass; before: `1623671c93` on
+  `9de95590f6`, rebased 2026-11-27 from `3f71170bdc` on `2ee3fe8351`,
   before that from `f5b5ba5e7b` on `46f147c65c`, from `10f03ae2a1` on `33c31e3bab` and from `4a257a84f5` on
   `7c02552a66`; each clean,
   `range-diff` identical; 152 C++ + 59 Python tests pass; force-pushed with lease). Not opened upstream: until #23327 is merged it would carry PR 4's
