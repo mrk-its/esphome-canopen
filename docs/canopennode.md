@@ -1199,7 +1199,13 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   OFFLINE is followed by NMT_CHANGED(UNKNOWN) and a RESET by NMT_CHANGED(INITIALIZING) in the same pass (the consumer's
   NMT-changed check after the timeout / boot-up); unchanged by this fix, not checked against the docs yet.
 - **Next: docs.** (1) esphome/esphome.io#8254 merged 2026-11-27 (`b8edc4861`), the docs branch rebased (`34c287463`, see
-  "State on 2026-11-27"); docs PR esphome/esphome.io#8285 opened 2026-11-27 and linked in #23327's description. Originally: rebase the docs branch onto `next`
+  "State on 2026-11-27"); docs PR esphome/esphome.io#8285 opened 2026-11-27 and linked in #23327's description. Copilot's review of #8285 (5 comments, 2026-11-27), all checked against the code and fixed in `29cf55e68`
+  (pushed): a line over 120 chars; local frames also arrive before a bus frame (`on_frame_()` drains the queue first);
+  the boot-up EMCY only for a node that was online, and no new EMCY while that error is active (one error per type,
+  not per node); a broadcast `reset_node` waits at most ~140 ms (`RESET_TX_GRACE_MS` + `RESET_FLUSH_EXTRA_MS`), then
+  reboots even if the frame is still queued; `set_nmt_state()` from `on_node_event` / `on_nmt_state_change` applies in
+  the next pass. Replied and resolved. Ported to esphome-docs `canopen-full` (`7a65a3ffc`, pushed), with what that branch
+  lacked: PR 4's `0f3c2d470` / `974af2728` texts and PR 3's `d5659143d`. Originally: rebase the docs branch onto `next`
   (`git rebase --onto <esphome.io next> canopen-pr3-node`; `../esphome-docs` has only the mrk-its remote, add
   `esphome/esphome.io` to fetch `next`), open the docs PR (the user may need to run `gh pr create` for esphome.io: the
   permission check blocked it once), link it in #23327's description. (2) ~~Port the docs back to esphome-docs `canopen-full`~~ done 2026-11-26: `83f007e3b` = PR 4's docs text
