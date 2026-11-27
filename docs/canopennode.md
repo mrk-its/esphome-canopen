@@ -1081,13 +1081,13 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   0x1016 read only, `send_nmt()` false cases, `reset_node` to all restarts us once sent. #2 thread replied and resolved,
   esphbot 3 answered in a PR comment. Still open: #11 (see "Next" below); #1 answered without a code change.
 - **State on 2026-11-27.** Everything is committed and pushed:
-  - mrk-its/esphome `canopen-full` = `67fc76bac6`; `canopen-pr4-monitor-nmt` (= #23327's head) = `46f147c65c`
-    (`3f4b44effe` + 14 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
+  - mrk-its/esphome `canopen-full` = `3342fab152`; `canopen-pr4-monitor-nmt` (= #23327's head) = `2ee3fe8351`
+    (`3f4b44effe` + 15 review-fix commits; upstream squashes). #23327 CI after `eff62bc872`: 79 checks pass, 7 skipped
     (builds and clang-tidy included); not checked after `b777e48bcd`.
-  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `0f3c2d470` (5 commits on `canopen-pr3-node` `e3dc011fe`; rebased
+  - mrk-its/esphome-docs `canopen-pr4-monitor-nmt` = `974af2728` (6 commits on `canopen-pr3-node` `e3dc011fe`; rebased
     2026-11-26 after #8254's esphbot fixes: `device_name` default = `esphome: name`, the `on_nmt_state_change` example
     only logs); the docs PR isn't opened.
-  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `67fc76bac6` (`test_hub_copy.py` passes).
+  - esphome-canopen `canopen_entities`: hub copy synced from `canopen-full` `3342fab152` (`test_hub_copy.py` passes).
   - esphbot approved (on `4b0926f608`, "ready to merge"); Copilot's last two reviews: no open issues; all 17 review
     threads resolved. No maintainer approval yet.
   - **bdraco's hardware test** of `33c31e3bab` (2026-11-27, #issuecomment on the PR; two ESP32-C3, 250 kbit/s, three
@@ -1099,7 +1099,16 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     `canopen.nmt` on a client-only hub is rejected at codegen, not validation (`esphome config` says valid); (4) the
     PR text's 2,804 B is vs. consumer always on: vs dev a plain node is 136 B smaller; (5) EMCY `0x8130` on every
     OFFLINE / RESET (CANopenNode behaviour). Also: the queue code (~600 B) is linked with a single local node too.
-    (2)-(5) not answered yet.
+    (2)-(5) and the queue size answered in #issuecomment-7212157463 (2026-11-27): (2) fixed, `canopen-full`
+    `3342fab152`, cut `2ee3fe8351`: `on_hb_nmt_changed()` skips `CO_NMT_INITIALIZING` (RESET carries the boot-up);
+    `EventsFromHeartbeats` checks the exact events / getters after a boot-up and the next heartbeat (fails before);
+    177 / 140 C++ pass; `types.h` comment. (3) kept: actions can't see the hub config at validation, codegen check
+    like `sdo_client: false`. (4) PR description updated with his numbers (and `nmt_master: true`). (5) documented
+    (docs `974af2728`: `0x8130`, error register bit 4, error reset EMCY, EMCY while stopped queued until the next
+    start; the boot-up EMCY is CANopenNode's, not CiA 301's). Queue code with a single local node (~600 B): left for a
+    follow-up (a `USE_CANOPEN_LOCAL_NODES` define when codegen links two or more hubs on one canbus).
+    PR 5 is still on `46f147c65c`: rebase onto `2ee3fe8351` (the profile's `on_node_nmt_changed()` no longer gets
+    BOOTUP).
   - **Monitoring while this node is STOPPED** (bdraco's (1)), done 2026-11-27: `CO_process()` runs the consumer only
     in pre-op / op and clears every entry on stop (no event, ONLINE again after a start). `init_node_monitor_()` sets
     `config_.CNT_HB_CONS = 0` after `CO_CANopenInit()` (`CO_GET_CNT(HB_CONS)` reads `co->config`, our `config_`; only
@@ -1205,7 +1214,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
 #### PR 5 as cut (2026-11-26, branch only)
 - **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `f5b5ba5e7b`,
   one commit "[canopen] Add the OD handler API (OdObject, write_od() / read_od()) and the profile API (CANopenNode,
-  register_node())") on the PR 4 head `46f147c65c` (`f5b5ba5e7b`, rebased 2026-11-27 from `10f03ae2a1` on
+  register_node())") on the PR 4 head `46f147c65c`, now one behind (`f5b5ba5e7b`, rebased 2026-11-27 from `10f03ae2a1` on
   `33c31e3bab`, clean, `range-diff` identical; 152 C++ + 59 Python tests pass; force-pushed with lease; before that
   from `4a257a84f5` on `7c02552a66`). Not opened upstream: until #23327 is merged it would carry PR 4's
   commit; then rebase it onto `dev` (`git rebase --onto upstream/dev canopen-pr4-monitor-nmt`, after checking that the

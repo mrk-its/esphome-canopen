@@ -38,9 +38,9 @@ esphome/esphome.io#8254 (esphome-docs branch `canopen-pr3-node`, rebased on `nex
 `backup/canopen-pr3-node-pre-rebase`; the fork PR mrk-its/esphome-docs#1 is closed) (`docs/canopennode.md`,
 "PR 3 as cut"). PR 4 (node monitoring + NMT master, plus the local frame queue and the heartbeat consumer only when
 used) is open upstream: esphome/esphome#23327 (2026-11-26, `canopen-pr4-monitor-nmt`, rebased on `dev`
-`6f7cd90870`, pushed to mrk-its; Copilot / esphbot review fixes on top, head `46f147c65c`, all review threads
-(5 Copilot rounds) fixed or answered and resolved, esphbot approved, bdraco's hardware test passed with caveats (monitoring
-while stopped fixed, the rest open); no builds / clang-tidy locally since the fixes); its docs on esphome-docs `canopen-pr4-monitor-nmt` (`0f3c2d470`, on
+`6f7cd90870`, pushed to mrk-its; Copilot / esphbot review fixes on top, head `2ee3fe8351`, all review threads
+(5 Copilot rounds) fixed or answered and resolved, esphbot approved, bdraco's hardware test passed with caveats (all
+answered: 2 fixed, 1 documented, 1 kept, the queue size left for a follow-up); no builds / clang-tidy locally since the fixes); its docs on esphome-docs `canopen-pr4-monitor-nmt` (`974af2728`, on
 `canopen-pr3-node` `e3dc011fe`), to be rebased on `next` and opened once #8254 is merged, then linked in #23327's description
 (`docs/canopennode.md`, "PR 4 as cut", with the open steps). PR 5 (OD handler API + profile API) is cut on `canopen-pr5-od-profile` (`f5b5ba5e7b`, on PR 4's
 head, pushed, not opened: `docs/canopennode.md`, "PR 5 as cut"). The cut's history and test
