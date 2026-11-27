@@ -1107,8 +1107,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
     (docs `974af2728`: `0x8130`, error register bit 4, error reset EMCY, EMCY while stopped queued until the next
     start; the boot-up EMCY is CANopenNode's, not CiA 301's). Queue code with a single local node (~600 B): left for a
     follow-up (a `USE_CANOPEN_LOCAL_NODES` define when codegen links two or more hubs on one canbus).
-    PR 5 is still on `46f147c65c`: rebase onto `2ee3fe8351` (the profile's `on_node_nmt_changed()` no longer gets
-    BOOTUP).
+    PR 5 rebased onto `2ee3fe8351` (see "PR 5 as cut"; the profile's `on_node_nmt_changed()` no longer gets BOOTUP,
+    its comment doesn't promise it).
   - **Monitoring while this node is STOPPED** (bdraco's (1)), done 2026-11-27: `CO_process()` runs the consumer only
     in pre-op / op and clears every entry on stop (no event, ONLINE again after a start). `init_node_monitor_()` sets
     `config_.CNT_HB_CONS = 0` after `CO_CANopenInit()` (`CO_GET_CNT(HB_CONS)` reads `co->config`, our `config_`; only
@@ -1212,11 +1212,11 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   credentials here: push to `git@github.com:mrk-its/esphome-docs.git`.
 
 #### PR 5 as cut (2026-11-26, branch only)
-- **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `f5b5ba5e7b`,
+- **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `3f71170bdc`,
   one commit "[canopen] Add the OD handler API (OdObject, write_od() / read_od()) and the profile API (CANopenNode,
-  register_node())") on the PR 4 head `46f147c65c`, now one behind (`f5b5ba5e7b`, rebased 2026-11-27 from `10f03ae2a1` on
-  `33c31e3bab`, clean, `range-diff` identical; 152 C++ + 59 Python tests pass; force-pushed with lease; before that
-  from `4a257a84f5` on `7c02552a66`). Not opened upstream: until #23327 is merged it would carry PR 4's
+  register_node())") on the PR 4 head `2ee3fe8351` (`3f71170bdc`, rebased 2026-11-27 from `f5b5ba5e7b` on
+  `46f147c65c`, before that from `10f03ae2a1` on `33c31e3bab` and from `4a257a84f5` on `7c02552a66`; each clean,
+  `range-diff` identical; 152 C++ + 59 Python tests pass; force-pushed with lease). Not opened upstream: until #23327 is merged it would carry PR 4's
   commit; then rebase it onto `dev` (`git rebase --onto upstream/dev canopen-pr4-monitor-nmt`, after checking that the
   squash has PR 4's canopen tree) and open it.
 - **Content:** `od_handler.h/.cpp` (`OdObject`, `OdStream`), the handler parts of `od.*` (`set_object()`, `write()`,
