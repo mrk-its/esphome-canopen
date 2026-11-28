@@ -1263,7 +1263,13 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   after #23327 merged: `08bc6ca533` on `upstream/dev` `6eadaff155` (`git rebase --onto upstream/dev
   canopen-pr4-monitor-nmt`; clean, `range-diff` identical; 156 C++ + 48 Python tests pass; force-pushed with lease; the
   pre-rebase branch is `backup/canopen-pr5-od-profile-pre-rebase`, local). **Opened 2026-11-28 as
-  esphome/esphome#23440** ("New developer-facing feature", no docs PR: no YAML options; no Claude attribution).
+  esphome/esphome#23440** ("New developer-facing feature", no esphome.io docs PR: no YAML options; no Claude
+  attribution). Developer docs: esphome/developers.esphome.io#382 (2026-11-28, `~/repos/developers.esphome.io` branch
+  `canopen-hub`, fork remote `mrk`): a new page `architecture/components/canopen.md` for the whole hub API (PRs 1-5,
+  each section ends with "available in 2026.12.0 (esphome/esphome#N)"), in the sidebar before `sendspin`; linked in
+  #23440's "developers.esphome.io" field. Checks there: `npm ci --ignore-scripts` (sharp has no prebuilt binary for
+  Node 25), `npm run lint:md`, `format:check`, `build`. Conventions: bdraco's agent guide (open PR #366 there): one page
+  per component, plain English, wrap at 120, check every claim against the code.
 - **Content:** `od_handler.h/.cpp` (`OdObject`, `OdStream`), the handler parts of `od.*` (`set_object()`, `write()`,
   `read()`, `value_size()`, `OD_extension_t` in `PendingEntry` / `extensions_`), `CANopenComponent::write_od()` /
   `read_od()`, `canopen_node.h/.cpp` (`CANopenNode`), in `__init__.py` `CONF_CANOPEN_ID`, `CANopenNode`,
@@ -1285,8 +1291,9 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   vs `canopen-full` only PR 6-8 parts and the edits above differ.
 - **Worktrees:** `~/.cache/esphome-wt/pr5` and `~/.cache/esphome-wt/full` (out of `/tmp`: its tmpfs quota filled
   during this work; builds / tidy with `PLATFORMIO_WORKSPACE_DIR=~/.cache/esphome-tidy-pio/<wt>`).
-- **Next:** the review of #23440 (fixes on `canopen-full` first, then cherry-picked onto the cut, as for PR 4). Docs:
-  none for now (no YAML options; at most `write_od()` / `read_od()` under "Lambdas", not decided).
+- **Next:** the reviews of #23440 (fixes on `canopen-full` first, then cherry-picked onto the cut, as for PR 4) and of
+  developers.esphome.io#382 (API changes in later PRs go to that page too). esphome.io docs: none for now (no YAML
+  options; at most `write_od()` / `read_od()` under "Lambdas", not decided).
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's

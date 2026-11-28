@@ -43,7 +43,7 @@ used) is **merged upstream** (2026-11-27, squash `738ccefc1c`, same canopen tree
 answered: 2 fixed, 1 documented, 1 kept, the queue compiled only with two or more nodes on a canbus); no builds / clang-tidy locally since the fixes); its docs PR esphome/esphome.io#8285 (still open; esphome-docs `canopen-pr4-monitor-nmt`
 `29cf55e68`, rebased on `next` `b8edc4861`; opened 2026-11-27, linked in #23327's description; Copilot's 5 comments fixed)
 (`docs/canopennode.md`, "PR 4 as cut", with the open steps). PR 5 (OD handler API + profile API) is cut on `canopen-pr5-od-profile` (`08bc6ca533`, rebased
-onto `upstream/dev` `6eadaff155` 2026-11-28, pushed) and open upstream: esphome/esphome#23440 (2026-11-28, no docs PR; `docs/canopennode.md`, "PR 5 as cut"). The cut's history and test
+onto `upstream/dev` `6eadaff155` 2026-11-28, pushed) and open upstream: esphome/esphome#23440 (2026-11-28; developer docs esphome/developers.esphome.io#382, the hub's API page; `docs/canopennode.md`, "PR 5 as cut"). The cut's history and test
 results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then into the open PR's cut. Before work in `../esphome` or `../esphome-docs`, read their AGENTS.md / CLAUDE.md
 (conventions, `node script/lint.mjs` for the docs).
 OTA in the hub on CiA 302-3 program download objects (`0x1F50`/`0x1F51`/`0x1F56`/`0x1F57`) instead of the mapper's `0x3000`:
