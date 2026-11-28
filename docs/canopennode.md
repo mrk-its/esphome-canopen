@@ -42,7 +42,7 @@ Where to continue (2026-11-28):
   `config/node.yaml` deleted: `canopen-full` uses `no_ota.yaml`), dev's for the rest, `esphome/core/defines.h` merged
   by hand (dev's lines plus PRs 5-8's `CO_CONFIG_SDO_SRV*` / `CRC16` / `PDO` / `STORAGE`, `USE_CANOPEN_PDO`,
   `CANOPEN_SDO_BLOCK_SIZE`); 181 C++ + 54 Python tests pass. `git diff upstream/dev canopen-full` is exactly PRs 5-8.
-  PR 5 rebased onto dev ("PR 5 as cut").
+  PR 5 rebased onto dev and opened: esphome/esphome#23440 ("PR 5 as cut").
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
 - **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
   `components_next`); the old component (`components/canopen`, canopen-stack) and `components_next/canopen` (a stale
@@ -1249,7 +1249,7 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   (`PLATFORMIO_WORKSPACE_DIR=~/.cache/esphome-tidy-pio/<wt>`). Pushing esphome-docs over HTTPS failed without
   credentials here: push to `git@github.com:mrk-its/esphome-docs.git`.
 
-#### PR 5 as cut (2026-11-26, branch only)
+#### PR 5 as cut (2026-11-26, esphome/esphome#23440)
 - **What:** the OD handler API and the profile API. Branch `canopen-pr5-od-profile` (mrk-its/esphome, `1623671c93`,
   one commit "[canopen] Add the OD handler API (OdObject, write_od() / read_od()) and the profile API (CANopenNode,
   register_node())") on the PR 4 head `17adee303b` (`d4a83338b1`, rebased 2026-11-27 onto bdraco's commits:
@@ -1262,7 +1262,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   `range-diff` identical; 152 C++ + 59 Python tests pass; force-pushed with lease). **Rebased onto `dev` (2026-11-28)**
   after #23327 merged: `08bc6ca533` on `upstream/dev` `6eadaff155` (`git rebase --onto upstream/dev
   canopen-pr4-monitor-nmt`; clean, `range-diff` identical; 156 C++ + 48 Python tests pass; force-pushed with lease; the
-  pre-rebase branch is `backup/canopen-pr5-od-profile-pre-rebase`, local). Not opened upstream yet.
+  pre-rebase branch is `backup/canopen-pr5-od-profile-pre-rebase`, local). **Opened 2026-11-28 as
+  esphome/esphome#23440** ("New developer-facing feature", no docs PR: no YAML options; no Claude attribution).
 - **Content:** `od_handler.h/.cpp` (`OdObject`, `OdStream`), the handler parts of `od.*` (`set_object()`, `write()`,
   `read()`, `value_size()`, `OD_extension_t` in `PendingEntry` / `extensions_`), `CANopenComponent::write_od()` /
   `read_od()`, `canopen_node.h/.cpp` (`CANopenNode`), in `__init__.py` `CONF_CANOPEN_ID`, `CANopenNode`,
@@ -1284,8 +1285,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   vs `canopen-full` only PR 6-8 parts and the edits above differ.
 - **Worktrees:** `~/.cache/esphome-wt/pr5` and `~/.cache/esphome-wt/full` (out of `/tmp`: its tmpfs quota filled
   during this work; builds / tidy with `PLATFORMIO_WORKSPACE_DIR=~/.cache/esphome-tidy-pio/<wt>`).
-- **Next:** docs (no YAML options; at most `write_od()` / `read_od()` under "Lambdas", not decided), then open it
-  (#23327 is merged).
+- **Next:** the review of #23440 (fixes on `canopen-full` first, then cherry-picked onto the cut, as for PR 4). Docs:
+  none for now (no YAML options; at most `write_od()` / `read_od()` under "Lambdas", not decided).
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
