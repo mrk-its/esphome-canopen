@@ -1291,6 +1291,15 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   vs `canopen-full` only PR 6-8 parts and the edits above differ.
 - **Worktrees:** `~/.cache/esphome-wt/pr5` and `~/.cache/esphome-wt/full` (out of `/tmp`: its tmpfs quota filled
   during this work; builds / tidy with `PLATFORMIO_WORKSPACE_DIR=~/.cache/esphome-tidy-pio/<wt>`).
+- **Copilot's review (2026-11-28, 2 threads):** (1) handlers not tested through real SDO transfers: added
+  `SdoDownloadIntoADomainHandler` (1000-byte segmented download into a writable domain handler: chunk offsets, size 0
+  until the last chunk, then the total) and `HandlerErrorAbortsTheSdoTransfer` (`OD_RESULT_VALUE_HIGH` -> client abort
+  `0x06090031`; checked that it fails when the trampoline drops the result) in `loopback_test.cpp`. (2) `read_od()` /
+  `write_od()` lack the SDO server's `ODA_STR` handling (shorter string writes with a terminator, reads up to the
+  terminator): not fixed, `ODA_STR` isn't in the hub's API (`OD_READ` / `OD_WRITE` / `OD_READ_WRITE`; `add_string()` is
+  read-only with the exact length, varying strings are domains with handlers); a comment at `write_od()` says so.
+  `canopen-full` `d6ed015f38`, cut `2047576b00` (158 C++ tests), both pushed; hub synced here. Replies drafted, not
+  posted yet (posting was blocked by the permission check).
 - **Next:** the reviews of #23440 (fixes on `canopen-full` first, then cherry-picked onto the cut, as for PR 4) and of
   developers.esphome.io#382 (API changes in later PRs go to that page too). esphome.io docs: none for now (no YAML
   options; at most `write_od()` / `read_od()` under "Lambdas", not decided).
