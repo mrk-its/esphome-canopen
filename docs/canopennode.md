@@ -1300,8 +1300,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   read-only with the exact length, varying strings are domains with handlers); a comment at `write_od()` says so.
   Writable strings work as a domain with an `od_write()` handler; a possible helper (`OdString<N>`), its draft and a
   comparison with `ODA_STR`: [spec/writable_strings.md](spec/writable_strings.md).
-  `canopen-full` `d6ed015f38`, cut `2047576b00` (158 C++ tests), both pushed; hub synced here. Replies drafted, not
-  posted yet (posting was blocked by the permission check).
+  `canopen-full` `d6ed015f38`, cut `2047576b00` (158 C++ tests), both pushed; hub synced here. Both threads answered
+  and resolved.
 - **Next:** the reviews of #23440 (fixes on `canopen-full` first, then cherry-picked onto the cut, as for PR 4) and of
   developers.esphome.io#382 (API changes in later PRs go to that page too). esphome.io docs: none for now (no YAML
   options; at most `write_od()` / `read_od()` under "Lambdas", not decided).
