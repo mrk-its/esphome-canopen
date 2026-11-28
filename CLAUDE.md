@@ -26,9 +26,9 @@ Current split (2026-11-05, "SDO client only first", 8 PRs): PR 1 = the hub witho
 `sdo_read` / `sdo_write`), PR 2 raw frames + heartbeat / EMCY triggers, PR 3 the node core (`USE_CANOPEN_NODE`) +
 loopback. PR 1 (esphome/esphome#22410, cut on `canopen-pr1-sdo-client`) is **merged upstream** (2026-11-24,
 squash `206bb68485`); its docs PR esphome/esphome.io#8059 is merged too (2026-11-25, squash `d3f9241e3` on `next`). `canopen-full` in `../esphome` is rebuilt
-on `upstream/dev` as one commit "PRs 3-8 on top of PR 2 (to be split)" (`f0e18d854d`, 2026-11-25), plus the PR 3
-cut's fixes, the Copilot review fixes of #23299 and bdraco's 6 PR 3 commits ported back (`e8c940ed02`); the history before, with bdraco's PR 2 review commits ported, is
-`canopen-full-backup3` (pushed; older: `canopen-full-backup2`). PR 2 (esphome/esphome#23266, cut on
+on `upstream/dev` (`6eadaff155`, after PR 4 merged) as one commit "PRs 5-8 on top of PR 4 (to be split)" (`7d30862484`,
+2026-11-28; `git diff upstream/dev canopen-full` = PRs 5-8); the history before is `canopen-full-backup4` (pushed;
+older: `canopen-full-backup3`, `canopen-full-backup2`). PR 2 (esphome/esphome#23266, cut on
 `canopen-pr2-frames`) is **merged upstream** (2026-11-25, squash `29f8ea8e39`, identical to the cut head
 `79dc2e5ede`); its docs PR esphome/esphome.io#8243 is merged too (2026-11-25, squash `67bb87134` on `next`, with a
 paragraph by bdraco on the frame listener's callback and `context`). PR 3 (the node core + loopback,
@@ -37,13 +37,13 @@ esphome/esphome#23299, cut on `canopen-pr3-node`, head `9e7687e388`) is **merged
 esphome/esphome.io#8254 is merged too (2026-11-27, squash `b8edc4861` on `next`) (esphome-docs branch `canopen-pr3-node`, rebased on `next`; the pre-rebase branch is
 `backup/canopen-pr3-node-pre-rebase`; the fork PR mrk-its/esphome-docs#1 is closed) (`docs/canopennode.md`,
 "PR 3 as cut"). PR 4 (node monitoring + NMT master, plus the local frame queue and the heartbeat consumer only when
-used) is open upstream: esphome/esphome#23327 (2026-11-26, `canopen-pr4-monitor-nmt`, rebased on `dev`
+used) is **merged upstream** (2026-11-27, squash `738ccefc1c`, same canopen tree as the cut head): esphome/esphome#23327 (2026-11-26, `canopen-pr4-monitor-nmt`, rebased on `dev`
 `6f7cd90870`, pushed to mrk-its; Copilot / esphbot review fixes on top, then bdraco's 5 commits (slot-list heartbeat clients, fixed reset grace; ported to `canopen-full`), head `17adee303b`, all review threads
 (5 Copilot rounds) fixed or answered and resolved, esphbot approved, bdraco's hardware test passed with caveats (all
-answered: 2 fixed, 1 documented, 1 kept, the queue compiled only with two or more nodes on a canbus); no builds / clang-tidy locally since the fixes); its docs PR esphome/esphome.io#8285 (esphome-docs `canopen-pr4-monitor-nmt`
+answered: 2 fixed, 1 documented, 1 kept, the queue compiled only with two or more nodes on a canbus); no builds / clang-tidy locally since the fixes); its docs PR esphome/esphome.io#8285 (still open; esphome-docs `canopen-pr4-monitor-nmt`
 `29cf55e68`, rebased on `next` `b8edc4861`; opened 2026-11-27, linked in #23327's description; Copilot's 5 comments fixed)
-(`docs/canopennode.md`, "PR 4 as cut", with the open steps). PR 5 (OD handler API + profile API) is cut on `canopen-pr5-od-profile` (`d4a83338b1`, on PR 4's
-head, pushed, not opened: `docs/canopennode.md`, "PR 5 as cut"). The cut's history and test
+(`docs/canopennode.md`, "PR 4 as cut", with the open steps). PR 5 (OD handler API + profile API) is cut on `canopen-pr5-od-profile` (`08bc6ca533`, rebased
+onto `upstream/dev` `6eadaff155` 2026-11-28, pushed, not opened: `docs/canopennode.md`, "PR 5 as cut"). The cut's history and test
 results: `docs/canopennode.md`, "PR 1 as cut". Fixes go to `canopen-full` first, then into the open PR's cut. Before work in `../esphome` or `../esphome-docs`, read their AGENTS.md / CLAUDE.md
 (conventions, `node script/lint.mjs` for the docs).
 OTA in the hub on CiA 302-3 program download objects (`0x1F50`/`0x1F51`/`0x1F56`/`0x1F57`) instead of the mapper's `0x3000`:

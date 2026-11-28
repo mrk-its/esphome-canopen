@@ -20,7 +20,7 @@ see "Hub for the entity mapper"). **Next:** cut the upstream PRs again from the 
   services use a stack-neutral API, but there is no runtime choice of backend.
 
 ## Current state (handoff)
-Where to continue (2026-11-24):
+Where to continue (2026-11-28):
 - **Upstream split:** "Upstream PRs" -> "SDO client only first" (the current split) and its "PR 1 as cut". PR 1 (the
   SDO client, no node; `canopen-pr1-sdo-client`) is **merged upstream**: esphome/esphome#22410, squash `206bb68485`
   on `dev` (2026-11-24), identical to the cut's tip. The docs PR esphome/esphome.io#8059 is merged too (2026-11-25, squash `d3f9241e3` on `next`). bdraco's 2026-11-23 round is ported to
@@ -35,6 +35,14 @@ Where to continue (2026-11-24):
   was rebuilt again on `upstream/dev` as `f0e18d854d` "[canopen] PRs 3-8 on top of PR 2 (to be split)" (the history
   before is `canopen-full-backup3`, pushed), then `72308fbd7e` (fixes from the PR 3 cut). PR 3 is cut on
   `canopen-pr3-node` and open upstream: esphome/esphome#23299 ("PR 3 as cut").
+  PR 3 and PR 4 (esphome/esphome#23327, merged 2026-11-27 by bdraco, squash `738ccefc1c`, canopen tree identical to
+  the cut head `17adee303b`) are **merged upstream**. `canopen-full` was rebuilt again (2026-11-28) on `upstream/dev`
+  `6eadaff155` as `7d30862484` "[canopen] PRs 5-8 on top of PR 4 (to be split)" (the history before is
+  `canopen-full-backup4` = `75a285d78f`, pushed): `canopen-full`'s files under the canopen dirs (PR 3's
+  `config/node.yaml` deleted: `canopen-full` uses `no_ota.yaml`), dev's for the rest, `esphome/core/defines.h` merged
+  by hand (dev's lines plus PRs 5-8's `CO_CONFIG_SDO_SRV*` / `CRC16` / `PDO` / `STORAGE`, `USE_CANOPEN_PDO`,
+  `CANOPEN_SDO_BLOCK_SIZE`); 181 C++ + 54 Python tests pass. `git diff upstream/dev canopen-full` is exactly PRs 5-8.
+  PR 5 rebased onto dev ("PR 5 as cut").
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
 - **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
   `components_next`); the old component (`components/canopen`, canopen-stack) and `components_next/canopen` (a stale
@@ -1000,6 +1008,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   callback and `context` lifetime (`26969462c`).
 
 #### PR 4 as cut (2026-11-26, esphome/esphome#23327)
+- **Merged** 2026-11-27 (bdraco) as `738ccefc1c` on `dev` (squash; canopen tree identical to the cut head
+  `17adee303b`). Docs PR esphome/esphome.io#8285 still open.
 - **Why now:** PR 3 (#23299) is close to merge; PR 4 is prepared so it can go up right after (a PR opened before would
   carry PR 3's commits). Two items deferred in PR 3's review land here.
 - **On `canopen-full`** (pushed), on top of `e8c940ed02`:
@@ -1249,9 +1259,10 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   `9de95590f6`, rebased 2026-11-27 from `3f71170bdc` on `2ee3fe8351`,
   before that from `f5b5ba5e7b` on `46f147c65c`, from `10f03ae2a1` on `33c31e3bab` and from `4a257a84f5` on
   `7c02552a66`; each clean,
-  `range-diff` identical; 152 C++ + 59 Python tests pass; force-pushed with lease). Not opened upstream: until #23327 is merged it would carry PR 4's
-  commit; then rebase it onto `dev` (`git rebase --onto upstream/dev canopen-pr4-monitor-nmt`, after checking that the
-  squash has PR 4's canopen tree) and open it.
+  `range-diff` identical; 152 C++ + 59 Python tests pass; force-pushed with lease). **Rebased onto `dev` (2026-11-28)**
+  after #23327 merged: `08bc6ca533` on `upstream/dev` `6eadaff155` (`git rebase --onto upstream/dev
+  canopen-pr4-monitor-nmt`; clean, `range-diff` identical; 156 C++ + 48 Python tests pass; force-pushed with lease; the
+  pre-rebase branch is `backup/canopen-pr5-od-profile-pre-rebase`, local). Not opened upstream yet.
 - **Content:** `od_handler.h/.cpp` (`OdObject`, `OdStream`), the handler parts of `od.*` (`set_object()`, `write()`,
   `read()`, `value_size()`, `OD_extension_t` in `PendingEntry` / `extensions_`), `CANopenComponent::write_od()` /
   `read_od()`, `canopen_node.h/.cpp` (`CANopenNode`), in `__init__.py` `CONF_CANOPEN_ID`, `CANopenNode`,
@@ -1273,8 +1284,8 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   vs `canopen-full` only PR 6-8 parts and the edits above differ.
 - **Worktrees:** `~/.cache/esphome-wt/pr5` and `~/.cache/esphome-wt/full` (out of `/tmp`: its tmpfs quota filled
   during this work; builds / tidy with `PLATFORMIO_WORKSPACE_DIR=~/.cache/esphome-tidy-pio/<wt>`).
-- **Next:** docs (no YAML options; at most `write_od()` / `read_od()` under "Lambdas", not decided), then open it once
-  #23327 is merged.
+- **Next:** docs (no YAML options; at most `write_od()` / `read_od()` under "Lambdas", not decided), then open it
+  (#23327 is merged).
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
