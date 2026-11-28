@@ -1337,6 +1337,10 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   was a code bug: the lost frames warning counted bus frames too but called them "frames from other local nodes"; fixed
   on `canopen-full` `8df6dda8e8` and in PR 5's cut (`b62775e08d`, pushed to #23440; PR 6 rebased onto it, `0b4bb79c88`).
   The separate branch `canopen-fix-lost-frames-log` (`3dabac0a3f`) is deleted.
+- esphbot's second summary on #8285 (approved again, 4 non-blocking points): `e26472d13` (pushed) drops `register_node()`
+  from the page (PR 5, developer API), says `canopen.nmt` failures don't stop the automation (`send_nmt()` in a lambda
+  to react), and that `set_nmt_state()` logs a command rejected as pending (it already did); unmonitored ids answered
+  as before (#issuecomment-7239694989).
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
