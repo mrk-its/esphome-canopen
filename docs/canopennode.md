@@ -1304,14 +1304,23 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
   comparison with `ODA_STR`: [spec/writable_strings.md](spec/writable_strings.md).
   `canopen-full` `d6ed015f38`, cut `2047576b00` (158 C++ tests), both pushed; hub synced here. Both threads answered
   and resolved.
+- **esphbot's second review (2026-11-28, approved; 7 non-blocking points):** fixed as new commits on the cut (on
+  `canopen-full` first: `ba12739abf`, `c9934a3e5c`, `0bee0acdd8`; cut `41ea4d8dd2`, `31ee167c09`, `34db860a5a`, pushed):
+  OD handlers attached in `finalize()` (`Pending::extensions` holds `{index, extension}`, no extra vector; any order of
+  `add_*()` / `set_object()`; a handler for a missing entry or a second handler fails `finalize()`), the `on_node_event`
+  warning counts `register_node(heartbeat_timeout=...)` (`CANopenData.monitoring_hubs`), `CANopenNode` not copyable.
+  Not changed, answered: `write_od()` follows the SDO server on OK with fewer bytes written, no warning for a profile
+  without `heartbeat_timeout` (#issuecomment-7239057271). Developer docs: developers.esphome.io#382 `5bfa614`. Before
+  that, the lost frames warning fix `b62775e08d` (from esphbot's review of esphome.io#8285). 161 C++ + 50 Python tests,
+  clang-tidy esp32-idf-tidy, builds esp8266-ard / esp32-idf / rp2040-ard pass. PR 6 rebased onto it (`6a16a99fcc`).
 - **Next:** the reviews of #23440 (fixes on `canopen-full` first, then cherry-picked onto the cut, as for PR 4) and of
   developers.esphome.io#382 (API changes in later PRs go to that page too). esphome.io docs: none for now (no YAML
   options; at most `write_od()` / `read_od()` under "Lambdas", not decided).
 
 #### PR 6 as cut (2026-11-28, not opened yet)
-- **Branch:** `canopen-pr6-pdo-storage` (mrk-its/esphome, `0b4bb79c88`, one commit "[canopen] Add own PDOs
+- **Branch:** `canopen-pr6-pdo-storage` (mrk-its/esphome, `6a16a99fcc`, one commit "[canopen] Add own PDOs
   (configure_tpdo() / configure_rpdo(), request_tpdo()) and store / restore of their parameters (0x1010 / 0x1011)") on
-  the PR 5 cut `b62775e08d` (first cut `a9b0c705e0` on `2047576b00`). Worktree `~/.cache/esphome-wt/pr6`.
+  the PR 5 cut `34db860a5a` (earlier `0b4bb79c88` on `b62775e08d`, first cut `a9b0c705e0` on `2047576b00`). Worktree `~/.cache/esphome-wt/pr6`.
 - **Content:** `pdo.cpp`, `pdo_storage.cpp`, `enable_pdo()`, `OD_TPDO` / `OD_RPDO`, `PdoMapping`, the PDO / storage
   hooks in `canopen.cpp`, the PDO API and members in `canopen.h`, "PDOs" in `require_node_id()`'s docstring and the
   `OdObject` comment; `defines.h` `USE_CANOPEN_PDO`, `CO_CONFIG_PDO`, `CO_CONFIG_STORAGE`. Tests: `pdo_test`,
