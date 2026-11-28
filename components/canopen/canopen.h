@@ -6,7 +6,6 @@
 #include <utility>
 #include <vector>
 
-#include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
 #include "esphome/core/helpers.h"
@@ -47,9 +46,10 @@ inline NMTState to_nmt_state(CO_NMT_internalState_t state) { return static_cast<
 // raw frames). CANopenNode's node part (NMT, heartbeat, EMCY, SDO server) isn't initialised, so it isn't linked either.
 //
 // The implementation is split by feature: canopen.cpp (setup, processing, NMT), driver_can.cpp (CANopenNode's CAN
-// driver, frame reception and transmission), device_info.cpp (identity, device information, SDO server),
-// node_monitor.cpp (heartbeat consumer), frames.cpp (raw frames, heartbeat / EMCY callbacks), sdo_client.cpp,
-// nmt_master.cpp, pdo.cpp and pdo_storage.cpp (0x1010 / 0x1011).
+// driver, frame reception and transmission), device_info.cpp (identity, device information, SDO server), od.cpp
+// (the object dictionary), od_handler.cpp (OD access through handlers), node_monitor.cpp (heartbeat consumer),
+// frames.cpp (raw frames, heartbeat / EMCY callbacks), sdo_client.cpp, nmt_master.cpp, pdo.cpp and pdo_storage.cpp
+// (0x1010 / 0x1011). canopen_node.h is the base class of components that drive another node. OTA: ota/.
 class CANopenComponent : public Component {
  public:
   // CiA 301 node ids are 1..127; 0 is reserved (NMT broadcast), so it can't clash with a real node. It's also
@@ -297,7 +297,7 @@ class CANopenComponent : public Component {
 #ifdef USE_CANOPEN_LOCAL_NODES
   CANopenComponent *next_local_{nullptr};
   FixedRingBuffer<LocalFrame, LOCAL_QUEUE_SIZE> local_queue_;
-  uint16_t local_dropped_{0};  // frames lost on a full local_queue_, logged by deliver_local_()
+  uint16_t local_dropped_{0};  // local and bus frames lost on a full local_queue_, logged by deliver_local_()
   // the current bus frame is already in local_queue_ (staged by the local node whose callback ran first); set and
   // cleared within one frame, since canbus calls all callbacks for a frame before it reads the next
   bool bus_frame_staged_{false};

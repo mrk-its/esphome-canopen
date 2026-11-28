@@ -76,8 +76,8 @@ class OdStream {
 
 // Base class of OD handlers (ObjectDictionary::set_object()). Handlers define od_read() / od_write() with these
 // signatures; they are called directly (no virtual functions), and the defaults access the entry's storage. Called for
-// SDO transfers (also local ones), write_od() and, with PDOs, for mapped entries. The SDO server checks the entry's
-// attributes before calling them.
+// SDO transfers (also local ones), write_od() / read_od() and, with PDOs, for mapped entries. The SDO server checks
+// the entry's attributes before calling them.
 struct OdObject {
   OdResult od_read(OdStream stream, void *buf, size_t count, size_t *done) {
     return stream.read_original(buf, count, done);
