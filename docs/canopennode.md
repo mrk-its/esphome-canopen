@@ -43,6 +43,8 @@ Where to continue (2026-11-28):
   by hand (dev's lines plus PRs 5-8's `CO_CONFIG_SDO_SRV*` / `CRC16` / `PDO` / `STORAGE`, `USE_CANOPEN_PDO`,
   `CANOPEN_SDO_BLOCK_SIZE`); 181 C++ + 54 Python tests pass. `git diff upstream/dev canopen-full` is exactly PRs 5-8.
   PR 5 rebased onto dev and opened: esphome/esphome#23440 ("PR 5 as cut").
+  PR 6 (own PDOs + store / restore) cut on `canopen-pr6-pdo-storage`, stacked on PR 5, pushed, not opened yet
+  ("PR 6 as cut").
 - **Mapper:** open points at the end of "Hub for the entity mapper"; sizes vs the old component in "Size comparison".
 - **Repo layout** (2026-11-01, `canopen_entities`): `components/` holds only `canopen_entities` (moved from
   `components_next`); the old component (`components/canopen`, canopen-stack) and `components_next/canopen` (a stale
@@ -1305,6 +1307,27 @@ steps (PR N: delete the files and lines of PRs > N, `--annotate` shows them).
 - **Next:** the reviews of #23440 (fixes on `canopen-full` first, then cherry-picked onto the cut, as for PR 4) and of
   developers.esphome.io#382 (API changes in later PRs go to that page too). esphome.io docs: none for now (no YAML
   options; at most `write_od()` / `read_od()` under "Lambdas", not decided).
+
+#### PR 6 as cut (2026-11-28, not opened yet)
+- **Branch:** `canopen-pr6-pdo-storage` (mrk-its/esphome, `0b4bb79c88`, one commit "[canopen] Add own PDOs
+  (configure_tpdo() / configure_rpdo(), request_tpdo()) and store / restore of their parameters (0x1010 / 0x1011)") on
+  the PR 5 cut `b62775e08d` (first cut `a9b0c705e0` on `2047576b00`). Worktree `~/.cache/esphome-wt/pr6`.
+- **Content:** `pdo.cpp`, `pdo_storage.cpp`, `enable_pdo()`, `OD_TPDO` / `OD_RPDO`, `PdoMapping`, the PDO / storage
+  hooks in `canopen.cpp`, the PDO API and members in `canopen.h`, "PDOs" in `require_node_id()`'s docstring and the
+  `OdObject` comment; `defines.h` `USE_CANOPEN_PDO`, `CO_CONFIG_PDO`, `CO_CONFIG_STORAGE`. Tests: `pdo_test`,
+  `storage_test`, the RPDO burst test in `processing_test`, `enable_pdo()` in the fake profile, the PDO asserts in
+  `test_register_node`. Left out: `sdo_block_size` / `enable_sdo_block()` (PR 7), OTA (PR 8).
+- **Size:** +398 / -17 code, +258 tests (vs PR 5).
+- **Checks:** 163 C++ + 48 Python tests; builds esp8266-ard / esp32-idf / rp2040-ard; clang-tidy esp32-idf-tidy on the
+  component clean. vs `canopen-full` only PR 7-8 parts differ; three fixes found while cutting (class comment file
+  list, `read_od()` in the `OdObject` comment, unused `automation.h` include) went to `canopen-full` `e49eef4a1c`.
+
+#### Follow-ups of PR 4 (2026-11-28)
+- esphbot's summary on the docs PR esphome/esphome.io#8285 (approved; 3 readability points, 6 "silent failure" items):
+  docs commit `4e1c43c3a` on `canopen-pr4-monitor-nmt` (pushed), answered on the PR (#issuecomment-7238592396). Item 3
+  was a code bug: the lost frames warning counted bus frames too but called them "frames from other local nodes"; fixed
+  on `canopen-full` `8df6dda8e8` and in PR 5's cut (`b62775e08d`, pushed to #23440; PR 6 rebased onto it, `0b4bb79c88`).
+  The separate branch `canopen-fix-lost-frames-log` (`3dabac0a3f`) is deleted.
 
 ### Possible reorder: node monitoring without the node core (not planned, 2026-11-07)
 An option for later, not the current plan: replace CANopenNode's heartbeat consumer with our own monitor on PR 2's
